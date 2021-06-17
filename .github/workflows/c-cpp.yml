@@ -10,7 +10,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout repository
+    - name: checkout
       uses: actions/checkout@v2
     - name: deps
       run: sudo apt install build-essential gcc-9 g++-9 cmake 
