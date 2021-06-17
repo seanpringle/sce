@@ -89,6 +89,11 @@ int main(int argc, char const *argv[]) {
 		return col >= view->x && col < view->x+view->w && row >= view->y && row < view->y+view->h;
 	};
 
+	auto clear = [&]() {
+		tui.print("\e[38;5;255m\e[48;5;235m");
+		tui.clear();
+	};
+
 	auto check = [&]() {
 		if (!lefts.size()) {
 			lefts.push_back(new View());
@@ -102,15 +107,18 @@ int main(int argc, char const *argv[]) {
 
 		if (resized) {
 			resized = false;
-			int panel = (tui.cols()-2)/2;
+			int cols = tui.cols();
+			int rows = tui.rows();
+
+			int width = (cols-2)/2;
 
 			for (auto view: lefts)
-				view->move(1,0,panel,tui.rows()+1);
+				view->move(1,0,width,rows);
 
 			for (auto view: rights)
-				view->move(panel+2,0,panel,tui.rows()+1);
+				view->move(width+2,0,width,rows);
 
-			tui.clear();
+			clear();
 			draw = true;
 		}
 	};
@@ -201,6 +209,10 @@ int main(int argc, char const *argv[]) {
 
 		std::this_thread::sleep_for(16ms);
 	}
+
+	for (auto view: lefts) delete view;
+	for (auto view: rights) delete view;
+
 	tui.stop();
 	return 0;
 }

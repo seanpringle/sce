@@ -764,7 +764,6 @@ void View::open(std::string path) {
 	}
 
 	if (soft || hard) {
-		note() << "tabs" << hard << soft;
 		tabs.hard = hard > soft;
 	}
 
@@ -820,10 +819,12 @@ void View::draw() {
 	tui.print("\e[48;5;22m");
 
 	auto left = fmt("[%s] %s %s %d", path, tui.escseq, tui.keysym, tui.keycode);
-	auto right = fmt("%dkB [%s]", text.size()/1024U, modified ? "modified": "saved");
+	auto right = fmt("%d %d %dkB [%s]", tui.cols(), w, text.size()/1024U, modified ? "modified": "saved");
 
 	tui.print(left);
-	tui.print(blank.substr(left.size()+right.size()));
+	if ((int)(left.size()+right.size()) < w) {
+		tui.print(blank.substr(left.size()+right.size()));
+	}
 	tui.print(right);
 
 	tui.format(theme.highlight[token][state]);
@@ -859,6 +860,7 @@ void View::draw() {
 	while (cursor <= (int)text.size() && row < h) {
 
 		if (col == 0) {
+			tui.to(x+col,y+row);
 			tui.print(fmt(lineFmt.c_str(), lineNo++));
 			col += lineCol+1;
 			tui.format(theme.highlight[token][state]);
@@ -903,7 +905,6 @@ void View::draw() {
 			}
 			row++;
 			col = 0;
-			tui.to(x+col,y+row);
 			continue;
 		}
 
@@ -928,10 +929,10 @@ void View::draw() {
 	tui.format(theme.highlight[Syntax::Token::None][Theme::State::Plain]);
 
 	while (row < h) {
+		tui.to(x+col,y+row);
 		eraseEol();
 		row++;
 		col = 0;
-		tui.to(x+col,y+row);
 	}
 }
 

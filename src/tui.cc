@@ -24,7 +24,6 @@ void TUI::start() {
 
 	print(CURSOR_OFF);
 	print("\e[?1049h");
-	print("\e[38;5;255m\e[48;5;0m"); // clear
 	print("\e[?1003h\e[?1015h\e[?1006h"); // mouse
 	clear();
 }
@@ -33,6 +32,7 @@ void TUI::stop() {
 	print("\e[?1049l");
 	print("\e[?1000l"); // mouse
 	print(CURSOR_ON);
+	flush();
 	tcsetattr(fileno(stdin), TCSANOW, &old_tio);
 	std::cerr.rdbuf(oldErr);
 	std::cerr << err.str();
@@ -65,13 +65,13 @@ void TUI::to (int x, int y) {
 int TUI::cols() {
 	struct winsize ws;
 	ioctl(fileno(stdin), TIOCGWINSZ, &ws);
-	return ws.ws_col-1;
+	return ws.ws_col;
 }
 
 int TUI::rows() {
 	struct winsize ws;
 	ioctl(fileno(stdin), TIOCGWINSZ, &ws);
-	return ws.ws_row-1;
+	return ws.ws_row;
 }
 
 int TUI::key() {

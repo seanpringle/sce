@@ -15,5 +15,5 @@ file(GLOB SRC_H CONFIGURE_DEPENDS "src/*.h")
 file(GLOB SRC_MAIN CONFIGURE_DEPENDS "src/*.cc")
 
 set(CMAKE_CXX_STANDARD 17)
-add_executable(ed1 ${SRC_H} ${SRC_MAIN})
-target_link_libraries(ed1 m pthread dl stdc++fs)
+add_executable(sce ${SRC_H} ${SRC_MAIN})
+target_link_libraries(sce m pthread dl stdc++fs)
