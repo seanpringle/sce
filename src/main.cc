@@ -41,10 +41,14 @@ int main(int argc, char const *argv[]) {
 	resized = true;
 
 	SelectList opener;
+	std::vector<std::string> openPaths;
 	std::vector<std::string> openItems;
 
 	std::vector<View*> lefts;
 	std::vector<View*> rights;
+
+	auto refreshTabs = [&]() {
+	};
 
 	auto open = [&](std::string path) {
 		if (path.size() > 1 && path.substr(0,2) == "./") {
@@ -57,6 +61,7 @@ int main(int argc, char const *argv[]) {
 				lefts.erase(it);
 				lefts.insert(lefts.begin(), buf);
 				view = 0;
+				refreshTabs();
 				return;
 			}
 		}
@@ -66,19 +71,22 @@ int main(int argc, char const *argv[]) {
 				rights.erase(it);
 				rights.insert(rights.begin(), buf);
 				view = 1;
+				refreshTabs();
 				return;
 			}
 		}
 
 		if (std::filesystem::path(path).extension() == ".h") {
-			rights.insert(rights.begin(), new View());
-			rights.front()->open(path);
-			view = 1;
+			lefts.insert(lefts.begin(), new View());
+			lefts.front()->open(path);
+			refreshTabs();
+			view = 0;
 			return;
 		}
-		lefts.insert(lefts.begin(), new View());
-		lefts.front()->open(path);
-		view = 0;
+		rights.insert(rights.begin(), new View());
+		rights.front()->open(path);
+		refreshTabs();
+		view = 1;
 	};
 
 	for (auto path: config.paths) {
@@ -95,30 +103,22 @@ int main(int argc, char const *argv[]) {
 	};
 
 	auto check = [&]() {
-		if (!lefts.size()) {
-			lefts.push_back(new View());
-			resized = true;
-		}
-
-		if (!rights.size()) {
-			rights.push_back(new View());
-			resized = true;
-		}
-
 		if (resized) {
 			resized = false;
+			int side = 0;
 			int cols = tui.cols();
 			int rows = tui.rows();
 
-			int width = (cols-2)/2;
+			int width = (cols-side-2)/3;
 
 			for (auto view: lefts)
 				view->move(1,0,width,rows);
 
 			for (auto view: rights)
-				view->move(width+2,0,width,rows);
+				view->move(width+2,0,width*2,rows);
 
 			clear();
+			refreshTabs();
 			draw = true;
 		}
 	};
@@ -143,30 +143,43 @@ int main(int argc, char const *argv[]) {
 			}
 
 			if (tui.keys.ctrl && tui.keysym == "W") {
-				if (view == 0 && !lefts.front()->modified) {
+				if (view == 0 && lefts.size() && !lefts.front()->modified) {
 					delete lefts.front();
 					lefts.erase(lefts.begin());
 				}
-				if (view == 1 && !rights.front()->modified) {
+				if (view == 1 && rights.size() && !rights.front()->modified) {
 					delete rights.front();
 					rights.erase(rights.begin());
 				}
+				resized = true;
 				check();
 			}
 
-			if (tui.mouse.left && within(lefts.front(), tui.mouse.col, tui.mouse.row)) {
+			if (tui.mouse.left && lefts.size() && within(lefts.front(), tui.mouse.col, tui.mouse.row)) {
 				view = 0;
 			}
 
-			if (tui.mouse.left && within(rights.front(), tui.mouse.col, tui.mouse.row)) {
+			if (tui.mouse.left && rights.size() && within(rights.front(), tui.mouse.col, tui.mouse.row)) {
 				view = 1;
 			}
 
 			if (tui.keys.ctrl && tui.keysym == "P") {
+				openPaths.clear();
 				openItems.clear();
 				for (const std::experimental::filesystem::directory_entry& entry: std::experimental::filesystem::recursive_directory_iterator(".")) {
-					const auto& path = entry.path();
-					openItems.push_back(path.string());
+					auto path = entry.path().string();
+					if (path.size() > 1 && path.substr(0,2) == "./") {
+						path = path.substr(2);
+					}
+					openPaths.push_back(path);
+					bool isModified = false;
+					for (auto view: lefts) {
+						if (view->path == path) isModified = view->modified;
+					}
+					for (auto view: rights) {
+						if (view->path == path) isModified = view->modified;
+					}
+					openItems.push_back(fmt("%s%s", path, isModified ? "*": ""));
 				}
 				opener.start(&openItems);
 			}
@@ -175,31 +188,33 @@ int main(int argc, char const *argv[]) {
 				if (opener.active) {
 					opener.input();
 					if (!opener.active && opener.chosen >= 0) {
-						open(openItems[opener.filtered[opener.chosen]]);
+						open(openPaths[opener.filtered[opener.chosen]]);
+					}
+					if (!opener.active) {
 						resized = true;
 						check();
 					}
 					return;
 				}
 
-				if (view == 0) {
+				if (view == 0 && lefts.size()) {
 					lefts.front()->input();
 					return;
 				}
 
-				if (view == 1) {
+				if (view == 1 && rights.size()) {
 					rights.front()->input();
 					return;
 				}
 			}();
 
+			refreshTabs();
 			draw = true;
 		}
 
 		if (draw) {
-			lefts.front()->draw();
-			rights.front()->draw();
-
+			if (lefts.size()) lefts.front()->draw();
+			if (rights.size()) rights.front()->draw();
 			if (opener.active) {
 				opener.draw(tui.cols()/4,tui.rows()/4,tui.cols()/2,tui.rows()/2);
 			}

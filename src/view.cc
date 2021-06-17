@@ -818,8 +818,8 @@ void View::draw() {
 	tui.print("\e[38;5;255m");
 	tui.print("\e[48;5;22m");
 
-	auto left = fmt("[%s] %s %s %d", path, tui.escseq, tui.keysym, tui.keycode);
-	auto right = fmt("%d %d %dkB [%s]", tui.cols(), w, text.size()/1024U, modified ? "modified": "saved");
+	auto left = fmt(" %s", path);
+	auto right = fmt("%dkB %s ", text.size()/1024U, modified ? "modified": "saved");
 
 	tui.print(left);
 	if ((int)(left.size()+right.size()) < w) {
@@ -999,8 +999,17 @@ void SelectList::draw(int x, int y, int w, int h) {
 	int row = 0;
 	tui.to(x+col, y+row);
 
-	tui.print(search);
-	col += search.size();
+	auto format = [&]() {
+		tui.print("\e[38;5;255m\e[48;5;235m");
+	};
+
+	format();
+
+	tui.emit('>');
+	col++;
+	int swidth = std::min((int)search.size(), w-2);
+	tui.print(search, swidth);
+	col += swidth;
 	tui.print(blank.substr(col));
 	row++;
 	col = 0;
@@ -1009,16 +1018,22 @@ void SelectList::draw(int x, int y, int w, int h) {
 	for (int i = 0; i < (int)filtered.size() && row < h; i++) {
 		auto& item = (*all)[filtered[i]];
 
+		tui.emit(' ');
+		col++;
+
 		if (selected == i) {
 			tui.format(theme.highlight[Syntax::Token::None][Theme::State::Selected]);
 		}
-
-		tui.print(item);
-		col += item.size();
-
-		if (selected == i) {
-			tui.format(theme.highlight[Syntax::Token::None][Theme::State::Plain]);
+		else
+		if (std::find(item.begin(), item.end(), '*') != item.end()) {
+			tui.print("\e[38;5;226m");
 		}
+
+		int iwidth = std::min((int)item.size(), w-col-1);
+		tui.print(item, iwidth);
+		col += iwidth;
+
+		format();
 
 		tui.print(blank.substr(col));
 		row++;
@@ -1026,7 +1041,7 @@ void SelectList::draw(int x, int y, int w, int h) {
 		tui.to(x+col,y+row);
 	}
 
-	tui.format(theme.highlight[Syntax::Token::None][Theme::State::Plain]);
+	format();
 
 	while (row < h) {
 		tui.print(blank.substr(col));
