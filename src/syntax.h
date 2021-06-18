@@ -100,6 +100,8 @@ struct Syntax {
 		"#define",
 		"#pragma",
 		"#if",
+		"#ifdef",
+		"#ifndef",
 		"#else",
 		"#endif",
 	};

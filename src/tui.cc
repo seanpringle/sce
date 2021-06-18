@@ -155,6 +155,7 @@ void TUI::accept() {
 						if (type == 65) mouse.wheel = 1;
 						if (type == 64) mouse.wheel = -1;
 					}
+					return;
 				}
 
 				// xterm
@@ -245,6 +246,9 @@ void TUI::accept() {
 				if (escseq == "5;6~") { keys.ctrl = true; keys.shift = true; keys.pgup = true; return; }
 				if (escseq == "6;6~") { keys.ctrl = true; keys.shift = true; keys.pgdown = true; return; }
 
+				// unrecognised sequence
+				keys.esc = true;
+				keycode = '\e';
 				return;
 			}
 		}();
@@ -256,6 +260,7 @@ void TUI::accept() {
 	}
 
 	keys.mods = keys.mods || keys.ctrl || keys.alt || keys.shift;
+	if (escseq[0] == '<') return; // mouse
 
 	if (keycode == 0x7f) keys.back = true;
 	if (keys.ctrl && keycode == 'I') keys.tab = true;
