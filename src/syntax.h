@@ -10,6 +10,7 @@ struct Syntax {
 	enum class Token {
 		None = 0,
 		Comment,
+		CommentBlock,
 		Function,
 		Call,
 		Integer,

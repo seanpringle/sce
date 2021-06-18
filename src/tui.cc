@@ -1,6 +1,9 @@
 #include "common.h"
 #include "tui.h"
+#include "config.h"
 #include <sstream>
+
+extern Config config;
 
 TUI::TUI() {
 }
@@ -24,13 +27,15 @@ void TUI::start() {
 
 	print(CURSOR_OFF);
 	print("\e[?1049h");
-	print("\e[?1003h\e[?1015h\e[?1006h"); // mouse
+	if (config.mouse.enabled)
+		print("\e[?1003h\e[?1015h\e[?1006h");
 	clear();
 }
 
 void TUI::stop() {
 	print("\e[?1049l");
-	print("\e[?1000l"); // mouse
+	if (config.mouse.enabled)
+		print("\e[?1000l");
 	print(CURSOR_ON);
 	flush();
 	tcsetattr(fileno(stdin), TCSANOW, &old_tio);
@@ -125,6 +130,7 @@ void TUI::accept() {
 	mouse.wheel = 0;
 	mouse.left = false;
 	mouse.right = false;
+	mouse.is = false;
 
 	keycode = key();
 	keysym.clear();
@@ -137,7 +143,9 @@ void TUI::accept() {
 				return;
 			}
 
-			keycode = key();
+			while (keycode == '\e') {
+				keycode = key();
+			}
 
 			if (isalpha(keycode)) {
 				keys.alt = true;
@@ -155,6 +163,7 @@ void TUI::accept() {
 						if (type == 65) mouse.wheel = 1;
 						if (type == 64) mouse.wheel = -1;
 					}
+					mouse.is = true;
 					return;
 				}
 
@@ -260,7 +269,7 @@ void TUI::accept() {
 	}
 
 	keys.mods = keys.mods || keys.ctrl || keys.alt || keys.shift;
-	if (escseq[0] == '<') return; // mouse
+	if (mouse.is) return;
 
 	if (keycode == 0x7f) keys.back = true;
 	if (keys.ctrl && keycode == 'I') keys.tab = true;

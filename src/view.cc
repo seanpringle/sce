@@ -684,7 +684,7 @@ void View::input() {
 		return;
 	}
 
-	if (tui.keys.esc && selections.size() > 1) { single(); return; }
+	if (tui.keys.esc && selections.size() > 1) { single(); sanity(); return; }
 
 	if (tui.keys.alt && tui.keys.shift && tui.keysym == "Down") { addCursorDown(); return; }
 	if (tui.keys.alt && tui.keys.shift && tui.keysym == "Up") { addCursorUp(); return; }

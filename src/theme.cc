@@ -9,10 +9,15 @@ Theme::Theme() {
 
 	highlight[Syntax::Token::Comment][State::Plain].fg = "\e[38;5;240m";
 
+	highlight[Syntax::Token::CommentBlock][State::Plain] = highlight[Syntax::Token::None][State::Plain];
+	highlight[Syntax::Token::CommentBlock][State::Selected] = highlight[Syntax::Token::None][State::Selected];
+
+	highlight[Syntax::Token::CommentBlock][State::Plain].fg = "\e[38;5;240m";
+
 	highlight[Syntax::Token::Integer][State::Plain] = highlight[Syntax::Token::None][State::Plain];
 	highlight[Syntax::Token::Integer][State::Selected] = highlight[Syntax::Token::None][State::Selected];
 
-	highlight[Syntax::Token::Integer][State::Plain].fg = "\e[38;5;51m";
+	highlight[Syntax::Token::Integer][State::Plain].fg = "\e[38;5;166m";
 
 	highlight[Syntax::Token::StringStart][State::Plain] = highlight[Syntax::Token::None][State::Plain];
 	highlight[Syntax::Token::StringStart][State::Selected] = highlight[Syntax::Token::None][State::Selected];
@@ -33,7 +38,7 @@ Theme::Theme() {
 	highlight[Syntax::Token::Type][State::Plain] = highlight[Syntax::Token::None][State::Plain];
 	highlight[Syntax::Token::Type][State::Selected] = highlight[Syntax::Token::None][State::Selected];
 
-	highlight[Syntax::Token::Type][State::Plain].fg = "\e[38;5;183m";
+	highlight[Syntax::Token::Type][State::Plain].fg = "\e[38;5;111m";
 
 	highlight[Syntax::Token::Keyword][State::Plain] = highlight[Syntax::Token::None][State::Plain];
 	highlight[Syntax::Token::Keyword][State::Selected] = highlight[Syntax::Token::None][State::Selected];
@@ -48,20 +53,20 @@ Theme::Theme() {
 	highlight[Syntax::Token::Namespace][State::Plain] = highlight[Syntax::Token::None][State::Plain];
 	highlight[Syntax::Token::Namespace][State::Selected] = highlight[Syntax::Token::None][State::Selected];
 
-	highlight[Syntax::Token::Namespace][State::Plain].fg = "\e[38;5;81m";
+	highlight[Syntax::Token::Namespace][State::Plain].fg = "\e[38;5;175m";
 
 	highlight[Syntax::Token::Directive][State::Plain] = highlight[Syntax::Token::None][State::Plain];
 	highlight[Syntax::Token::Directive][State::Selected] = highlight[Syntax::Token::None][State::Selected];
 
-	highlight[Syntax::Token::Directive][State::Plain].fg = "\e[38;5;208m";
+	highlight[Syntax::Token::Directive][State::Plain].fg = "\e[38;5;161m";
 
 	highlight[Syntax::Token::Call][State::Plain] = highlight[Syntax::Token::None][State::Plain];
 	highlight[Syntax::Token::Call][State::Selected] = highlight[Syntax::Token::None][State::Selected];
 
-	highlight[Syntax::Token::Call][State::Plain].fg = "\e[38;5;81m";
+	highlight[Syntax::Token::Call][State::Plain].fg = "\e[38;5;39m";
 
 	highlight[Syntax::Token::Function][State::Plain] = highlight[Syntax::Token::None][State::Plain];
 	highlight[Syntax::Token::Function][State::Selected] = highlight[Syntax::Token::None][State::Selected];
 
-	highlight[Syntax::Token::Function][State::Plain].fg = "\e[38;5;154m";
+	highlight[Syntax::Token::Function][State::Plain].fg = "\e[38;5;112m";
 }

@@ -22,4 +22,10 @@ void Config::args(int argc, const char** argv) {
 
 		paths.push_back(argv[i]);
 	}
+
+	auto term = std::string(std::getenv("TERM"));
+	if (term.find("screen") != std::string::npos) {
+		note() << "GNU Screen detected, disabling mouse";
+		mouse.enabled = false;
+	}
 }

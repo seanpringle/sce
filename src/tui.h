@@ -62,6 +62,8 @@ struct TUI {
 	} keys;
 
 	struct {
+		bool is = false;
+		bool enabled = false;
 		int col = 0;
 		int row = 0;
 		int wheel = 0;

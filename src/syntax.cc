@@ -133,6 +133,10 @@ Syntax::Token Syntax::next(const std::deque<char>& text, int cursor, Syntax::Tok
 				return Token::Comment;
 			}
 
+			if (rget() == '/' && rget(1) == '*') {
+				return Token::CommentBlock;
+			}
+
 			if (isdigit(rget()) && isboundary(rget(-1))) {
 				int len = 0;
 				while (isdigit(rget(len))) cursor++;
@@ -149,14 +153,6 @@ Syntax::Token Syntax::next(const std::deque<char>& text, int cursor, Syntax::Tok
 
 			if (matchFunction(text, cursor) || matchBlockType(text, cursor)) {
 				return Token::Function;
-			}
-
-			if (isnamestart(rget())) {
-				int len = 0;
-				while (rget(len) && isname(rget(len))) len++;
-				if (rget(len) == '(') return Token::Call;
-				if (rget(len) == ':') return Token::Namespace;
-				if (rget(len) == '<') return Token::Call;
 			}
 
 			if (isboundary(rget(-1))) {
@@ -176,6 +172,14 @@ Syntax::Token Syntax::next(const std::deque<char>& text, int cursor, Syntax::Tok
 					if (word(text, cursor, name)) return Token::Constant;
 				}
 			}
+
+			if (isnamestart(rget())) {
+				int len = 0;
+				while (rget(len) && isname(rget(len))) len++;
+				if (rget(len) == '(') return Token::Call;
+				if (rget(len) == ':' && rget(len+1) == ':') return Token::Namespace;
+				if (rget(len) == '<') return Token::Call;
+			}
 			break;
 		}
 
@@ -184,8 +188,13 @@ Syntax::Token Syntax::next(const std::deque<char>& text, int cursor, Syntax::Tok
 			break;
 		}
 
+		case Token::CommentBlock: {
+			if (rget(-2) == '*' && rget(-1) == '/') return next(text, cursor, Token::None);
+			break;
+		}
+
 		case Token::Integer: {
-			if (!isdigit(rget())) return next(text, cursor, Token::None);
+			if (!isalnum(rget())) return next(text, cursor, Token::None);
 			break;
 		}
 
