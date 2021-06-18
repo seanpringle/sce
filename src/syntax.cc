@@ -1,13 +1,38 @@
 #include "syntax.h"
 
-Syntax::Syntax() {
-	reFunction = std::regex("^([a-zA-Z]+[a-zA-Z0-9_:]*)\\s*\\([^\\)]*?\\)\\s*[{:]");
-	reInclude = std::regex("^\\s+<.*?>");
-	reBlockType = std::regex("^([a-zA-Z]+[a-zA-Z0-9_:]*)\\s*[{:]");
+std::vector<View::Region> Syntax::tags(const std::deque<char>& text) {
+	std::vector<View::Region> hits;
+
+	int cursor = 0;
+
+	auto c = [&](int offset = 0) {
+		return get(text, cursor+offset);
+	};
+
+	// namespace::symbol or symbol
+	auto symbolStart = [&]() {
+		if (c(-2) == ':' && c(-1) == ':') {
+			cursor -= 2;
+			while (isname(c(-1))) cursor--;
+		}
+	};
+
+	auto extract = [&]() {
+		symbolStart();
+		int offset = cursor;
+		while (isname(c()) || c() == ':') cursor++;
+		hits.push_back({offset, cursor-offset});
+	};
+
+	while (cursor < (int)text.size()) {
+		if (matchFunction(text, cursor) || matchBlockType(text, cursor)) extract(); else cursor++;
+	}
+
+	return hits;
 }
 
 bool Syntax::isname(int c) {
-	return isnamestart(c);
+	return isalnum(c) || c == '_';
 }
 
 bool Syntax::isnamestart(int c) {
@@ -22,15 +47,6 @@ int Syntax::get(const std::deque<char>& text, int cursor) {
 	return cursor >= 0 && cursor < (int)text.size() ? text[cursor]: 0;
 }
 
-std::string Syntax::getline(const std::deque<char>& text, int cursor) {
-	std::string line;
-	for (int len = 0;
-		get(text, cursor+len) && get(text, cursor+len) != '\n';
-		line.push_back(get(text, cursor+len)), len++
-	);
-	return line;
-}
-
 bool Syntax::word(const std::deque<char>& text, int cursor, const std::string& name) {
 	int l = name.size();
 	for (int i = 0; i < l; i++) {
@@ -39,18 +55,74 @@ bool Syntax::word(const std::deque<char>& text, int cursor, const std::string& n
 	return !isname(get(text, cursor+l));
 }
 
-Syntax::Token Syntax::next(const std::deque<char>& text, int cursor, Syntax::Token token) {
-
-	auto isboundary = [&](int c) {
-		return c != '_' && (iscntrl(c) || ispunct(c) || isspace(c));
+bool Syntax::matchBlockType(const std::deque<char>& text, int cursor) {
+	auto c = [&]() {
+		return get(text, cursor);
 	};
+
+	auto white = [&]() {
+		while (c() && isspace(c())) cursor++;
+	};
+
+	if (!isnamestart(c())) return false;
+
+	cursor--;
+	cursor--;
+
+	// namespace::type {
+	// keyword type {
+
+	if (!(isalnum(c()) || c() == ':')) return false;
+	cursor++;
+
+	if (!(isspace(c()) || c() == ':')) return false;
+	cursor++;
+
+	while (c() && isname(c())) cursor++;
+	white();
+	if (c() != '{') return false;
+	return true;
+}
+
+bool Syntax::matchFunction(const std::deque<char>& text, int cursor) {
+	auto c = [&]() {
+		return get(text, cursor);
+	};
+
+	auto white = [&]() {
+		while (c() && isspace(c())) cursor++;
+	};
+
+	if (!isnamestart(c())) return false;
+
+	cursor--;
+	cursor--;
+
+	// namespace::function(args) {
+	// type function(args) {
+
+	if (!(isalnum(c()) || c() == ':')) return false;
+	cursor++;
+
+	if (!(isspace(c()) || c() == ':')) return false;
+	cursor++;
+
+	while (c() && isname(c())) cursor++;
+	white();
+	if (c() != '(') return false;
+	cursor++;
+	while (c() && c() != ')') cursor++;
+	if (c() != ')') return false;
+	cursor++;
+	white();
+	if (c() != '{') return false;
+	return true;
+}
+
+Syntax::Token Syntax::next(const std::deque<char>& text, int cursor, Syntax::Token token) {
 
 	auto rget = [&](int offset = 0) {
 		return get(text, cursor+offset);
-	};
-
-	auto rgetline = [&](int offset = 0) {
-		return getline(text, cursor+offset);
 	};
 
 	if (!rget()) return token;
@@ -75,30 +147,8 @@ Syntax::Token Syntax::next(const std::deque<char>& text, int cursor, Syntax::Tok
 				return Token::CharStringStart;
 			}
 
-			if (isalpha(rget())) {
-				std::string line = rgetline();
-
-				{
-					std::smatch m;
-					bool matchedA = std::regex_match(line, m, reFunction);
-					bool type = matchedA && types.count(m[1].str());
-					bool constant = matchedA && constants.count(m[1].str());
-					bool keyword = matchedA && keywords.count(m[1].str());
-					if (matchedA && !type && !keyword && !constant) {
-						return Token::Function;
-					}
-				}
-
-				{
-					std::smatch m;
-					bool matchedA = std::regex_match(line, m, reBlockType);
-					bool type = matchedA && types.count(m[1].str());
-					bool constant = matchedA && constants.count(m[1].str());
-					bool keyword = matchedA && keywords.count(m[1].str());
-					if (matchedA && !type && !keyword && !constant) {
-						return Token::Function;
-					}
-				}
+			if (matchFunction(text, cursor) || matchBlockType(text, cursor)) {
+				return Token::Function;
 			}
 
 			if (isnamestart(rget())) {
@@ -151,7 +201,6 @@ Syntax::Token Syntax::next(const std::deque<char>& text, int cursor, Syntax::Tok
 
 		case Token::Directive: {
 			if (!isalpha(get(text, cursor))) {
-				//if (std::regex_match(getline(), reInclude)) return Token::StringStart;
 				return next(text, cursor, Token::None);
 			}
 			break;
@@ -199,35 +248,4 @@ Syntax::Token Syntax::next(const std::deque<char>& text, int cursor, Syntax::Tok
 	}
 
 	return token;
-}
-
-std::vector<View::Region> Syntax::tags(const std::deque<char>& text) {
-	std::vector<View::Region> hits;
-
-	for (int i = 0; i < (int)text.size(); i++) {
-		auto line = getline(text, i);
-		{
-			std::smatch m;
-			bool matched = std::regex_match(line, m, reFunction);
-			if (matched && std::find(keywords.begin(), keywords.end(), m[1].str()) == keywords.end()) {
-				hits.push_back({i, (int)m[1].str().size()});
-			}
-			if (matched) {
-				i += (int)m[0].str().size()-1;
-				continue;
-			}
-		}
-		{
-			std::smatch m;
-			bool matched = std::regex_match(line, m, reBlockType);
-			if (matched && std::find(keywords.begin(), keywords.end(), m[1].str()) == keywords.end()) {
-				hits.push_back({i, (int)m[1].str().size()});
-			}
-			if (matched) {
-				i += (int)m[0].str().size()-1;
-				continue;
-			}
-		}
-	}
-	return hits;
 }

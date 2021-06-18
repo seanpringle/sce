@@ -123,8 +123,6 @@ int main(int argc, char const *argv[]) {
 		}
 	};
 
-	view = 0;
-
 	while (running) {
 		draw = false;
 

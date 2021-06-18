@@ -104,19 +104,16 @@ struct Syntax {
 		"#endif",
 	};
 
-	std::regex reFunction;
-	std::regex reInclude;
-	std::regex reBlockType;
+	Syntax() = default;
 
+	std::vector<View::Region> tags(const std::deque<char>& text);
 	Token next(const std::deque<char>& text, int cursor, Token token);
 
 	bool isname(int c);
 	bool isnamestart(int c);
 	bool isboundary(int c);
 	int get(const std::deque<char>& text, int offset);
-	std::string getline(const std::deque<char>& text, int offset);
 	bool word(const std::deque<char>& text, int offset, const std::string& name);
-
-	Syntax();
-	std::vector<View::Region> tags(const std::deque<char>& text);
+	bool matchFunction(const std::deque<char>& text, int cursor);
+	bool matchBlockType(const std::deque<char>& text, int cursor);
 };

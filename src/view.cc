@@ -818,7 +818,7 @@ void View::draw() {
 	tui.print("\e[38;5;255m");
 	tui.print("\e[48;5;22m");
 
-	auto left = fmt(" %s", path);
+	auto left = fmt(" %s %s", path, tui.escseq);
 	auto right = fmt("%dkB %s ", text.size()/1024U, modified ? "modified": "saved");
 
 	tui.print(left);
