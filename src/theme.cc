@@ -1,7 +1,7 @@
 #include "theme.h"
 
 Theme::Theme() {
-	highlight[Syntax::Token::None][State::Plain] = { .fg = "\e[38;5;255m", .bg = "\e[48;5;234m" };
+	highlight[Syntax::Token::None][State::Plain] = { .fg = "\e[38;5;252m", .bg = "\e[48;5;234m" };
 	highlight[Syntax::Token::None][State::Selected] = { .fg = "\e[38;5;0m", .bg = "\e[48;5;250m" };
 
 	highlight[Syntax::Token::Comment][State::Plain] = highlight[Syntax::Token::None][State::Plain];
@@ -17,12 +17,12 @@ Theme::Theme() {
 	highlight[Syntax::Token::Integer][State::Plain] = highlight[Syntax::Token::None][State::Plain];
 	highlight[Syntax::Token::Integer][State::Selected] = highlight[Syntax::Token::None][State::Selected];
 
-	highlight[Syntax::Token::Integer][State::Plain].fg = "\e[38;5;166m";
+	highlight[Syntax::Token::Integer][State::Plain].fg = "\e[38;5;140m";
 
 	highlight[Syntax::Token::StringStart][State::Plain] = highlight[Syntax::Token::None][State::Plain];
 	highlight[Syntax::Token::StringStart][State::Selected] = highlight[Syntax::Token::None][State::Selected];
 
-	highlight[Syntax::Token::StringStart][State::Plain].fg = "\e[38;5;228m";
+	highlight[Syntax::Token::StringStart][State::Plain].fg = "\e[38;5;185m";
 
 	highlight[Syntax::Token::StringFinish][State::Plain] = highlight[Syntax::Token::StringStart][State::Plain];
 	highlight[Syntax::Token::StringFinish][State::Selected] = highlight[Syntax::Token::StringStart][State::Selected];
@@ -30,7 +30,7 @@ Theme::Theme() {
 	highlight[Syntax::Token::CharStringStart][State::Plain] = highlight[Syntax::Token::None][State::Plain];
 	highlight[Syntax::Token::CharStringStart][State::Selected] = highlight[Syntax::Token::None][State::Selected];
 
-	highlight[Syntax::Token::CharStringStart][State::Plain].fg = "\e[38;5;228m";
+	highlight[Syntax::Token::CharStringStart][State::Plain].fg = "\e[38;5;185m";
 
 	highlight[Syntax::Token::CharStringFinish][State::Plain] = highlight[Syntax::Token::CharStringStart][State::Plain];
 	highlight[Syntax::Token::CharStringFinish][State::Selected] = highlight[Syntax::Token::CharStringStart][State::Selected];
@@ -53,7 +53,7 @@ Theme::Theme() {
 	highlight[Syntax::Token::Namespace][State::Plain] = highlight[Syntax::Token::None][State::Plain];
 	highlight[Syntax::Token::Namespace][State::Selected] = highlight[Syntax::Token::None][State::Selected];
 
-	highlight[Syntax::Token::Namespace][State::Plain].fg = "\e[38;5;175m";
+	highlight[Syntax::Token::Namespace][State::Plain].fg = "\e[38;5;109m";
 
 	highlight[Syntax::Token::Directive][State::Plain] = highlight[Syntax::Token::None][State::Plain];
 	highlight[Syntax::Token::Directive][State::Selected] = highlight[Syntax::Token::None][State::Selected];
@@ -63,10 +63,15 @@ Theme::Theme() {
 	highlight[Syntax::Token::Call][State::Plain] = highlight[Syntax::Token::None][State::Plain];
 	highlight[Syntax::Token::Call][State::Selected] = highlight[Syntax::Token::None][State::Selected];
 
-	highlight[Syntax::Token::Call][State::Plain].fg = "\e[38;5;39m";
+	highlight[Syntax::Token::Call][State::Plain].fg = "\e[38;5;110m";
 
 	highlight[Syntax::Token::Function][State::Plain] = highlight[Syntax::Token::None][State::Plain];
 	highlight[Syntax::Token::Function][State::Selected] = highlight[Syntax::Token::None][State::Selected];
 
-	highlight[Syntax::Token::Function][State::Plain].fg = "\e[38;5;112m";
+	highlight[Syntax::Token::Function][State::Plain].fg = "\e[38;5;70m";
+
+	highlight[Syntax::Token::Operator][State::Plain] = highlight[Syntax::Token::None][State::Plain];
+	highlight[Syntax::Token::Operator][State::Selected] = highlight[Syntax::Token::None][State::Selected];
+
+	highlight[Syntax::Token::Operator][State::Plain].fg = "\e[38;5;181m";
 }

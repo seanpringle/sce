@@ -31,6 +31,58 @@ std::vector<View::Region> Syntax::tags(const std::deque<char>& text) {
 	return hits;
 }
 
+std::vector<std::string> Syntax::matches(const std::deque<char>& text, int cursor) {
+	std::set<std::string> hits;
+	std::vector<std::string> results;
+
+	auto c = [&](int offset = 0) {
+		return get(text, cursor+offset);
+	};
+
+	int home = cursor;
+
+	while (isname(c(-1))) --cursor;
+
+	int pstart = cursor;
+
+	while (isname(c())) ++cursor;
+
+	int plength = cursor-pstart;
+
+	if (pstart < home) {
+		cursor = 0;
+		while (cursor < (int)text.size()) {
+			int mstart = cursor;
+			for (int i = 0; i < plength; i++, cursor++) {
+				if (c() != get(text, pstart+i)) break;
+			}
+			int mlength = cursor-mstart;
+			if (mlength == plength) {
+				while (isname(c())) cursor++;
+				std::string match;
+				for (int i = mstart; i < cursor; i++) {
+					match += get(text, i);
+				}
+				hits.insert(match);
+				continue;
+			}
+			cursor++;
+		}
+
+		std::string prefix;
+		for (int i = pstart; i < home; i++) {
+			prefix += get(text, i);
+		}
+
+		results.push_back(prefix);
+
+		for (auto& hit: hits) {
+			results.push_back(hit);
+		}
+	}
+	return results;
+}
+
 bool Syntax::isname(int c) {
 	return isalnum(c) || c == '_';
 }
@@ -41,6 +93,10 @@ bool Syntax::isnamestart(int c) {
 
 bool Syntax::isboundary(int c) {
 	return c != '_' && (iscntrl(c) || ispunct(c) || isspace(c));
+}
+
+bool Syntax::isoperator(int c) {
+	return strchr("+-*/%=<>&|^!?:", c);
 }
 
 int Syntax::get(const std::deque<char>& text, int cursor) {
@@ -56,66 +112,102 @@ bool Syntax::word(const std::deque<char>& text, int cursor, const std::string& n
 }
 
 bool Syntax::matchBlockType(const std::deque<char>& text, int cursor) {
-	auto c = [&]() {
-		return get(text, cursor);
-	};
-
-	auto white = [&]() {
-		while (c() && isspace(c())) cursor++;
+	auto c = [&](int offset = 0) {
+		return get(text, cursor+offset);
 	};
 
 	if (!isnamestart(c())) return false;
+	int start = cursor;
 
-	cursor--;
-	cursor--;
+	// blocktype namespace::...::name {
+	if (c(-1) == ':') {
+		while (c(-1) && (isname(c(-1)) || c(-1) == ':')) --cursor;
+	}
 
-	// namespace::type {
-	// keyword type {
+	// blocktype name {
+	while (c(-1) && isspace(c(-1))) --cursor;
+	while (c(-1) && isalnum(c(-1))) --cursor;
 
-	if (!(isalnum(c()) || c() == ':')) return false;
-	cursor++;
+	if (!isalpha(c())) return false;
+	bool blocktype = false;
+	for (auto& name: blocktypes) {
+		if (word(text, cursor, name)) {
+			blocktype = true;
+			break;
+		}
+	}
+	if (!blocktype) return false;
 
-	if (!(isspace(c()) || c() == ':')) return false;
-	cursor++;
+	cursor = start;
 
 	while (c() && isname(c())) cursor++;
-	white();
-	if (c() != '{') return false;
+	while (c() && isspace(c())) cursor++;
+	if (!(c() == '{' || c() == ':' || c() == ';')) return false;
+
 	return true;
 }
 
 bool Syntax::matchFunction(const std::deque<char>& text, int cursor) {
-	auto c = [&]() {
-		return get(text, cursor);
-	};
-
-	auto white = [&]() {
-		while (c() && isspace(c())) cursor++;
+	auto c = [&](int offset = 0) {
+		return get(text, cursor+offset);
 	};
 
 	if (!isnamestart(c())) return false;
+	int start = cursor;
+	while (isname(c())) cursor++;
+	int length = cursor-start;
 
-	cursor--;
-	cursor--;
+	bool constructor = false;
+	bool function = false;
 
-	// namespace::function(args) {
-	// type function(args) {
+	cursor = start;
+	// name::name constructor
+	if (c(-1) == ':' && c(-2) == ':') {
+		cursor = start-2;
+		while (c(-1) && isname(c(-1))) --cursor;
+		int cstart = cursor;
+		int clength = start-cursor-2;
+		constructor = clength == length;
+		for (int i = 0; constructor && i < clength; i++) {
+			constructor = get(text, cstart+i) == get(text, start+i);
+		}
+	}
 
-	if (!(isalnum(c()) || c() == ':')) return false;
-	cursor++;
+	cursor = start;
+	// type namespace::...::name
+	if (c(-1) == ':' && c(-2) == ':') {
+		cursor = start;
+		while (c(-1) && (isname(c(-1)) || c(-1) == ':')) --cursor;
+		// type name {
+		while (c(-1) && isspace(c(-1))) --cursor;
+		if (c(-1) == '&' || c(-1) == '*') --cursor;
+		while (c(-1) && isname(c(-1))) --cursor;
+		function = start != cursor && isname(c());
+	}
 
-	if (!(isspace(c()) || c() == ':')) return false;
-	cursor++;
+	cursor = start;
+	// type name
+	if (!function && isspace(c(-1))) {
+		while (c(-1) && isspace(c(-1))) --cursor;
+		if (c(-1) == '&' || c(-1) == '*') --cursor;
+		while (c(-1) && isname(c(-1))) --cursor;
+		function = start != cursor && isname(c());
+	}
 
-	while (c() && isname(c())) cursor++;
-	white();
+	if (!constructor && !function) return false;
+
+	cursor = start+length;
+	while (c() && isspace(c())) cursor++;
+
+	// arg list
 	if (c() != '(') return false;
 	cursor++;
 	while (c() && c() != ')') cursor++;
 	if (c() != ')') return false;
 	cursor++;
-	white();
-	if (c() != '{') return false;
+	while (c() && isspace(c())) cursor++;
+
+	if (!(c() == '{' || c() == ':')) return false;
 	return true;
 }
 
@@ -138,9 +230,7 @@ Syntax::Token Syntax::next(const std::deque<char>& text, int cursor, Syntax::Tok
 			}
 
 			if (isdigit(rget()) && isboundary(rget(-1))) {
-				int len = 0;
-				while (isdigit(rget(len))) cursor++;
-				if (rget(len) != '.') return Token::Integer;
+				return Token::Integer;
 			}
 
 			if (rget() == '"') {
@@ -177,8 +267,12 @@ Syntax::Token Syntax::next(const std::deque<char>& text, int cursor, Syntax::Tok
 				int len = 0;
 				while (rget(len) && isname(rget(len))) len++;
 				if (rget(len) == '(') return Token::Call;
+				if (rget(len) == '<') return Token::Type;
 				if (rget(len) == ':' && rget(len+1) == ':') return Token::Namespace;
-				if (rget(len) == '<') return Token::Call;
+			}
+
+			if (isoperator(rget())) {
+				return Token::Operator;
 			}
 			break;
 		}
@@ -194,7 +288,7 @@ Syntax::Token Syntax::next(const std::deque<char>& text, int cursor, Syntax::Tok
 		}
 
 		case Token::Integer: {
-			if (!isalnum(rget())) return next(text, cursor, Token::None);
+			if (!(isalnum(rget()) || rget() == '.')) return next(text, cursor, Token::None);
 			break;
 		}
 
@@ -252,6 +346,11 @@ Syntax::Token Syntax::next(const std::deque<char>& text, int cursor, Syntax::Tok
 
 		case Token::Function: {
 			if (!isname(rget())) return next(text, cursor, Token::None);
+			break;
+		}
+
+		case Token::Operator: {
+			if (!isoperator(rget())) return next(text, cursor, Token::None);
 			break;
 		}
 	}

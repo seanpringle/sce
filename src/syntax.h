@@ -23,6 +23,7 @@ struct Syntax {
 		Directive,
 		Constant,
 		Namespace,
+		Operator,
 	};
 
 	const std::set<std::string> types = {
@@ -38,6 +39,8 @@ struct Syntax {
 		"int32_t",
 		"int64_t",
 		"int",
+		"float",
+		"double",
 		"size_t",
 		"off_t",
 		"string",
@@ -94,6 +97,15 @@ struct Syntax {
 		"friend",
 		"constexpr",
 		"namespace",
+		"operator",
+		"override",
+		"virtual",
+	};
+
+	const std::set<std::string> blocktypes = {
+		"enum",
+		"class",
+		"struct",
 	};
 
 	const std::set<std::string> directives = {
@@ -110,11 +122,13 @@ struct Syntax {
 	Syntax() = default;
 
 	std::vector<View::Region> tags(const std::deque<char>& text);
+	std::vector<std::string> matches(const std::deque<char>& text, int cursor);
 	Token next(const std::deque<char>& text, int cursor, Token token);
 
 	bool isname(int c);
 	bool isnamestart(int c);
 	bool isboundary(int c);
+	bool isoperator(int c);
 	int get(const std::deque<char>& text, int offset);
 	bool word(const std::deque<char>& text, int offset, const std::string& name);
 	bool matchFunction(const std::deque<char>& text, int cursor);

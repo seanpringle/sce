@@ -270,7 +270,11 @@ void View::insert(char c, bool autoindent) {
 	sanity();
 }
 
-void View::insertTab() {
+void View::tab() {
+	if (selections.size() == 1 && !sol(selections.back().offset)) {
+		autocomplete();
+		if (autoComp.active) return;
+	}
 	if (tabs.hard) {
 		insert('\t');
 		return;
@@ -668,6 +672,47 @@ void View::addCursorUp() {
 	sanity();
 }
 
+void View::interpret() {
+	auto prefix = [&](const std::string& s) {
+		return prompt.content.find(s) == 0;
+	};
+
+	if (prefix("find ") && prompt.content.size() > 5U) {
+		int from = selections.back().offset;
+		auto needle = prompt.content.substr(5);
+
+		auto match = [&](const std::string& needle, int offset) {
+			for (int i = 0; i < (int)needle.size(); i++) {
+				if (get(offset+i) != needle[i]) return false;
+			}
+			return true;
+		};
+
+		selections.clear();
+
+		for (int i = from; !selections.size() && i < (int)text.size(); i++) {
+			if (match(needle, i)) selections.push_back({i,(int)needle.size()});
+		}
+
+		for (int i = 0; !selections.size() && i < from; i++) {
+			if (match(needle, i)) selections.push_back({i,(int)needle.size()});
+		}
+
+		sanity();
+		return;
+	}
+}
+
+void View::autocomplete() {
+	if (selections.size() > 1U) return;
+	int cursor = selections.back().offset;
+	autoStrings = syntax.matches(text, cursor);
+	if (!autoStrings.size()) return;
+	autoPrefix = autoStrings.front();
+	autoStrings.erase(autoStrings.begin());
+	autoComp.start(&autoStrings);
+}
+
 void View::input() {
 	if (findTag.active) {
 		findTag.input();
@@ -680,6 +725,26 @@ void View::input() {
 			}
 			top = std::max(0, lineno-10);
 			sanity();
+		}
+		return;
+	}
+
+	if (autoComp.active) {
+		autoComp.input();
+		if (!autoComp.active && autoComp.chosen >= 0) {
+			std::string autoMatch = autoStrings[autoComp.filtered[autoComp.chosen]];
+			for (int i = 0; i < (int)autoMatch.size(); i++) {
+				if (i < (int)autoPrefix.size()) continue;
+				insert(autoMatch[i]);
+			}
+		}
+		return;
+	}
+
+	if (prompt.active) {
+		prompt.input();
+		if (!prompt.active) {
+			interpret();
 		}
 		return;
 	}
@@ -698,7 +763,7 @@ void View::input() {
 	if (tui.keys.shift && tui.keysym == "Down") { selectDown(); return; }
 	if (tui.keys.shift && tui.keysym == "Up") { selectUp(); return; }
 
-	if (tui.keys.ctrl && tui.keysym == "I") { insertTab(); return; }
+	if (tui.keys.ctrl && tui.keysym == "I") { tab(); return; }
 	if (tui.keys.ctrl && tui.keysym == "M") { insert('\n', true); return; }
 	if (tui.keys.ctrl && tui.keysym == "Z") { undo(); return; }
 	if (tui.keys.ctrl && tui.keysym == "Y") { redo(); return; }
@@ -708,6 +773,7 @@ void View::input() {
 	if (tui.keys.ctrl && tui.keysym == "D") { selectNext(); return; }
 	if (tui.keys.ctrl && tui.keysym == "K") { selectSkip(); return; }
 	if (tui.keys.ctrl && tui.keysym == "R") { findTags(); return; }
+	if (tui.keys.ctrl && tui.keysym == "F") { prompt.start("find "); return; }
 	if (tui.keys.ctrl && tui.keysym == "S") { save(); return; }
 
 	if (!tui.keys.mods && tui.keysym == "Up") { up(); return; }
@@ -834,6 +900,11 @@ void View::draw() {
 		return;
 	}
 
+	if (autoComp.active) {
+		autoComp.draw(x, y+1, w, h-1);
+		return;
+	}
+
 	row++;
 	col = 0;
 
@@ -933,6 +1004,10 @@ void View::draw() {
 		eraseEol();
 		row++;
 		col = 0;
+	}
+
+	if (prompt.active) {
+		prompt.draw(x, y+h-1, w, 1);
 	}
 }
 
@@ -1049,4 +1124,41 @@ void SelectList::draw(int x, int y, int w, int h) {
 		col = 0;
 		tui.to(x+col,y+row);
 	}
+}
+
+void InputBox::start(std::string prefix) {
+	active = true;
+	content = prefix;
+}
+
+void InputBox::input() {
+	if (tui.keys.esc) {
+		active = false;
+		return;
+	}
+
+	if (tui.keys.ctrl && tui.keysym == "M") {
+		active = false;
+		return;
+	}
+
+	if (!tui.keys.ctrl && tui.keys.back && content.size()) {
+		content = content.substr(0, content.size()-1);
+		return;
+	}
+
+	if (!tui.keys.ctrl && tui.keysym.size() == 1) {
+		content += tui.keysym;
+		return;
+	}
+}
+
+void InputBox::draw(int x, int y, int w, int h) {
+	tui.to(x,y);
+	tui.print("\e[38;5;255m\e[48;5;235m>");
+	int col = 1;
+	int cwidth = std::min((int)content.size(), w-2);
+	tui.print(content, cwidth);
+	col += cwidth;
+	while (col < w) { tui.emit(' '); col++; }
 }

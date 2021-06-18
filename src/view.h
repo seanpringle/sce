@@ -18,6 +18,14 @@ struct SelectList {
 	void filter();
 };
 
+struct InputBox {
+	bool active = false;
+	std::string content;
+	void start(std::string prefix);
+	void input();
+	void draw(int xx, int yy, int ww, int hh);
+};
+
 struct View {
 	int x = 0;
 	int y = 0;
@@ -44,6 +52,12 @@ struct View {
 	SelectList findTag;
 	std::vector<View::Region> tagRegions;
 	std::vector<std::string> tagStrings;
+
+	SelectList autoComp;
+	std::string autoPrefix;
+	std::vector<std::string> autoStrings;
+
+	InputBox prompt;
 
 	Region skip;
 
@@ -74,7 +88,7 @@ struct View {
 	void undo();
 	void redo();
 	void insert(char c, bool autoindent = false);
-	void insertTab();
+	void tab();
 	bool erase();
 	char upper(char c);
 	char lower(char c);
@@ -117,4 +131,6 @@ struct View {
 	void move(int xx, int yy, int ww, int hh);
 	void input();
 	void single();
+	void autocomplete();
+	void interpret();
 };
