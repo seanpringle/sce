@@ -84,11 +84,11 @@ struct View {
 	View();
 	void open(std::string path);
 	void save();
+	void reload();
 	void nav();
 	void undo();
 	void redo();
 	void insert(char c, bool autoindent = false);
-	void tab();
 	bool erase();
 	char upper(char c);
 	char lower(char c);
@@ -106,12 +106,13 @@ struct View {
 	void cut();
 	void copy();
 	void paste();
+	bool dup();
 	void findTags();
 	void filterTags();
 	void drawTags();
 	void selectRight();
 	void selectLeft();
-	void selectNext();
+	bool selectNext();
 	void selectDown();
 	void selectUp();
 	void selectSkip();
@@ -121,6 +122,7 @@ struct View {
 	void boundaryLeft();
 	void addCursorDown();
 	void addCursorUp();
+	void unwind();
 	void sanity();
 	int toSol(int offset);
 	int toEol(int offset);
@@ -131,6 +133,7 @@ struct View {
 	void move(int xx, int yy, int ww, int hh);
 	void input();
 	void single();
-	void autocomplete();
+	bool indent();
+	bool autocomplete();
 	void interpret();
 };

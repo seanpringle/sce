@@ -133,6 +133,8 @@ int main(int argc, char const *argv[]) {
 
 			if (tui.keys.f12) {
 				running = false;
+				for (auto view: lefts) running = running || view->modified;
+				for (auto view: rights) running = running || view->modified;
 				continue;
 			}
 

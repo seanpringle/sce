@@ -260,9 +260,11 @@ void View::insert(char c, bool autoindent) {
 			inserted += indent.size();
 		}
 
-		for (int j = i; j < (int)selections.size(); j++) {
-			auto& selection = selections[j];
-			selection.offset += inserted;
+		for (int j = 0; j < (int)selections.size(); j++) {
+			auto& jselection = selections[j];
+			if (jselection.offset >= selection.offset) {
+				jselection.offset += inserted;
+			}
 		}
 	}
 	batches++;
@@ -270,18 +272,14 @@ void View::insert(char c, bool autoindent) {
 	sanity();
 }
 
-void View::tab() {
-	if (selections.size() == 1 && !sol(selections.back().offset)) {
-		autocomplete();
-		if (autoComp.active) return;
-	}
+bool View::indent() {
 	if (tabs.hard) {
 		insert('\t');
-		return;
 	}
-	for (int i = 0; i < tabs.width; i++) {
+	for (int i = 0; !tabs.hard && i < tabs.width; i++) {
 		insert(' ');
 	}
+	return true;
 }
 
 void View::back() {
@@ -314,9 +312,11 @@ void View::back() {
 			}
 
 			text.erase(it-1, it);
-			for (int j = i; j < (int)selections.size(); j++) {
-				auto& selection = selections[j];
-				selection.offset -= 1;
+			for (int j = 0; j < (int)selections.size(); j++) {
+				auto& jselection = selections[j];
+				if (jselection.offset >= selection.offset) {
+					jselection.offset -= 1;
+				}
 			}
 		}
 		batches++;
@@ -353,9 +353,11 @@ void View::del() {
 			}
 
 			text.erase(it, it+1);
-			for (int j = i+1; j < (int)selections.size(); j++) {
-				auto& selection = selections[j];
-				selection.offset -= 1;
+			for (int j = 0; j < (int)selections.size(); j++) {
+				auto& jselection = selections[j];
+				if (jselection.offset > selection.offset) {
+					jselection.offset -= 1;
+				}
 			}
 		}
 		batches++;
@@ -407,11 +409,26 @@ void View::paste() {
 	if (selections.size() > 1) return;
 	auto& selection = selections.front();
 	if (selection.length > 0) del();
+	int offset = selection.offset;
 	if (tui.clip.line) {
+		nav();
 		int left = toSol(selection.offset);
 		selection.offset -= left;
 	}
-	for (auto c: tui.clip.text) insert(c, false);
+	for (auto c: tui.clip.text) {
+		insert(c, false);
+	}
+	if (tui.clip.line) {
+		selection.offset = offset;
+		sanity();
+		down();
+	}
+}
+
+bool View::dup() {
+	copy();
+	paste();
+	return true;
 }
 
 void View::findTags() {
@@ -534,11 +551,14 @@ void View::selectUp() {
 	sanity();
 }
 
-void View::selectNext() {
-	nav();
+bool View::selectNext() {
 	bool match = false;
 	auto& selection = selections.back();
+	if (!selection.length) return false;
+
+	nav();
 	selection.length = std::max(selection.length, 1);
+
 	for (int i = selection.offset+1; i < (int)text.size()-selection.length && !match; i++) {
 		auto a = text.begin()+selection.offset;
 		auto b = text.begin()+i;
@@ -578,6 +598,7 @@ void View::selectNext() {
 		}
 	}
 	sanity();
+	return true;
 }
 
 void View::selectSkip() {
@@ -672,9 +693,29 @@ void View::addCursorUp() {
 	sanity();
 }
 
+void View::unwind() {
+	if (selections.size() < 2) return;
+	selections.pop_back();
+	sanity();
+}
+
 void View::interpret() {
 	auto prefix = [&](const std::string& s) {
 		return prompt.content.find(s) == 0;
+	};
+
+	auto find = [&](int from, const std::string& needle, std::function<bool(const std::string& needle, int offset)> match) {
+		selections.clear();
+
+		for (int i = from; !selections.size() && i < (int)text.size(); i++) {
+			if (match(needle, i)) selections.push_back({i,(int)needle.size()});
+		}
+
+		for (int i = 0; !selections.size() && i < from; i++) {
+			if (match(needle, i)) selections.push_back({i,(int)needle.size()});
+		}
+
+		sanity();
 	};
 
 	if (prefix("find ") && prompt.content.size() > 5U) {
@@ -688,29 +729,47 @@ void View::interpret() {
 			return true;
 		};
 
-		selections.clear();
+		find(from, needle, match);
+		return;
+	}
 
-		for (int i = from; !selections.size() && i < (int)text.size(); i++) {
-			if (match(needle, i)) selections.push_back({i,(int)needle.size()});
+	if (prefix("ifind ") && prompt.content.size() > 6U) {
+		int from = selections.back().offset;
+		auto needle = prompt.content.substr(6);
+
+		auto match = [&](const std::string& needle, int offset) {
+			for (int i = 0; i < (int)needle.size(); i++) {
+				if (std::toupper(get(offset+i)) != std::toupper(needle[i])) return false;
+			}
+			return true;
+		};
+
+		find(from, needle, match);
+		return;
+	}
+
+	if (prefix("go ")) {
+		int lineno = 0;
+		if (lines.size() && 1 == std::sscanf(prompt.content.c_str(), "go %d", &lineno)) {
+			lineno = std::max(1, std::min((int)lines.size(), lineno));
+			selections.clear();
+			selections.push_back({lines[lineno-1].offset, 0});
 		}
-
-		for (int i = 0; !selections.size() && i < from; i++) {
-			if (match(needle, i)) selections.push_back({i,(int)needle.size()});
-		}
-
 		sanity();
 		return;
 	}
 }
 
-void View::autocomplete() {
-	if (selections.size() > 1U) return;
+bool View::autocomplete() {
+	if (selections.size() > 1U) return false;
 	int cursor = selections.back().offset;
 	autoStrings = syntax.matches(text, cursor);
-	if (!autoStrings.size()) return;
+	if (!autoStrings.size()) return false;
 	autoPrefix = autoStrings.front();
 	autoStrings.erase(autoStrings.begin());
 	autoComp.start(&autoStrings);
+	autoComp.search = autoPrefix;
+	return true;
 }
 
 void View::input() {
@@ -763,18 +822,22 @@ void View::input() {
 	if (tui.keys.shift && tui.keysym == "Down") { selectDown(); return; }
 	if (tui.keys.shift && tui.keysym == "Up") { selectUp(); return; }
 
-	if (tui.keys.ctrl && tui.keysym == "I") { tab(); return; }
+	if (tui.keys.ctrl && tui.keysym == "I") { autocomplete() || indent(); return; }
 	if (tui.keys.ctrl && tui.keysym == "M") { insert('\n', true); return; }
 	if (tui.keys.ctrl && tui.keysym == "Z") { undo(); return; }
 	if (tui.keys.ctrl && tui.keysym == "Y") { redo(); return; }
 	if (tui.keys.ctrl && tui.keysym == "X") { cut(); return; }
 	if (tui.keys.ctrl && tui.keysym == "C") { copy(); return; }
 	if (tui.keys.ctrl && tui.keysym == "V") { paste(); return; }
-	if (tui.keys.ctrl && tui.keysym == "D") { selectNext(); return; }
+	if (tui.keys.ctrl && tui.keysym == "D") { selectNext() || dup(); return; }
 	if (tui.keys.ctrl && tui.keysym == "K") { selectSkip(); return; }
+	if (tui.keys.ctrl && tui.keysym == "B") { unwind(); return; }
 	if (tui.keys.ctrl && tui.keysym == "R") { findTags(); return; }
+	if (tui.keys.ctrl && tui.keysym == "E") { prompt.start(""); return; }
 	if (tui.keys.ctrl && tui.keysym == "F") { prompt.start("find "); return; }
+	if (tui.keys.ctrl && tui.keysym == "G") { prompt.start("go "); return; }
 	if (tui.keys.ctrl && tui.keysym == "S") { save(); return; }
+	if (tui.keys.ctrl && tui.keysym == "L") { reload(); return; }
 
 	if (!tui.keys.mods && tui.keysym == "Up") { up(); return; }
 	if (!tui.keys.mods && tui.keysym == "Down") { down(); return; }
@@ -801,6 +864,7 @@ void View::open(std::string path) {
 	lines.clear();
 	selections.clear();
 	batches = 0;
+	modified = false;
 	undos.clear();
 	redos.clear();
 
@@ -850,6 +914,10 @@ void View::save() {
 	}
 	out.close();
 	modified = false;
+}
+
+void View::reload() {
+	if (path.size()) open(path);
 }
 
 void View::draw() {
@@ -1007,7 +1075,7 @@ void View::draw() {
 	}
 
 	if (prompt.active) {
-		prompt.draw(x, y+h-1, w, 1);
+		prompt.draw(x, y+1, w, 1);
 	}
 }
 
@@ -1059,7 +1127,18 @@ void SelectList::filter() {
 	filtered.clear();
 	for (int i = 0; i < (int)all->size(); i++) {
 		auto& item = (*all)[i];
-		if (!search.size() || item.find(search) != std::string::npos) {
+		if (!search.size()) {
+			filtered.push_back(i);
+			continue;
+		}
+		auto it = std::search(
+			item.begin(), item.end(),
+			search.begin(), search.end(),
+			[](char a, char b) {
+				return std::toupper(a) == std::toupper(b);
+			}
+		);
+		if (it != item.end()) {
 			filtered.push_back(i);
 		}
 	}
@@ -1160,5 +1239,9 @@ void InputBox::draw(int x, int y, int w, int h) {
 	int cwidth = std::min((int)content.size(), w-2);
 	tui.print(content, cwidth);
 	col += cwidth;
+	tui.format(theme.highlight[Syntax::Token::None][Theme::State::Selected]);
+	tui.emit(' ');
+	col++;
+	tui.print("\e[38;5;255m\e[48;5;235m");
 	while (col < w) { tui.emit(' '); col++; }
 }
