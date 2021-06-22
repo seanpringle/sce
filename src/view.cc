@@ -111,6 +111,7 @@ void View::undo() {
 		Change change = undos.back();
 		undos.pop_back();
 
+		ensure(change.length == (int)change.text.size());
 		selections = change.selections;
 
 		if (change.type == Insertion) {
@@ -151,6 +152,7 @@ void View::redo() {
 		Change change = redos.back();
 		redos.pop_back();
 
+		ensure(change.length == (int)change.text.size());
 		selections = change.selections;
 
 		if (change.type == Insertion) {

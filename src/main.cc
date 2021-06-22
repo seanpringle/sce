@@ -171,7 +171,16 @@ int main(int argc, char const *argv[]) {
 					if (path.size() > 1 && path.substr(0,2) == "./") {
 						path = path.substr(2);
 					}
+
+					if (path.find(".git") != std::string::npos) continue;
+					if (path.find("build") == 0) continue;
+
 					openPaths.push_back(path);
+				}
+
+				std::sort(openPaths.begin(), openPaths.end());
+
+				for (auto& path: openPaths) {
 					bool isModified = false;
 					for (auto view: lefts) {
 						if (view->path == path) isModified = view->modified;
@@ -181,6 +190,7 @@ int main(int argc, char const *argv[]) {
 					}
 					openItems.push_back(fmt("%s%s", path, isModified ? "*": ""));
 				}
+
 				opener.start(&openItems);
 			}
 
