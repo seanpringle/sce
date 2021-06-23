@@ -1,4 +1,5 @@
 #include "syntax.h"
+#include <string_view>
 
 std::vector<View::Region> Syntax::tags(const std::deque<char>& text) {
 	std::vector<View::Region> hits;
@@ -111,6 +112,68 @@ bool Syntax::word(const std::deque<char>& text, int cursor, const std::string& n
 	return !isname(get(text, cursor+l));
 }
 
+bool Syntax::keyword(const std::deque<char>& text, int cursor) {
+	char pad[32]; int len = 0;
+	for (int i = 0; i < 31 && isname(get(text, cursor+i)); i++) {
+		pad[len++] = get(text, cursor+i);
+	}
+	pad[len] = 0;
+	return keywords.find(std::string_view(pad)) != keywords.end();
+}
+
+// is cursor inside a line // comment
+bool Syntax::comment(const std::deque<char>& text, int cursor) {
+	auto c = [&](int offset = 0) {
+		return get(text, cursor+offset);
+	};
+	while (c()) {
+		if (c() == '/') return true;
+		if (c(-1) == '\n') return false;
+		cursor--;
+	}
+	return false;
+}
+
+// is cursor in a [namespace::]type[<namespace::type>[&*]]
+bool Syntax::type(const std::deque<char>& text, int cursor) {
+	auto prev = [&]() {
+		return get(text, cursor-1);
+	};
+
+	auto white = [&]() {
+		return isspace(prev());
+	};
+
+	auto name = [&]() {
+		return prev() == ':' || isname(prev());
+	};
+
+	auto skip = [&](auto fn) {
+		while (prev() && fn()) --cursor;
+	};
+
+	skip(white);
+	int start = cursor;
+
+	if (prev() == '&' || prev() == '*')
+		--cursor;
+
+	if (prev() == '>') {
+		--cursor;
+		while (prev() != '<' && (name() || white())) cursor--;
+		if (prev() != '>') return false;
+		--cursor;
+	}
+
+	skip(white);
+	skip(name);
+
+	if (keyword(text, cursor)) return false;
+
+	return start != cursor && isname(get(text, cursor));
+}
+
+// is cursor on a struct or class definition name
 bool Syntax::matchBlockType(const std::deque<char>& text, int cursor) {
 	auto c = [&](int offset = 0) {
 		return get(text, cursor+offset);
@@ -118,6 +181,8 @@ bool Syntax::matchBlockType(const std::deque<char>& text, int cursor) {
 
 	if (!isnamestart(c())) return false;
 	int start = cursor;
+
+	if (keyword(text, cursor)) return false;
 
 	// blocktype namespace::...::name {
 	if (c(-1) == ':') {
@@ -136,6 +201,8 @@ bool Syntax::matchBlockType(const std::deque<char>& text, int cursor) {
 			break;
 		}
 	}
+
+	if (comment(text, cursor)) return false;
 	if (!blocktype) return false;
 
 	cursor = start;
@@ -147,6 +214,7 @@ bool Syntax::matchBlockType(const std::deque<char>& text, int cursor) {
 	return true;
 }
 
+// is cursor on a function or method name
 bool Syntax::matchFunction(const std::deque<char>& text, int cursor) {
 	auto c = [&](int offset = 0) {
 		return get(text, cursor+offset);
@@ -156,6 +224,8 @@ bool Syntax::matchFunction(const std::deque<char>& text, int cursor) {
 	int start = cursor;
 	while (isname(c())) cursor++;
 	int length = cursor-start;
+
+	if (keyword(text, start)) return false;
 
 	bool constructor = false;
 	bool function = false;
@@ -181,17 +251,14 @@ bool Syntax::matchFunction(const std::deque<char>& text, int cursor) {
 		// type name {
 		while (c(-1) && isspace(c(-1))) --cursor;
 		if (c(-1) == '&' || c(-1) == '*') --cursor;
-		while (c(-1) && isname(c(-1))) --cursor;
-		function = start != cursor && isname(c());
+		function = start != cursor && type(text, cursor);
 	}
 
 	cursor = start;
 	// type name
-	if (!function && isspace(c(-1))) {
+	if (!function) {
 		while (c(-1) && isspace(c(-1))) --cursor;
-		if (c(-1) == '&' || c(-1) == '*') --cursor;
-		while (c(-1) && isname(c(-1))) --cursor;
-		function = start != cursor && isname(c());
+		function = type(text, cursor) && !comment(text, cursor-1);
 	}
 
 	if (!constructor && !function) return false;
@@ -207,7 +274,7 @@ bool Syntax::matchFunction(const std::deque<char>& text, int cursor) {
 	cursor++;
 	while (c() && isspace(c())) cursor++;
 
-	if (!(c() == '{' || c() == ':')) return false;
+	if (!(c() == '{' || c() == ':' || c() == ';')) return false;
 	return true;
 }
 
@@ -250,12 +317,12 @@ Syntax::Token Syntax::next(const std::deque<char>& text, int cursor, Syntax::Tok
 					if (word(text, cursor, name)) return Token::Type;
 				}
 
-				for (auto& name: keywords) {
-					if (word(text, cursor, name)) return Token::Keyword;
-				}
+				if (keyword(text, cursor)) return Token::Keyword;
 
-				for (auto& name: directives) {
-					if (word(text, cursor, name)) return Token::Directive;
+				if (get(text, cursor) == '#') {
+					for (auto& name: directives) {
+						if (word(text, cursor, name)) return Token::Directive;
+					}
 				}
 
 				for (auto& name: constants) {

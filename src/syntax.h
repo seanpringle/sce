@@ -26,7 +26,7 @@ struct Syntax {
 		Operator,
 	};
 
-	const std::set<std::string> types = {
+	const std::set<std::string, std::less<>> types = {
 		"void",
 		"auto",
 		"bool",
@@ -62,7 +62,7 @@ struct Syntax {
 		"__VA_ARGS_"
 	};
 
-	const std::set<std::string> keywords = {
+	const std::set<std::string, std::less<>> keywords = {
 		"typedef",
 		"enum",
 		"new",
@@ -131,6 +131,9 @@ struct Syntax {
 	bool isoperator(int c);
 	int get(const std::deque<char>& text, int offset);
 	bool word(const std::deque<char>& text, int offset, const std::string& name);
+	bool keyword(const std::deque<char>& text, int offset);
+	bool comment(const std::deque<char>& text, int offset);
+	bool type(const std::deque<char>& text, int offset);
 	bool matchFunction(const std::deque<char>& text, int cursor);
 	bool matchBlockType(const std::deque<char>& text, int cursor);
 };
