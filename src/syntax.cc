@@ -135,7 +135,7 @@ bool Syntax::comment(const std::deque<char>& text, int cursor) {
 }
 
 // is cursor in a [namespace::]type[<namespace::type>[&*]]
-bool Syntax::type(const std::deque<char>& text, int cursor) {
+bool Syntax::typelike(const std::deque<char>& text, int cursor) {
 	auto prev = [&]() {
 		return get(text, cursor-1);
 	};
@@ -148,6 +148,10 @@ bool Syntax::type(const std::deque<char>& text, int cursor) {
 		return prev() == ':' || isname(prev());
 	};
 
+	auto refptr = [&]() {
+		return prev() == '&' || prev() == '*';
+	};
+
 	auto skip = [&](auto fn) {
 		while (prev() && fn()) --cursor;
 	};
@@ -155,13 +159,13 @@ bool Syntax::type(const std::deque<char>& text, int cursor) {
 	skip(white);
 	int start = cursor;
 
-	if (prev() == '&' || prev() == '*')
-		--cursor;
+	if (refptr()) --cursor;
+	skip(white);
 
 	if (prev() == '>') {
 		--cursor;
-		while (prev() != '<' && (name() || white())) cursor--;
-		if (prev() != '>') return false;
+		while (name() || white() || refptr()) cursor--;
+		if (prev() != '<') return false;
 		--cursor;
 	}
 
@@ -246,19 +250,17 @@ bool Syntax::matchFunction(const std::deque<char>& text, int cursor) {
 	cursor = start;
 	// type namespace::...::name
 	if (c(-1) == ':' && c(-2) == ':') {
-		cursor = start;
 		while (c(-1) && (isname(c(-1)) || c(-1) == ':')) --cursor;
 		// type name {
 		while (c(-1) && isspace(c(-1))) --cursor;
-		if (c(-1) == '&' || c(-1) == '*') --cursor;
-		function = start != cursor && type(text, cursor);
+		function = start != cursor && typelike(text, cursor);
 	}
 
 	cursor = start;
 	// type name
 	if (!function) {
 		while (c(-1) && isspace(c(-1))) --cursor;
-		function = type(text, cursor) && !comment(text, cursor-1);
+		function = start != cursor && typelike(text, cursor) && !comment(text, cursor-1);
 	}
 
 	if (!constructor && !function) return false;

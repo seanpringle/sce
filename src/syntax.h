@@ -133,7 +133,7 @@ struct Syntax {
 	bool word(const std::deque<char>& text, int offset, const std::string& name);
 	bool keyword(const std::deque<char>& text, int offset);
 	bool comment(const std::deque<char>& text, int offset);
-	bool type(const std::deque<char>& text, int offset);
+	bool typelike(const std::deque<char>& text, int offset);
 	bool matchFunction(const std::deque<char>& text, int cursor);
 	bool matchBlockType(const std::deque<char>& text, int cursor);
 };
