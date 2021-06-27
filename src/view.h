@@ -1,9 +1,13 @@
 #pragma once
 
+struct View;
+struct ViewRegion;
+
 #include <deque>
 #include <vector>
 #include <list>
 #include <string>
+#include "syntax.h"
 
 struct SelectList {
 	bool active = false;
@@ -26,6 +30,11 @@ struct InputBox {
 	void draw(int xx, int yy, int ww, int hh);
 };
 
+struct ViewRegion {
+	int offset;
+	int length;
+};
+
 struct View {
 	int x = 0;
 	int y = 0;
@@ -35,22 +44,18 @@ struct View {
 	std::deque<char> text;
 	std::string path;
 	bool modified = false;
+	Syntax* syntax = nullptr;;
 
 	struct {
 		bool hard = true;
 		int width = 4;
 	} tabs;
 
-	struct Region {
-		int offset = 0;
-		int length = 0;
-	};
-
-	std::vector<Region> lines;
-	std::vector<Region> selections;
+	std::vector<ViewRegion> lines;
+	std::vector<ViewRegion> selections;
 
 	SelectList findTag;
-	std::vector<View::Region> tagRegions;
+	std::vector<ViewRegion> tagRegions;
 	std::vector<std::string> tagStrings;
 
 	SelectList autoComp;
@@ -59,7 +64,7 @@ struct View {
 
 	InputBox prompt;
 
-	Region skip;
+	ViewRegion skip;
 
 	enum ChangeType {
 		Insertion,
@@ -75,13 +80,14 @@ struct View {
 		int offset = 0;
 		int length = 0;
 		std::string text;
-		std::vector<Region> selections;
+		std::vector<ViewRegion> selections;
 	};
 
 	std::vector<Change> undos;
 	std::vector<Change> redos;
 
 	View();
+	~View();
 	void open(std::string path);
 	void save();
 	void reload();
@@ -116,8 +122,8 @@ struct View {
 	void selectDown();
 	void selectUp();
 	void selectSkip();
-	void intoView(Region& region);
-	void intoViewTop(Region& region);
+	void intoView(ViewRegion& region);
+	void intoViewTop(ViewRegion& region);
 	void boundaryRight();
 	void boundaryLeft();
 	void addCursorDown();

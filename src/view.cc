@@ -5,9 +5,9 @@
 #include "theme.h"
 #include "config.h"
 #include <fstream>
+#include <filesystem>
 
 extern TUI tui;
-extern Syntax syntax;
 extern Theme theme;
 extern Config config;
 
@@ -15,6 +15,10 @@ View::View() {
 	sanity();
 	tabs.hard = config.tabs.hard;
 	tabs.width = config.tabs.width;
+}
+
+View::~View() {
+	delete syntax;
 }
 
 void View::move(int xx, int yy, int ww, int hh) {
@@ -80,7 +84,7 @@ bool View::eol(int offset) {
 void View::index() {
 	lines.clear();
 	int offset = 0;
-	Region line = {0,0};
+	ViewRegion line = {0,0};
 	for (auto c: text) {
 		line.length++;
 		if (c == '\n') {
@@ -111,14 +115,14 @@ void View::undo() {
 		Change change = undos.back();
 		undos.pop_back();
 
-		ensure(change.length == (int)change.text.size());
+		ensuref(change.length == (int)change.text.size(), "[%s] != %d", change.text, change.length);
 		selections = change.selections;
 
 		if (change.type == Insertion) {
 			// find the spot and remove the region
 			auto it = text.begin()+change.offset;
 			std::string s = {it,it+change.length};
-			ensure(s == change.text);
+			ensuref(s == change.text, "[%s] != [%s]", s, change.text);
 			text.erase(it, it+change.length);
 		}
 
@@ -260,6 +264,8 @@ void View::insert(char c, bool autoindent) {
 
 			text.insert(it, indent.begin(), indent.end());
 			inserted += indent.size();
+			undos.back().text += indent;
+			undos.back().length += (int)indent.size();
 		}
 
 		for (int j = 0; j < (int)selections.size(); j++) {
@@ -434,7 +440,7 @@ bool View::dup() {
 }
 
 void View::findTags() {
-	tagRegions = syntax.tags(text);
+	tagRegions = syntax->tags(text);
 	tagStrings.clear();
 	for (auto& region: tagRegions) {
 		auto it = text.begin()+region.offset;
@@ -478,7 +484,8 @@ void View::down() {
 
 void View::right() {
 	for (auto& selection: selections) {
-		selection.offset++;
+		selection.offset += selection.length;
+		if (!selection.length) selection.offset++;
 		selection.length = 0;
 	}
 	sanity();
@@ -486,7 +493,7 @@ void View::right() {
 
 void View::left() {
 	for (auto& selection: selections) {
-		selection.offset--;
+		if (!selection.length) selection.offset--;
 		selection.length = 0;
 	}
 	sanity();
@@ -577,8 +584,7 @@ bool View::selectNext() {
 		}
 	}
 	if (!match) {
-		for (int i = 0; i < (int)text.size()-selection.length && !match; i++) {
-			if (i >= selection.offset) break;
+		for (int i = 0; i < (int)text.size()-selection.offset && !match; i++) {
 			bool duplicate = false;
 			for (auto& other: selections) {
 				duplicate = duplicate || other.offset == i;
@@ -607,7 +613,7 @@ void View::selectSkip() {
 	skip = selections.back();
 }
 
-void View::intoView(Region& selection) {
+void View::intoView(ViewRegion& selection) {
 	int lineno = 0;
 	for (auto& line: lines) {
 		if (line.offset <= selection.offset) lineno++;
@@ -624,7 +630,7 @@ void View::intoView(Region& selection) {
 	top = std::max(0, std::min((int)lines.size()-1, top));
 }
 
-void View::intoViewTop(Region& selection) {
+void View::intoViewTop(ViewRegion& selection) {
 	int lineno = 0;
 	for (auto& line: lines) {
 		if (line.offset <= selection.offset) lineno++;
@@ -765,7 +771,7 @@ void View::interpret() {
 bool View::autocomplete() {
 	if (selections.size() > 1U) return false;
 	int cursor = selections.back().offset;
-	autoStrings = syntax.matches(text, cursor);
+	autoStrings = syntax->matches(text, cursor);
 	if (!autoStrings.size()) return false;
 	autoPrefix = autoStrings.front();
 	autoStrings.erase(autoStrings.begin());
@@ -861,6 +867,16 @@ void View::input() {
 
 void View::open(std::string path) {
 	this->path = path;
+
+	delete syntax;
+	auto fpath = std::filesystem::path(path);
+
+	if (contains(std::vector<std::string>{".cc", ".cpp", ".c", ".h"}, fpath.extension().string())) {
+		syntax = new CPP();
+	}
+	else {
+		syntax = new PlainText();
+	}
 
 	text.clear();
 	lines.clear();
@@ -1021,7 +1037,7 @@ void View::draw() {
 			}
 		}
 
-		auto newToken = syntax.next(text, cursor, token);
+		auto newToken = syntax->next(text, cursor, token);
 
 		if (newToken != token || newState != state) {
 			token = newToken;

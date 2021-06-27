@@ -1,6 +1,5 @@
 #include "common.h"
 #include "tui.h"
-#include "syntax.h"
 #include "theme.h"
 #include "view.h"
 #include "config.h"
@@ -14,7 +13,6 @@
 using namespace std::chrono_literals;
 
 TUI tui;
-Syntax syntax;
 Theme theme;
 Config config;
 

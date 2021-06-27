@@ -1,12 +1,13 @@
 #pragma once
 
+struct Syntax;
+
 #include <set>
 #include <regex>
 #include <deque>
 #include "view.h"
 
 struct Syntax {
-
 	enum class Token {
 		None = 0,
 		Comment,
@@ -25,6 +26,23 @@ struct Syntax {
 		Namespace,
 		Operator,
 	};
+
+	virtual ~Syntax() {};
+	virtual std::vector<ViewRegion> tags(const std::deque<char>& text) = 0;
+	virtual std::vector<std::string> matches(const std::deque<char>& text, int cursor) = 0;
+	virtual Syntax::Token next(const std::deque<char>& text, int cursor, Token token) = 0;
+};
+
+struct PlainText : Syntax {
+	std::vector<ViewRegion> tags(const std::deque<char>& text);
+	std::vector<std::string> matches(const std::deque<char>& text, int cursor);
+	Token next(const std::deque<char>& text, int cursor, Token token);
+};
+
+struct CPP : Syntax {
+	std::vector<ViewRegion> tags(const std::deque<char>& text);
+	std::vector<std::string> matches(const std::deque<char>& text, int cursor);
+	Token next(const std::deque<char>& text, int cursor, Token token);
 
 	const std::set<std::string, std::less<>> types = {
 		"void",
@@ -118,12 +136,6 @@ struct Syntax {
 		"#else",
 		"#endif",
 	};
-
-	Syntax() = default;
-
-	std::vector<View::Region> tags(const std::deque<char>& text);
-	std::vector<std::string> matches(const std::deque<char>& text, int cursor);
-	Token next(const std::deque<char>& text, int cursor, Token token);
 
 	bool isname(int c);
 	bool isnamestart(int c);

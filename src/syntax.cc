@@ -1,8 +1,20 @@
 #include "syntax.h"
 #include <string_view>
 
-std::vector<View::Region> Syntax::tags(const std::deque<char>& text) {
-	std::vector<View::Region> hits;
+std::vector<ViewRegion> PlainText::tags(const std::deque<char>& text) {
+	return {};
+}
+
+std::vector<std::string> PlainText::matches(const std::deque<char>& text, int cursor) {
+	return {};
+}
+
+Syntax::Token PlainText::next(const std::deque<char>& text, int cursor, CPP::Token token) {
+	return Token::None;
+}
+
+std::vector<ViewRegion> CPP::tags(const std::deque<char>& text) {
+	std::vector<ViewRegion> hits;
 
 	int cursor = 0;
 
@@ -32,7 +44,7 @@ std::vector<View::Region> Syntax::tags(const std::deque<char>& text) {
 	return hits;
 }
 
-std::vector<std::string> Syntax::matches(const std::deque<char>& text, int cursor) {
+std::vector<std::string> CPP::matches(const std::deque<char>& text, int cursor) {
 	std::set<std::string> hits;
 	std::vector<std::string> results;
 
@@ -84,27 +96,27 @@ std::vector<std::string> Syntax::matches(const std::deque<char>& text, int curso
 	return results;
 }
 
-bool Syntax::isname(int c) {
+bool CPP::isname(int c) {
 	return isalnum(c) || c == '_';
 }
 
-bool Syntax::isnamestart(int c) {
+bool CPP::isnamestart(int c) {
 	return isalpha(c) || c == '_';
 }
 
-bool Syntax::isboundary(int c) {
+bool CPP::isboundary(int c) {
 	return c != '_' && (iscntrl(c) || ispunct(c) || isspace(c));
 }
 
-bool Syntax::isoperator(int c) {
+bool CPP::isoperator(int c) {
 	return strchr("+-*/%=<>&|^!?:", c);
 }
 
-int Syntax::get(const std::deque<char>& text, int cursor) {
+int CPP::get(const std::deque<char>& text, int cursor) {
 	return cursor >= 0 && cursor < (int)text.size() ? text[cursor]: 0;
 }
 
-bool Syntax::word(const std::deque<char>& text, int cursor, const std::string& name) {
+bool CPP::word(const std::deque<char>& text, int cursor, const std::string& name) {
 	int l = name.size();
 	for (int i = 0; i < l; i++) {
 		if (get(text, cursor+i) != name[i]) return false;
@@ -112,7 +124,7 @@ bool Syntax::word(const std::deque<char>& text, int cursor, const std::string& n
 	return !isname(get(text, cursor+l));
 }
 
-bool Syntax::keyword(const std::deque<char>& text, int cursor) {
+bool CPP::keyword(const std::deque<char>& text, int cursor) {
 	char pad[32]; int len = 0;
 	for (int i = 0; i < 31 && isname(get(text, cursor+i)); i++) {
 		pad[len++] = get(text, cursor+i);
@@ -122,7 +134,7 @@ bool Syntax::keyword(const std::deque<char>& text, int cursor) {
 }
 
 // is cursor inside a line // comment
-bool Syntax::comment(const std::deque<char>& text, int cursor) {
+bool CPP::comment(const std::deque<char>& text, int cursor) {
 	auto c = [&](int offset = 0) {
 		return get(text, cursor+offset);
 	};
@@ -135,7 +147,7 @@ bool Syntax::comment(const std::deque<char>& text, int cursor) {
 }
 
 // is cursor in a [namespace::]type[<namespace::type>[&*]]
-bool Syntax::typelike(const std::deque<char>& text, int cursor) {
+bool CPP::typelike(const std::deque<char>& text, int cursor) {
 	auto prev = [&]() {
 		return get(text, cursor-1);
 	};
@@ -156,12 +168,14 @@ bool Syntax::typelike(const std::deque<char>& text, int cursor) {
 		while (prev() && fn()) --cursor;
 	};
 
-	skip(white);
 	int start = cursor;
+
+	skip(white);
 
 	if (refptr()) --cursor;
 	skip(white);
 
+	// templated type. should probably be recursive
 	if (prev() == '>') {
 		--cursor;
 		while (name() || white() || refptr()) cursor--;
@@ -174,11 +188,17 @@ bool Syntax::typelike(const std::deque<char>& text, int cursor) {
 
 	if (keyword(text, cursor)) return false;
 
-	return start != cursor && isname(get(text, cursor));
+	int match = cursor;
+
+	skip(white);
+
+	if (isoperator(prev())) return false;
+
+	return match < start;
 }
 
 // is cursor on a struct or class definition name
-bool Syntax::matchBlockType(const std::deque<char>& text, int cursor) {
+bool CPP::matchBlockType(const std::deque<char>& text, int cursor) {
 	auto c = [&](int offset = 0) {
 		return get(text, cursor+offset);
 	};
@@ -219,7 +239,7 @@ bool Syntax::matchBlockType(const std::deque<char>& text, int cursor) {
 }
 
 // is cursor on a function or method name
-bool Syntax::matchFunction(const std::deque<char>& text, int cursor) {
+bool CPP::matchFunction(const std::deque<char>& text, int cursor) {
 	auto c = [&](int offset = 0) {
 		return get(text, cursor+offset);
 	};
@@ -271,16 +291,27 @@ bool Syntax::matchFunction(const std::deque<char>& text, int cursor) {
 	// arg list
 	if (c() != '(') return false;
 	cursor++;
-	while (c() && c() != ')') cursor++;
+	int levels = 1;
+	while (c()) {
+		if (c() == '(') levels++;
+		if (c() == ')') levels--;
+		if (!levels) break;
+		cursor++;
+	}
 	if (c() != ')') return false;
 	cursor++;
 	while (c() && isspace(c())) cursor++;
+
+	if (word(text, cursor, "const")) {
+		cursor += 5;
+		while (c() && isspace(c())) cursor++;
+	}
 
 	if (!(c() == '{' || c() == ':' || c() == ';')) return false;
 	return true;
 }
 
-Syntax::Token Syntax::next(const std::deque<char>& text, int cursor, Syntax::Token token) {
+Syntax::Token CPP::next(const std::deque<char>& text, int cursor, CPP::Token token) {
 
 	auto rget = [&](int offset = 0) {
 		return get(text, cursor+offset);
