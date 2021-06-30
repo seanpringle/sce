@@ -28,21 +28,21 @@ struct Syntax {
 	};
 
 	virtual ~Syntax() {};
-	virtual std::vector<ViewRegion> tags(const std::deque<char>& text) = 0;
-	virtual std::vector<std::string> matches(const std::deque<char>& text, int cursor) = 0;
-	virtual Syntax::Token next(const std::deque<char>& text, int cursor, Token token) = 0;
+	virtual std::vector<ViewRegion> tags(const std::deque<int>& text) = 0;
+	virtual std::vector<std::string> matches(const std::deque<int>& text, int cursor) = 0;
+	virtual Syntax::Token next(const std::deque<int>& text, int cursor, Token token) = 0;
 };
 
 struct PlainText : Syntax {
-	std::vector<ViewRegion> tags(const std::deque<char>& text);
-	std::vector<std::string> matches(const std::deque<char>& text, int cursor);
-	Token next(const std::deque<char>& text, int cursor, Token token);
+	std::vector<ViewRegion> tags(const std::deque<int>& text);
+	std::vector<std::string> matches(const std::deque<int>& text, int cursor);
+	Token next(const std::deque<int>& text, int cursor, Token token);
 };
 
 struct CPP : Syntax {
-	std::vector<ViewRegion> tags(const std::deque<char>& text);
-	std::vector<std::string> matches(const std::deque<char>& text, int cursor);
-	Token next(const std::deque<char>& text, int cursor, Token token);
+	std::vector<ViewRegion> tags(const std::deque<int>& text);
+	std::vector<std::string> matches(const std::deque<int>& text, int cursor);
+	Token next(const std::deque<int>& text, int cursor, Token token);
 
 	const std::set<std::string, std::less<>> types = {
 		"void",
@@ -70,7 +70,7 @@ struct CPP : Syntax {
 		"FILE",
 	};
 
-	const std::set<std::string> constants = {
+	const std::set<std::string, std::less<>> constants = {
 		"NULL",
 		"nullptr",
 		"true",
@@ -120,13 +120,13 @@ struct CPP : Syntax {
 		"virtual",
 	};
 
-	const std::set<std::string> blocktypes = {
+	const std::set<std::string, std::less<>> blocktypes = {
 		"enum",
 		"class",
 		"struct",
 	};
 
-	const std::set<std::string> directives = {
+	const std::set<std::string, std::less<>> directives = {
 		"#include",
 		"#define",
 		"#pragma",
@@ -137,15 +137,22 @@ struct CPP : Syntax {
 		"#endif",
 	};
 
+	const std::set<std::string, std::less<>> specifiers = {
+		"override",
+		"const",
+	};
+
 	bool isname(int c);
 	bool isnamestart(int c);
 	bool isboundary(int c);
 	bool isoperator(int c);
-	int get(const std::deque<char>& text, int offset);
-	bool word(const std::deque<char>& text, int offset, const std::string& name);
-	bool keyword(const std::deque<char>& text, int offset);
-	bool comment(const std::deque<char>& text, int offset);
-	bool typelike(const std::deque<char>& text, int offset);
-	bool matchFunction(const std::deque<char>& text, int cursor);
-	bool matchBlockType(const std::deque<char>& text, int cursor);
+	int get(const std::deque<int>& text, int offset);
+	bool word(const std::deque<int>& text, int offset, const std::string& name);
+	bool wordset(const std::deque<int>& text, int offset, const std::set<std::string, std::less<>>& names);
+	bool keyword(const std::deque<int>& text, int offset);
+	bool specifier(const std::deque<int>& text, int offset);
+	bool comment(const std::deque<int>& text, int offset);
+	bool typelike(const std::deque<int>& text, int offset);
+	bool matchFunction(const std::deque<int>& text, int cursor);
+	bool matchBlockType(const std::deque<int>& text, int cursor);
 };

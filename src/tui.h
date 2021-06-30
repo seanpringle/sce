@@ -8,12 +8,13 @@
 #include <poll.h>
 #include <string>
 #include <sstream>
+#include <vector>
 
 struct TUI {
 	struct termios old_tio, new_tio;
 	std::streambuf* oldErr = nullptr;
 	std::stringstream err;
-	std::string out;
+	std::vector<unsigned char> out;
 
 	struct {
 		std::string text;
@@ -81,7 +82,7 @@ struct TUI {
 		void emit();
 	};
 
-	void emit(char c);
+	void emit(int c);
 
 	int print(std::string s, int len = -1);
 

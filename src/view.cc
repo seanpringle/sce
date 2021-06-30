@@ -6,6 +6,7 @@
 #include "config.h"
 #include <fstream>
 #include <filesystem>
+#include <chrono>
 
 extern TUI tui;
 extern Theme theme;
@@ -69,7 +70,7 @@ int View::toEol(int offset) {
 	return end-offset;
 }
 
-char View::get(int offset) {
+int View::get(int offset) {
 	return offset >= 0 && (int)text.size() > offset ? text[offset]: 0;
 }
 
@@ -121,7 +122,7 @@ void View::undo() {
 		if (change.type == Insertion) {
 			// find the spot and remove the region
 			auto it = text.begin()+change.offset;
-			std::string s = {it,it+change.length};
+			std::vector<int> s = {it,it+change.length};
 			ensuref(s == change.text, "[%s] != [%s]", s, change.text);
 			text.erase(it, it+change.length);
 		}
@@ -171,7 +172,7 @@ void View::redo() {
 		if (change.type == Deletion) {
 			// find the spot and remove the region
 			auto it = text.begin()+change.offset;
-			std::string s = {it,it+change.length};
+			std::vector<int> s = {it,it+change.length};
 			ensure(s == change.text);
 			text.erase(it, it+change.length);
 		}
@@ -209,8 +210,11 @@ bool View::erase() {
 			redos.clear();
 
 			text.erase(it, it+selection.length);
-			for (int j = i+1; j < (int)selections.size(); j++) {
-				selections[j].offset -= selection.length;
+			for (int j = 0; j < (int)selections.size(); j++) {
+				auto& jselection = selections[j];
+				if (jselection.offset > selection.offset) {
+					jselection.offset -= selection.length;
+				}
 			}
 			selection.length = 0;
 		}
@@ -223,7 +227,7 @@ bool View::erase() {
 	return erased;
 }
 
-void View::insert(char c, bool autoindent) {
+void View::insert(int c, bool autoindent) {
 	erase();
 	for (int i = 0; i < (int)selections.size(); i++) {
 		auto& selection = selections[i];
@@ -236,7 +240,7 @@ void View::insert(char c, bool autoindent) {
 			&& undos.back().offset+undos.back().length == selection.offset
 		){
 			undos.back().length++;
-			undos.back().text += c;
+			undos.back().text.push_back(c);
 		}
 		else {
 			Change change;
@@ -257,14 +261,14 @@ void View::insert(char c, bool autoindent) {
 			int left = toSol(selection.offset);
 			int start = selection.offset-left;
 
-			std::string indent;
-			while (isspace(text[start]) && text[start] != '\n') {
-				indent += text[start++];
+			std::vector<int> indent;
+			while (iswspace(text[start]) && text[start] != '\n') {
+				indent.push_back(text[start++]);
 			}
 
 			text.insert(it, indent.begin(), indent.end());
 			inserted += indent.size();
-			undos.back().text += indent;
+			for (int c: indent) undos.back().text.push_back(c);
 			undos.back().length += (int)indent.size();
 		}
 
@@ -290,12 +294,23 @@ bool View::indent() {
 	return true;
 }
 
-void View::back() {
+bool View::outdent() {
+	if (tabs.hard) {
+		del('\t');
+	}
+	for (int i = 0; !tabs.hard && i < tabs.width; i++) {
+		del(' ');
+	}
+	return true;
+}
+
+void View::back(int c) {
 	if (!erase()) {
 		for (int i = 0; i < (int)selections.size(); i++) {
 			auto& selection = selections[i];
 			if (!selection.offset) continue;
 			auto it = text.begin()+selection.offset;
+			if (c && c != get(selection.offset-1)) continue;
 
 			if ((int)selections.size() == 1
 				&& undos.size() > 0
@@ -305,7 +320,7 @@ void View::back() {
 			){
 				undos.back().offset--;
 				undos.back().length++;
-				undos.back().text.insert(0, 1, text[undos.back().offset]);
+				undos.back().text.insert(undos.back().text.begin(), text[undos.back().offset]);
 			}
 			else {
 				Change change;
@@ -333,11 +348,12 @@ void View::back() {
 	}
 }
 
-void View::del() {
+void View::del(int c) {
 	if (!erase()) {
 		for (int i = 0; i < (int)selections.size(); i++) {
 			auto& selection = selections[i];
 			auto it = text.begin()+selection.offset;
+			if (c && c != get(selection.offset)) continue;
 
 			if ((int)selections.size() == 1
 				&& undos.size() > 0
@@ -346,7 +362,7 @@ void View::del() {
 				&& undos.back().offset == selection.offset
 			){
 				undos.back().length++;
-				undos.back().text += text[undos.back().offset];
+				undos.back().text.push_back(text[undos.back().offset]);
 			}
 			else {
 				Change change;
@@ -449,11 +465,11 @@ void View::findTags() {
 	findTag.start(&tagStrings);
 }
 
-char View::upper(char c) {
+int View::upper(int c) {
 	return toupper(c);
 }
 
-char View::lower(char c) {
+int View::lower(int c) {
 	return tolower(c);
 }
 
@@ -562,45 +578,45 @@ void View::selectUp() {
 
 bool View::selectNext() {
 	bool match = false;
-	auto& selection = selections.back();
-	if (!selection.length) return false;
+	auto& pattern = selections.front();
+	auto& marker = selections.back();
+	if (!pattern.length) return false;
 
 	nav();
-	selection.length = std::max(selection.length, 1);
 
-	for (int i = selection.offset+1; i < (int)text.size()-selection.length && !match; i++) {
-		auto a = text.begin()+selection.offset;
+	for (int i = marker.offset+1; i < (int)text.size()-pattern.length && !match; i++) {
+		auto a = text.begin()+pattern.offset;
 		auto b = text.begin()+i;
 		match = true;
-		for (int j = 0; j < selection.length && match; j++) {
+		for (int j = 0; j < pattern.length && match; j++) {
 			match = match && (*a == *b);
 			++a; ++b;
 		}
 		if (match) {
-			if (selection.offset == skip.offset && selection.length == skip.length)
+			if (marker.offset == skip.offset && marker.length == skip.length)
 				selections.pop_back();
-			selections.push_back({i,selection.length});
+			selections.push_back({i,pattern.length});
 			skip = {-1,-1};
 		}
 	}
 	if (!match) {
-		for (int i = 0; i < (int)text.size()-selection.offset && !match; i++) {
+		for (int i = 0; i < pattern.offset && i < (int)text.size()-pattern.length && !match; i++) {
 			bool duplicate = false;
 			for (auto& other: selections) {
 				duplicate = duplicate || other.offset == i;
 			}
 			if (duplicate) continue;
-			auto a = text.begin()+selection.offset;
+			auto a = text.begin()+pattern.offset;
 			auto b = text.begin()+i;
 			match = true;
-			for (int j = 0; j < selection.length && match; j++) {
+			for (int j = 0; j < pattern.length && match; j++) {
 				match = match && (*a == *b);
 				++a; ++b;
 			}
 			if (match) {
-				if (selection.offset == skip.offset && selection.length == skip.length)
+				if (marker.offset == skip.offset && marker.length == skip.length)
 					selections.pop_back();
-				selections.push_back({i,selection.length});
+				selections.push_back({i,pattern.length});
 				skip = {-1,-1};
 			}
 		}
@@ -616,7 +632,7 @@ void View::selectSkip() {
 void View::intoView(ViewRegion& selection) {
 	int lineno = 0;
 	for (auto& line: lines) {
-		if (line.offset <= selection.offset) lineno++;
+		if (line.offset <= selection.offset+selection.length) lineno++;
 	}
 
 	while (lineno+10 > top+h) {
@@ -630,18 +646,9 @@ void View::intoView(ViewRegion& selection) {
 	top = std::max(0, std::min((int)lines.size()-1, top));
 }
 
-void View::intoViewTop(ViewRegion& selection) {
-	int lineno = 0;
-	for (auto& line: lines) {
-		if (line.offset <= selection.offset) lineno++;
-	}
-	top = lineno-10;
-	top = std::max(0, std::min((int)lines.size()-1, top));
-}
-
 void View::boundaryRight() {
 	auto isboundary = [&](int c) {
-		return c != '_' && (iscntrl(c) || ispunct(c) || isspace(c));
+		return c != '_' && (iswcntrl(c) || iswpunct(c) || iswspace(c));
 	};
 
 	for (auto& selection: selections) {
@@ -654,7 +661,7 @@ void View::boundaryRight() {
 
 void View::boundaryLeft() {
 	auto isboundary = [&](int c) {
-		return c != '_' && (iscntrl(c) || ispunct(c) || isspace(c));
+		return c != '_' && (iswcntrl(c) || iswpunct(c) || iswspace(c));
 	};
 
 	for (auto& selection: selections) {
@@ -830,7 +837,9 @@ void View::input() {
 	if (tui.keys.shift && tui.keysym == "Down") { selectDown(); return; }
 	if (tui.keys.shift && tui.keysym == "Up") { selectUp(); return; }
 
-	if (tui.keys.ctrl && tui.keysym == "I") { autocomplete() || indent(); return; }
+	if (tui.keys.shift && tui.keys.tab) { outdent(); return; }
+	if (!tui.keys.shift && tui.keys.tab) { autocomplete() || indent(); return; }
+
 	if (tui.keys.ctrl && tui.keysym == "M") { insert('\n', true); return; }
 	if (tui.keys.ctrl && tui.keysym == "Z") { undo(); return; }
 	if (tui.keys.ctrl && tui.keysym == "Y") { redo(); return; }
@@ -860,8 +869,19 @@ void View::input() {
 	if (!tui.keys.mods && tui.keys.back) { back(); return; }
 	if (!tui.keys.mods && tui.keys.del) { del(); return; }
 
+	if (tui.mouse.wheel) {
+		auto now = std::chrono::system_clock::now();
+		auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now-lastWheel);
+		int steps = ms < config.mouse.wheelSpeedStep ? 3: 1;
+		if (tui.mouse.wheel < 0) { for (int i = 0; i < steps; i++) up(); }
+		if (tui.mouse.wheel > 0) { for (int i = 0; i < steps; i++) down(); }
+		lastWheel = now;
+		return;
+	}
+
 	if (tui.escseq.size()) return;
 
+	if (!tui.keys.ctrl && tui.keycode&0xff00) { insert(tui.keycode); return; }
 	if (!tui.keys.ctrl && tui.keysym.size() == 1) { insert(tui.keysym.front()); return; }
 }
 
@@ -886,14 +906,17 @@ void View::open(std::string path) {
 	undos.clear();
 	redos.clear();
 
+	// figure out why wifstream doesn't work
 	auto in = std::ifstream(path);
+	int c = 0;
 
-	for (std::string line; std::getline(in, line);) {
-		for (auto c: line) text.push_back(c);
-		text.push_back('\n');
+	while ((c = in.get()) && c != EOF) {
+		if (c == 0xc2) {
+			text.push_back((c << 8)|in.get());
+			continue;
+		}
+		text.push_back(c);
 	}
-
-	in.close();
 
 	int soft = 0;
 	int hard = 0;
@@ -924,10 +947,17 @@ void View::save() {
 	if (!path.size()) return;
 	auto out = std::ofstream(path);
 	for (int i = 0; i < (int)text.size(); ) {
-		std::string line;
+		std::vector<int> line;
 		while (!eol(i)) line.push_back(text[i++]);
-		while (isspace(line.back())) line = line.substr(0, line.size()-1);
-		out << line << "\n";
+		while (line.size() && iswspace(line.back())) line.pop_back();
+		for (int c: line) {
+			if (c&0xff00) {
+				out << (unsigned char)((c&0xff00)>>8);
+				c = c&0xff;
+			}
+			out << (unsigned char)c;
+		}
+		out << '\n';
 		i++;
 	}
 	out.close();
@@ -971,7 +1001,7 @@ void View::draw() {
 	tui.print("\e[48;5;22m");
 
 	auto left = fmt(" %s %s", path, tui.escseq);
-	auto right = fmt("%dkB %s ", text.size()/1024U, modified ? "modified": "saved");
+	auto right = fmt("%dkB %s ", std::max(1, (int)(text.size()/1024U)), modified ? "modified": "saved");
 
 	tui.print(left);
 	if ((int)(left.size()+right.size()) < w) {
@@ -1014,6 +1044,15 @@ void View::draw() {
 		col += spaces;
 	};
 
+	// detect large selection starting off screen
+	for (auto& selection: selections) {
+		if (selection.offset < cursor && selection.offset+selection.length >= cursor) {
+			++selecting;
+			state = Theme::State::Selected;
+			break;
+		}
+	}
+
 	while (cursor <= (int)text.size() && row < h) {
 
 		if (col == 0) {
@@ -1045,7 +1084,7 @@ void View::draw() {
 			tui.format(theme.highlight[token][state]);
 		}
 
-		char c = cursor < (int)text.size() ? text[cursor]: '\n';
+		int c = cursor < (int)text.size() ? text[cursor]: '\n';
 		cursor++;
 
 		if (c == '\n') {
@@ -1152,7 +1191,7 @@ void SelectList::filter() {
 		auto it = std::search(
 			item.begin(), item.end(),
 			search.begin(), search.end(),
-			[](char a, char b) {
+			[](int a, int b) {
 				return std::toupper(a) == std::toupper(b);
 			}
 		);

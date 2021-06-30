@@ -41,10 +41,11 @@ struct View {
 	int w = 0;
 	int h = 0;
 	int top = 0;
-	std::deque<char> text;
+	std::deque<int> text;
 	std::string path;
 	bool modified = false;
-	Syntax* syntax = nullptr;;
+	Syntax* syntax = nullptr;
+	std::chrono::time_point<std::chrono::system_clock> lastWheel;
 
 	struct {
 		bool hard = true;
@@ -79,7 +80,7 @@ struct View {
 		ChangeType type = Insertion;
 		int offset = 0;
 		int length = 0;
-		std::string text;
+		std::vector<int> text;
 		std::vector<ViewRegion> selections;
 	};
 
@@ -94,10 +95,10 @@ struct View {
 	void nav();
 	void undo();
 	void redo();
-	void insert(char c, bool autoindent = false);
+	void insert(int c, bool autoindent = false);
 	bool erase();
-	char upper(char c);
-	char lower(char c);
+	int upper(int c);
+	int lower(int c);
 	void draw();
 	void up();
 	void down();
@@ -107,8 +108,8 @@ struct View {
 	void end();
 	void pgup();
 	void pgdown();
-	void back();
-	void del();
+	void back(int c = 0);
+	void del(int c = 0);
 	void cut();
 	void copy();
 	void paste();
@@ -123,7 +124,6 @@ struct View {
 	void selectUp();
 	void selectSkip();
 	void intoView(ViewRegion& region);
-	void intoViewTop(ViewRegion& region);
 	void boundaryRight();
 	void boundaryLeft();
 	void addCursorDown();
@@ -132,7 +132,7 @@ struct View {
 	void sanity();
 	int toSol(int offset);
 	int toEol(int offset);
-	char get(int offset);
+	int get(int offset);
 	bool sol(int offset);
 	bool eol(int offset);
 	void index();
@@ -140,6 +140,7 @@ struct View {
 	void input();
 	void single();
 	bool indent();
+	bool outdent();
 	bool autocomplete();
 	void interpret();
 };

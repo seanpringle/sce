@@ -1,7 +1,11 @@
 #include "common.h"
 #include "config.h"
 
+using namespace std::chrono_literals;
+
 void Config::args(int argc, const char** argv) {
+	mouse.wheelSpeedStep = 30ms;
+
 	for (int i = 1; i < argc; i++) {
 		bool next = i < argc-1;
 		auto arg = std::string(argv[i]);

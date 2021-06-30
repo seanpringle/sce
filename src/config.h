@@ -1,4 +1,5 @@
 #include "common.h"
+#include <chrono>
 
 struct Config {
 	struct {
@@ -8,6 +9,7 @@ struct Config {
 
 	struct {
 		bool enabled = true;
+		std::chrono::milliseconds wheelSpeedStep;
 	} mouse;
 
 	std::vector<std::string> paths;

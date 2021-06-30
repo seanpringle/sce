@@ -43,19 +43,25 @@ void TUI::stop() {
 	std::cerr << err.str();
 }
 
-void TUI::emit(char c) {
-	out += c;
+void TUI::emit(int c) {
+	if (c & 0xff00) {
+		out.push_back((c&0xff00)>>8);
+		c &= 0xff;
+	}
+	out.push_back(c);
 }
 
 int TUI::print(std::string s, int len) {
 	if (len < 0) len = s.size();
 	len = std::min(len, (int)s.size());
-	out += s.substr(0, len);
+	for (int i = 0; i < len; i++) {
+		out.push_back((unsigned char)s[i]);
+	}
 	return len;
 }
 
 void TUI::flush() {
-	ensure((int)out.size() == write(fileno(stdout), out.c_str(), out.size()));
+	ensure((int)out.size() == write(fileno(stdout), out.data(), out.size()));
 	out.clear();
 }
 
@@ -80,7 +86,7 @@ int TUI::rows() {
 }
 
 int TUI::key() {
-	char c = 0;
+	unsigned char c = 0;
 	int bytes = read(fileno(stdin), &c, 1);
 	if (bytes < 1) c = 0;
 	return c;
@@ -174,6 +180,7 @@ void TUI::accept() {
 				if (escseq == "D") { keys.left = true; return; }
 				if (escseq == "F") { keys.end = true; return; }
 				if (escseq == "H") { keys.home = true; return; }
+				if (escseq == "Z") { keys.shift = true; keys.tab = true; return; }
 				if (escseq == "1P") { keys.f1 = true; return; }
 				if (escseq == "1Q") { keys.f2 = true; return; }
 				if (escseq == "1R") { keys.f3 = true; return; }
@@ -267,12 +274,25 @@ void TUI::accept() {
 		keys.ctrl = true;
 		keycode += 64;
 	}
+	else
+	if (keycode == 0xC2) {
+		keycode = (keycode << 8) | key();
+	}
 
 	keys.mods = keys.mods || keys.ctrl || keys.alt || keys.shift;
-	if (mouse.is) return;
 
-	if (keycode == 0x7f) keys.back = true;
-	if (keys.ctrl && keycode == 'I') keys.tab = true;
+	if (mouse.is) {
+		return;
+	}
+
+	if (keycode == 0x7f) {
+		keys.back = true;
+	}
+
+	if (keys.ctrl && keycode == 'I') {
+		keys.ctrl = false;
+		keys.tab = true;
+	}
 
 	if (keys.esc) keysym = "Escape";
 	else if (keys.home) keysym = "Home";
