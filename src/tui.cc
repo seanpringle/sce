@@ -47,6 +47,12 @@ void TUI::emit(int c) {
 	if (c & 0xff00) {
 		out.push_back((c&0xff00)>>8);
 		c &= 0xff;
+		out.push_back(c);
+		return;
+	}
+	if (!iswprint(c)) {
+		out.push_back(127);
+		return;
 	}
 	out.push_back(c);
 }

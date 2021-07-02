@@ -31,6 +31,13 @@ struct Syntax {
 	virtual std::vector<ViewRegion> tags(const std::deque<int>& text) = 0;
 	virtual std::vector<std::string> matches(const std::deque<int>& text, int cursor) = 0;
 	virtual Syntax::Token next(const std::deque<int>& text, int cursor, Token token) = 0;
+
+	virtual bool isname(int c);
+	virtual bool isboundary(int c);
+	virtual bool isoperator(int c);
+
+	int get(const std::deque<int>& text, int offset);
+	bool wordset(const std::deque<int>& text, int offset, const std::set<std::string, std::less<>>& names);
 };
 
 struct PlainText : Syntax {
@@ -142,17 +149,30 @@ struct CPP : Syntax {
 		"const",
 	};
 
-	bool isname(int c);
-	bool isnamestart(int c);
-	bool isboundary(int c);
-	bool isoperator(int c);
-	int get(const std::deque<int>& text, int offset);
+	bool isoperator(int c) override;
+
 	bool word(const std::deque<int>& text, int offset, const std::string& name);
-	bool wordset(const std::deque<int>& text, int offset, const std::set<std::string, std::less<>>& names);
+
 	bool keyword(const std::deque<int>& text, int offset);
 	bool specifier(const std::deque<int>& text, int offset);
 	bool comment(const std::deque<int>& text, int offset);
 	bool typelike(const std::deque<int>& text, int offset);
 	bool matchFunction(const std::deque<int>& text, int cursor);
 	bool matchBlockType(const std::deque<int>& text, int cursor);
+};
+
+struct OpenSCAD : Syntax {
+	std::vector<ViewRegion> tags(const std::deque<int>& text);
+	std::vector<std::string> matches(const std::deque<int>& text, int cursor);
+	Token next(const std::deque<int>& text, int cursor, Token token);
+
+	const std::set<std::string, std::less<>> keywords = {
+		"module",
+		"for",
+		"use",
+	};
+
+	bool keyword(const std::deque<int>& text, int offset);
+	bool comment(const std::deque<int>& text, int offset);
+	bool matchModule(const std::deque<int>& text, int cursor);
 };

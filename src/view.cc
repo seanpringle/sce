@@ -34,22 +34,34 @@ void View::sanity() {
 
 	index();
 
-	for (auto it = selections.begin(); it != selections.end(); ) {
-		auto& selection = *it;
+	// bounds
+	for (auto& selection: selections) {
+		selection.offset = std::max(0, std::min((int)text.size(), selection.offset));
 		selection.length = std::max(0, std::min((int)text.size() - selection.offset, selection.length));
-		if ((int)selections.size() > 1 && (selection.offset < 0 || selection.offset > (int)text.size())) {
-			it = selections.erase(it);
-		} else {
-			++it;
-		}
 	}
 
-	for (auto& selection: selections) {
-		if (selection.offset < 0 || selection.offset+selection.length > (int)text.size()) {
-			selection.offset = std::max(0, std::min((int)text.size(), selection.offset));
-			selection.length = 0;
+	// duplicates, overlaps
+	std::vector<ViewRegion> keep;
+
+	auto within = [&](int offset, int length, int p) {
+		return offset <= p && p < offset+length;
+	};
+
+	for (auto candidate: selections) {
+		bool clash = false;
+		for (auto& selection: keep) {
+			bool same = candidate.offset == selection.offset && candidate.length == selection.length;
+			bool overlapA = within(selection.offset, selection.length, candidate.offset);
+			bool overlapB = within(selection.offset, selection.length, candidate.offset+candidate.length);
+			bool overlapC = within(candidate.offset, candidate.length, selection.offset);
+			bool overlapD = within(candidate.offset, candidate.length, selection.offset+selection.length);
+			clash = (same || overlapA || overlapB || overlapC || overlapD);
+			if (clash) break;
 		}
+		if (!clash) keep.push_back(candidate);
 	}
+
+	selections = keep;
 
 	if (!selections.size()) {
 		selections.push_back({0,0});
@@ -894,6 +906,10 @@ void View::open(std::string path) {
 	if (contains(std::vector<std::string>{".cc", ".cpp", ".c", ".h"}, fpath.extension().string())) {
 		syntax = new CPP();
 	}
+	else
+	if (contains(std::vector<std::string>{".scad"}, fpath.extension().string())) {
+		syntax = new OpenSCAD();
+	}
 	else {
 		syntax = new PlainText();
 	}
@@ -1000,7 +1016,7 @@ void View::draw() {
 	tui.print("\e[38;5;255m");
 	tui.print("\e[48;5;22m");
 
-	auto left = fmt(" %s %s", path, tui.escseq);
+	auto left = fmt(" %s %llu %s", path, selections.size(), tui.escseq);
 	auto right = fmt("%dkB %s ", std::max(1, (int)(text.size()/1024U)), modified ? "modified": "saved");
 
 	tui.print(left);

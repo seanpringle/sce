@@ -1,6 +1,31 @@
 #include "syntax.h"
 #include <string_view>
 
+bool Syntax::isname(int c) {
+	return iswalnum(c) || c == '_';
+}
+
+bool Syntax::isboundary(int c) {
+	return c != '_' && (iswcntrl(c) || iswpunct(c) || iswspace(c));
+}
+
+bool Syntax::isoperator(int c) {
+	return strchr("+-*/%=<>", c);
+}
+
+int Syntax::get(const std::deque<int>& text, int cursor) {
+	return cursor >= 0 && cursor < (int)text.size() ? text[cursor]: 0;
+}
+
+bool Syntax::wordset(const std::deque<int>& text, int cursor, const std::set<std::string,std::less<>>& names) {
+	char pad[32]; int len = 0;
+	for (int i = 0; i < 31 && isname(get(text, cursor+i)); i++) {
+		pad[len++] = get(text, cursor+i);
+	}
+	pad[len] = 0;
+	return names.count(std::string_view(pad)) > 0;
+}
+
 std::vector<ViewRegion> PlainText::tags(const std::deque<int>& text) {
 	return {};
 }
@@ -58,9 +83,10 @@ std::vector<std::string> CPP::matches(const std::deque<int>& text, int cursor) {
 
 	int pstart = cursor;
 
-	while (isname(c())) ++cursor;
+	//while (isname(c())) ++cursor;
+	//int plength = cursor-pstart;
 
-	int plength = cursor-pstart;
+	int plength = home-pstart;
 
 	if (pstart < home) {
 		cursor = 0;
@@ -76,7 +102,9 @@ std::vector<std::string> CPP::matches(const std::deque<int>& text, int cursor) {
 				for (int i = mstart; i < cursor; i++) {
 					match += get(text, i);
 				}
-				hits.insert(match);
+				if ((int)match.size() > mlength) {
+					hits.insert(match);
+				}
 				continue;
 			}
 			cursor++;
@@ -96,24 +124,8 @@ std::vector<std::string> CPP::matches(const std::deque<int>& text, int cursor) {
 	return results;
 }
 
-bool CPP::isname(int c) {
-	return iswalnum(c) || c == '_';
-}
-
-bool CPP::isnamestart(int c) {
-	return iswalpha(c) || c == '_';
-}
-
-bool CPP::isboundary(int c) {
-	return c != '_' && (iswcntrl(c) || iswpunct(c) || iswspace(c));
-}
-
 bool CPP::isoperator(int c) {
 	return strchr("+-*/%=<>&|^!?:", c);
-}
-
-int CPP::get(const std::deque<int>& text, int cursor) {
-	return cursor >= 0 && cursor < (int)text.size() ? text[cursor]: 0;
 }
 
 bool CPP::word(const std::deque<int>& text, int cursor, const std::string& name) {
@@ -122,15 +134,6 @@ bool CPP::word(const std::deque<int>& text, int cursor, const std::string& name)
 		if (get(text, cursor+i) != name[i]) return false;
 	}
 	return !isname(get(text, cursor+l));
-}
-
-bool CPP::wordset(const std::deque<int>& text, int cursor, const std::set<std::string,std::less<>>& names) {
-	char pad[32]; int len = 0;
-	for (int i = 0; i < 31 && isname(get(text, cursor+i)); i++) {
-		pad[len++] = get(text, cursor+i);
-	}
-	pad[len] = 0;
-	return names.count(std::string_view(pad)) > 0;
 }
 
 bool CPP::keyword(const std::deque<int>& text, int cursor) {
@@ -204,7 +207,15 @@ bool CPP::typelike(const std::deque<int>& text, int cursor) {
 
 	skip(gap);
 
-	if (isoperator(prev())) return false;
+	auto paren = [&]() {
+		return prev() == '(' || prev() == ')';
+	};
+
+	auto brace = [&]() {
+		return prev() == '{' || prev() == '}';
+	};
+
+	if (isoperator(prev()) || paren() || brace()) return false;
 
 	return match < start;
 }
@@ -215,7 +226,7 @@ bool CPP::matchBlockType(const std::deque<int>& text, int cursor) {
 		return get(text, cursor+offset);
 	};
 
-	if (!isnamestart(c())) return false;
+	if (!isname(c())) return false;
 	int start = cursor;
 
 	if (keyword(text, cursor)) return false;
@@ -256,7 +267,7 @@ bool CPP::matchFunction(const std::deque<int>& text, int cursor) {
 		return get(text, cursor+offset);
 	};
 
-	if (!isnamestart(c())) return false;
+	if (!isname(c())) return false;
 	int start = cursor;
 	while (isname(c())) cursor++;
 	int length = cursor-start;
@@ -375,7 +386,7 @@ Syntax::Token CPP::next(const std::deque<int>& text, int cursor, CPP::Token toke
 				}
 			}
 
-			if (isnamestart(rget())) {
+			if (isname(rget())) {
 				int len = 0;
 				while (rget(len) && isname(rget(len))) len++;
 				if (rget(len) == '(') return Token::Call;
@@ -467,5 +478,127 @@ Syntax::Token CPP::next(const std::deque<int>& text, int cursor, CPP::Token toke
 		}
 	}
 
+	return token;
+}
+
+bool OpenSCAD::keyword(const std::deque<int>& text, int cursor) {
+	return wordset(text, cursor, keywords);
+}
+
+std::vector<ViewRegion> OpenSCAD::tags(const std::deque<int>& text) {
+	return {};
+}
+
+std::vector<std::string> OpenSCAD::matches(const std::deque<int>& text, int cursor) {
+	return {};
+}
+
+// is cursor inside a line // comment
+bool OpenSCAD::comment(const std::deque<int>& text, int cursor) {
+	auto c = [&](int offset = 0) {
+		return get(text, cursor+offset);
+	};
+	while (c()) {
+		if (c() == '/') return true;
+		if (c(-1) == '\n') return false;
+		cursor--;
+	}
+	return false;
+}
+
+// is cursor on a module name
+bool OpenSCAD::matchModule(const std::deque<int>& text, int cursor) {
+	auto c = [&](int offset = 0) {
+		return get(text, cursor+offset);
+	};
+
+	if (!isname(c())) return false;
+
+	int start = cursor;
+	while (isname(c())) cursor++;
+	int length = cursor-start;
+
+	if (keyword(text, start)) return false;
+
+	cursor = start;
+	while (c(-1) && iswspace(c(-1))) --cursor;
+	while (c(-1) && isname(c(-1))) --cursor;
+	if (!wordset(text, cursor, {"module"})) return false;
+
+	cursor = start+length;
+	while (c() && iswspace(c())) cursor++;
+
+	// arg list
+	if (c() != '(') return false;
+	cursor++;
+	int levels = 1;
+	while (c()) {
+		if (c() == '(') levels++;
+		if (c() == ')') levels--;
+		if (!levels) break;
+		cursor++;
+	}
+	if (c() != ')') return false;
+	cursor++;
+
+	while (c() && iswspace(c())) cursor++;
+	return c() == '{';
+}
+
+Syntax::Token OpenSCAD::next(const std::deque<int>& text, int cursor, CPP::Token token) {
+	switch (token) {
+
+		case Token::None: {
+			if (keyword(text, cursor)) return Token::Keyword;
+
+			if (get(text, cursor) == '/' && get(text, cursor+1) == '/') {
+				return Token::Comment;
+			}
+
+			if (isdigit(get(text, cursor)) && isboundary(get(text, cursor-1))) {
+				return Token::Integer;
+			}
+
+			if (matchModule(text, cursor)) {
+				return Token::Function;
+			}
+
+			if (isname(get(text, cursor))) {
+				int len = 0;
+				while (isname(get(text, cursor+len))) len++;
+				if (get(text, cursor+len) == '(') return Token::Call;
+			}
+
+			break;
+		}
+
+		case Token::Keyword: {
+			if (!iswalpha(get(text, cursor))) return next(text, cursor, Token::None);
+			break;
+		}
+
+		case Token::Comment: {
+			if (get(text, cursor) == '\n') return next(text, cursor, Token::None);
+			break;
+		}
+
+		case Token::Integer: {
+			if (!(iswalnum(get(text, cursor)) || get(text, cursor) == '.')) return next(text, cursor, Token::None);
+			break;
+		}
+
+		case Token::Call: {
+			if (isboundary(get(text, cursor))) return next(text, cursor, Token::None);
+			break;
+		}
+
+		case Token::Function: {
+			if (!isname(get(text, cursor))) return next(text, cursor, Token::None);
+			break;
+		}
+
+		default:
+			break;
+	}
 	return token;
 }
