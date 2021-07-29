@@ -70,6 +70,7 @@ int main(int argc, const char* argv[])
 	ImGui::CreateContext();
 
 	ImGuiIO& io = ImGui::GetIO();
+	io.IniFilename = nullptr;
 	io.WantSaveIniSettings = false;
 
 	//ImGui::StyleColorsDark();
