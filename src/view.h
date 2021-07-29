@@ -9,35 +9,12 @@ struct ViewRegion;
 #include <string>
 #include "syntax.h"
 
-struct SelectList {
-	bool active = false;
-	std::string search;
-	std::vector<std::string>* all;
-	std::vector<int> filtered;
-	int selected = 0;
-	int chosen = -1;
-	void start(std::vector<std::string>* items);
-	void input();
-	void draw(int xx, int yy, int ww, int hh);
-	void filter();
-};
-
-struct InputBox {
-	bool active = false;
-	std::string content;
-	void start(std::string prefix);
-	void input();
-	void draw(int xx, int yy, int ww, int hh);
-};
-
 struct ViewRegion {
 	int offset;
 	int length;
 };
 
 struct View {
-	int x = 0;
-	int y = 0;
 	int w = 0;
 	int h = 0;
 	int top = 0;
@@ -55,15 +32,12 @@ struct View {
 	std::vector<ViewRegion> lines;
 	std::vector<ViewRegion> selections;
 
-	SelectList findTag;
-	std::vector<ViewRegion> tagRegions;
-	std::vector<std::string> tagStrings;
+	struct Clip {
+		std::string text;
+		bool line = false;
+	};
 
-	SelectList autoComp;
-	std::string autoPrefix;
-	std::vector<std::string> autoStrings;
-
-	InputBox prompt;
+	std::vector<Clip> clips;
 
 	ViewRegion skip;
 
@@ -95,12 +69,14 @@ struct View {
 	void nav();
 	void undo();
 	void redo();
+	void insertAt(ViewRegion& selection, int c, bool autoindent);
 	void insert(int c, bool autoindent = false);
 	bool erase();
 	int upper(int c);
 	int lower(int c);
 	void draw();
 	void up();
+	void downAt(ViewRegion& selection);
 	void down();
 	void right();
 	void left();
@@ -108,17 +84,20 @@ struct View {
 	void end();
 	void pgup();
 	void pgdown();
+	void bumpup();
+	void bumpdown();
 	void back(int c = 0);
+	void delAt(ViewRegion& selection);
 	void del(int c = 0);
+	void clip();
 	void cut();
 	void copy();
 	void paste();
 	bool dup();
-	void findTags();
-	void filterTags();
-	void drawTags();
 	void selectRight();
+	void selectRightBoundary();
 	void selectLeft();
+	void selectLeftBoundary();
 	bool selectNext();
 	void selectDown();
 	void selectUp();
@@ -139,8 +118,9 @@ struct View {
 	void move(int xx, int yy, int ww, int hh);
 	void input();
 	void single();
+	void single(ViewRegion& selection);
 	bool indent();
 	bool outdent();
-	bool autocomplete();
-	void interpret();
+	std::vector<std::string> autocomplete();
+	void interpret(const std::string& cmd);
 };

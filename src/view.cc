@@ -1,14 +1,16 @@
 #include "common.h"
 #include "view.h"
-#include "tui.h"
 #include "syntax.h"
 #include "theme.h"
 #include "config.h"
 #include <fstream>
 #include <filesystem>
 #include <chrono>
+#include "../imgui/imgui.h"
+#include "../imgui/imgui_impl_sdl.h"
+#include "../imgui/imgui_impl_opengl3.h"
+#include <SDL.h>
 
-extern TUI tui;
 extern Theme theme;
 extern Config config;
 
@@ -20,13 +22,6 @@ View::View() {
 
 View::~View() {
 	delete syntax;
-}
-
-void View::move(int xx, int yy, int ww, int hh) {
-	x = xx;
-	y = yy;
-	w = ww;
-	h = hh;
 }
 
 void View::sanity() {
@@ -44,7 +39,7 @@ void View::sanity() {
 	std::vector<ViewRegion> keep;
 
 	auto within = [&](int offset, int length, int p) {
-		return offset <= p && p < offset+length;
+		return p >= offset && p < offset+length;
 	};
 
 	for (auto candidate: selections) {
@@ -52,9 +47,9 @@ void View::sanity() {
 		for (auto& selection: keep) {
 			bool same = candidate.offset == selection.offset && candidate.length == selection.length;
 			bool overlapA = within(selection.offset, selection.length, candidate.offset);
-			bool overlapB = within(selection.offset, selection.length, candidate.offset+candidate.length);
+			bool overlapB = within(selection.offset, selection.length, candidate.offset+std::max(0,candidate.length-1));
 			bool overlapC = within(candidate.offset, candidate.length, selection.offset);
-			bool overlapD = within(candidate.offset, candidate.length, selection.offset+selection.length);
+			bool overlapD = within(candidate.offset, candidate.length, selection.offset+std::max(0,selection.length-1));
 			clash = (same || overlapA || overlapB || overlapC || overlapD);
 			if (clash) break;
 		}
@@ -239,57 +234,60 @@ bool View::erase() {
 	return erased;
 }
 
+void View::insertAt(ViewRegion& selection, int c, bool autoindent) {
+	auto it = text.begin()+selection.offset;
+
+	if (selections.size() == 1U
+		&& undos.size() > 0
+		&& undos.back().type == Insertion
+		&& undos.back().selections.size() == 1
+		&& undos.back().offset+undos.back().length == selection.offset
+	){
+		undos.back().length++;
+		undos.back().text.push_back(c);
+	}
+	else {
+		Change change;
+		change.batch = batches;
+		change.type = Insertion;
+		change.offset = selection.offset;
+		change.length = 1;
+		change.text = {c};
+		change.selections = selections;
+		undos.push_back(change);
+		redos.clear();
+	}
+
+	int inserted = 1;
+	it = text.insert(it, c)+1;
+
+	if (autoindent && c == '\n') {
+		int left = toSol(selection.offset);
+		int start = selection.offset-left;
+
+		std::vector<int> indent;
+		while (iswspace(text[start]) && text[start] != '\n') {
+			indent.push_back(text[start++]);
+		}
+
+		text.insert(it, indent.begin(), indent.end());
+		inserted += indent.size();
+		for (int c: indent) undos.back().text.push_back(c);
+		undos.back().length += (int)indent.size();
+	}
+
+	for (int j = 0; j < (int)selections.size(); j++) {
+		auto& jselection = selections[j];
+		if (jselection.offset >= selection.offset) {
+			jselection.offset += inserted;
+		}
+	}
+}
+
 void View::insert(int c, bool autoindent) {
 	erase();
-	for (int i = 0; i < (int)selections.size(); i++) {
-		auto& selection = selections[i];
-		auto it = text.begin()+selection.offset;
-
-		if ((int)selections.size() == 1
-			&& undos.size() > 0
-			&& undos.back().type == Insertion
-			&& undos.back().selections.size() == 1
-			&& undos.back().offset+undos.back().length == selection.offset
-		){
-			undos.back().length++;
-			undos.back().text.push_back(c);
-		}
-		else {
-			Change change;
-			change.batch = batches;
-			change.type = Insertion;
-			change.offset = selection.offset;
-			change.length = 1;
-			change.text = {c};
-			change.selections = selections;
-			undos.push_back(change);
-			redos.clear();
-		}
-
-		int inserted = 1;
-		it = text.insert(it, c)+1;
-
-		if (autoindent && c == '\n') {
-			int left = toSol(selection.offset);
-			int start = selection.offset-left;
-
-			std::vector<int> indent;
-			while (iswspace(text[start]) && text[start] != '\n') {
-				indent.push_back(text[start++]);
-			}
-
-			text.insert(it, indent.begin(), indent.end());
-			inserted += indent.size();
-			for (int c: indent) undos.back().text.push_back(c);
-			undos.back().length += (int)indent.size();
-		}
-
-		for (int j = 0; j < (int)selections.size(); j++) {
-			auto& jselection = selections[j];
-			if (jselection.offset >= selection.offset) {
-				jselection.offset += inserted;
-			}
-		}
+	for (auto& selection: selections) {
+		insertAt(selection, c, autoindent);
 	}
 	batches++;
 	modified = true;
@@ -360,41 +358,45 @@ void View::back(int c) {
 	}
 }
 
+void View::delAt(ViewRegion& selection) {
+	auto it = text.begin()+selection.offset;
+
+	if ((int)selections.size() == 1
+		&& undos.size() > 0
+		&& undos.back().type == Deletion
+		&& undos.back().selections.size() == 1
+		&& undos.back().offset == selection.offset
+	){
+		undos.back().length++;
+		undos.back().text.push_back(text[undos.back().offset]);
+	}
+	else {
+		Change change;
+		change.batch = batches;
+		change.type = Deletion;
+		change.offset = selection.offset;
+		change.length = 1;
+		change.text = {it, it+1};
+		change.selections = selections;
+		undos.push_back(change);
+		redos.clear();
+	}
+
+	text.erase(it, it+1);
+	for (int j = 0; j < (int)selections.size(); j++) {
+		auto& jselection = selections[j];
+		if (jselection.offset > selection.offset) {
+			jselection.offset -= 1;
+		}
+	}
+}
+
 void View::del(int c) {
 	if (!erase()) {
 		for (int i = 0; i < (int)selections.size(); i++) {
 			auto& selection = selections[i];
-			auto it = text.begin()+selection.offset;
 			if (c && c != get(selection.offset)) continue;
-
-			if ((int)selections.size() == 1
-				&& undos.size() > 0
-				&& undos.back().type == Deletion
-				&& undos.back().selections.size() == 1
-				&& undos.back().offset == selection.offset
-			){
-				undos.back().length++;
-				undos.back().text.push_back(text[undos.back().offset]);
-			}
-			else {
-				Change change;
-				change.batch = batches;
-				change.type = Deletion;
-				change.offset = selection.offset;
-				change.length = 1;
-				change.text = {it, it+1};
-				change.selections = selections;
-				undos.push_back(change);
-				redos.clear();
-			}
-
-			text.erase(it, it+1);
-			for (int j = 0; j < (int)selections.size(); j++) {
-				auto& jselection = selections[j];
-				if (jselection.offset > selection.offset) {
-					jselection.offset -= 1;
-				}
-			}
+			delAt(selection);
 		}
 		batches++;
 		modified = true;
@@ -402,79 +404,76 @@ void View::del(int c) {
 	}
 }
 
-void View::cut() {
-	if (selections.size() > 1) return;
-	auto& selection = selections.front();
-	if (selection.length > 0) {
+void View::clip() {
+	clips.clear();
+	std::list<bool> lines;
+	for (auto& selection: selections) {
+		lines.push_back(!selection.length);
+		if (!selection.length) {
+			int left = toSol(selection.offset);
+			int right = toEol(selection.offset)+1;
+			selection.offset -= left;
+			selection.length = right+left;
+		}
+	}
+	sanity();
+	for (auto& selection: selections) {
 		auto it = text.begin()+selection.offset;
-		tui.clip.text = {it, it+selection.length};
-		tui.clip.line = false;
-		del();
-	} else {
-		int left = toSol(selection.offset);
-		int right = toEol(selection.offset);
-		auto it = text.begin()+selection.offset-left;
-		tui.clip.text = {it, it+left+right};
-		tui.clip.text += '\n';
-		tui.clip.line = true;
-		for (int i = 0; i < left; i++) back();
-		for (int i = 0; i < right+1; i++) del();
+		Clip clip;
+		clip.text = {it, it+selection.length};
+		clip.line = lines.front();
+		lines.pop_front();
+		clips.push_back(clip);
+	}
+	ImGui::SetClipboardText(clips.front().text.c_str());
+}
+
+void View::cut() {
+	clip();
+	erase();
+}
+
+void View::copy() {
+	clip();
+	sanity();
+}
+
+void View::paste() {
+	erase();
+	int nclips = clips.size();
+	auto cliptext = ImGui::GetClipboardText();
+	auto clipstring = std::string(cliptext ? cliptext: "");
+	for (int i = selections.size()-1; i >= 0; --i) {
+		auto& selection = selections[i];
+		// when single clip/selection, clipboard takes precedence
+		auto clipText = nclips > 0 && nclips > i ? clips[i].text: clipstring;
+		auto clipLine = nclips > 0 && nclips > i ? clips[i].line: false;
+		int offset = selection.offset;
+
+		if (clipLine) {
+			int left = toSol(selection.offset);
+			selection.offset -= left;
+		}
+
+		for (auto c: clipText) {
+			insertAt(selection, c, false);
+		}
+
+		if (clipLine) {
+			selection.offset = offset;
+			downAt(selection);
+		}
 	}
 	modified = true;
 	sanity();
 }
 
-void View::copy() {
-	if (selections.size() > 1) return;
-	auto& selection = selections.front();
-	if (selection.length > 0) {
-		auto it = text.begin()+selection.offset;
-		tui.clip.text = {it, it+selection.length};
-		tui.clip.line = false;
-	} else {
-		int left = toSol(selection.offset);
-		int right = toEol(selection.offset);
-		auto it = text.begin()+selection.offset-left;
-		tui.clip.text = {it, it+left+right};
-		tui.clip.text += '\n';
-		tui.clip.line = true;
-	}
-}
-
-void View::paste() {
-	if (selections.size() > 1) return;
-	auto& selection = selections.front();
-	if (selection.length > 0) del();
-	int offset = selection.offset;
-	if (tui.clip.line) {
-		nav();
-		int left = toSol(selection.offset);
-		selection.offset -= left;
-	}
-	for (auto c: tui.clip.text) {
-		insert(c, false);
-	}
-	if (tui.clip.line) {
-		selection.offset = offset;
-		sanity();
-		down();
-	}
-}
-
 bool View::dup() {
 	copy();
+	for (auto& selection: selections)
+		selection.length = 0;
 	paste();
 	return true;
-}
-
-void View::findTags() {
-	tagRegions = syntax->tags(text);
-	tagStrings.clear();
-	for (auto& region: tagRegions) {
-		auto it = text.begin()+region.offset;
-		tagStrings.push_back({it, it+region.length});
-	}
-	findTag.start(&tagStrings);
 }
 
 int View::upper(int c) {
@@ -498,14 +497,18 @@ void View::up() {
 	sanity();
 }
 
+void View::downAt(ViewRegion& selection) {
+	int left = toSol(selection.offset);
+	selection.offset += toEol(selection.offset);
+	selection.offset++;
+	int right = toEol(selection.offset);
+	selection.offset += std::min(left, right);
+	selection.length = 0;
+}
+
 void View::down() {
 	for (auto& selection: selections) {
-		int left = toSol(selection.offset);
-		selection.offset += toEol(selection.offset);
-		selection.offset++;
-		int right = toEol(selection.offset);
-		selection.offset += std::min(left, right);
-		selection.length = 0;
+		downAt(selection);
 	}
 	sanity();
 }
@@ -543,13 +546,23 @@ void View::end() {
 
 void View::pgup() {
 	single();
-	for (int i = 0; i < h; i++) up();
+	for (int i = 0; h > 0 && i < h; i++) up();
 	sanity();
 }
 
 void View::pgdown() {
 	single();
-	for (int i = 0; i < h; i++) down();
+	for (int i = 0; h > 0 && i < h; i++) down();
+	sanity();
+}
+
+void View::bumpup() {
+	top = std::max(0, top-1);
+	sanity();
+}
+
+void View::bumpdown() {
+	top = std::min((int)lines.size()-1, top+1);
 	sanity();
 }
 
@@ -561,10 +574,30 @@ void View::selectRight() {
 	sanity();
 }
 
+void View::selectRightBoundary() {
+	for (auto& selection: selections) {
+		int offset = selection.offset+selection.length;
+		while (offset < (int)text.size() && !eol(offset) && syntax->isboundary(get(offset))) offset++;
+		while (offset < (int)text.size() && !eol(offset) && !syntax->isboundary(get(offset))) offset++;
+		selection.length = offset-selection.offset;
+	}
+	sanity();
+}
+
 void View::selectLeft() {
 	for (auto& selection: selections) {
 		selection.length--;
 		if (selection.length == 1) selection.length = 0;
+	}
+	sanity();
+}
+
+void View::selectLeftBoundary() {
+	for (auto& selection: selections) {
+		int offset = selection.offset+selection.length;
+		while (offset > selection.offset && !sol(offset) && syntax->isboundary(get(offset))) offset--;
+		while (offset > selection.offset && !sol(offset) && !syntax->isboundary(get(offset))) offset--;
+		selection.length = offset-selection.offset;
 	}
 	sanity();
 }
@@ -659,27 +692,19 @@ void View::intoView(ViewRegion& selection) {
 }
 
 void View::boundaryRight() {
-	auto isboundary = [&](int c) {
-		return c != '_' && (iswcntrl(c) || iswpunct(c) || iswspace(c));
-	};
-
 	for (auto& selection: selections) {
-		while (selection.offset < (int)text.size() && !eol(selection.offset) && isboundary(get(selection.offset))) selection.offset++;
-		while (selection.offset < (int)text.size() && !eol(selection.offset) && !isboundary(get(selection.offset))) selection.offset++;
+		while (selection.offset < (int)text.size() && !eol(selection.offset) && syntax->isboundary(get(selection.offset))) selection.offset++;
+		while (selection.offset < (int)text.size() && !eol(selection.offset) && !syntax->isboundary(get(selection.offset))) selection.offset++;
 		selection.length = 0;
 	}
 	sanity();
 }
 
 void View::boundaryLeft() {
-	auto isboundary = [&](int c) {
-		return c != '_' && (iswcntrl(c) || iswpunct(c) || iswspace(c));
-	};
-
 	for (auto& selection: selections) {
 		selection.length = 0;
-		while (selection.offset > 0 && !sol(selection.offset) && isboundary(get(selection.offset))) selection.offset--;
-		while (selection.offset > 0 && !sol(selection.offset) && !isboundary(get(selection.offset))) selection.offset--;
+		while (selection.offset > 0 && !sol(selection.offset) && syntax->isboundary(get(selection.offset))) selection.offset--;
+		while (selection.offset > 0 && !sol(selection.offset) && !syntax->isboundary(get(selection.offset))) selection.offset--;
 	}
 	sanity();
 }
@@ -687,6 +712,21 @@ void View::boundaryLeft() {
 void View::single() {
 	skip = {-1,-1};
 	selections = {selections.back()};
+	if (clips.size()) {
+		clips.push_back({});
+		auto& clip = clips.back();
+		for (auto c: clips) {
+			clip.text += c.text;
+			clip.text += '\n';
+		}
+		ImGui::SetClipboardText(clip.text.c_str());
+	}
+}
+
+void View::single(ViewRegion& selection) {
+	single();
+	selections = {selection};
+	sanity();
 }
 
 void View::addCursorDown() {
@@ -726,9 +766,9 @@ void View::unwind() {
 	sanity();
 }
 
-void View::interpret() {
+void View::interpret(const std::string& cmd) {
 	auto prefix = [&](const std::string& s) {
-		return prompt.content.find(s) == 0;
+		return cmd.find(s) == 0;
 	};
 
 	auto find = [&](int from, const std::string& needle, std::function<bool(const std::string& needle, int offset)> match) {
@@ -745,9 +785,9 @@ void View::interpret() {
 		sanity();
 	};
 
-	if (prefix("find ") && prompt.content.size() > 5U) {
+	if (prefix("find ") && cmd.size() > 5U) {
 		int from = selections.back().offset;
-		auto needle = prompt.content.substr(5);
+		auto needle = cmd.substr(5);
 
 		auto match = [&](const std::string& needle, int offset) {
 			for (int i = 0; i < (int)needle.size(); i++) {
@@ -760,9 +800,9 @@ void View::interpret() {
 		return;
 	}
 
-	if (prefix("ifind ") && prompt.content.size() > 6U) {
+	if (prefix("ifind ") && cmd.size() > 6U) {
 		int from = selections.back().offset;
-		auto needle = prompt.content.substr(6);
+		auto needle = cmd.substr(6);
 
 		auto match = [&](const std::string& needle, int offset) {
 			for (int i = 0; i < (int)needle.size(); i++) {
@@ -777,7 +817,7 @@ void View::interpret() {
 
 	if (prefix("go ")) {
 		int lineno = 0;
-		if (lines.size() && 1 == std::sscanf(prompt.content.c_str(), "go %d", &lineno)) {
+		if (lines.size() && 1 == std::sscanf(cmd.c_str(), "go %d", &lineno)) {
 			lineno = std::max(1, std::min((int)lines.size(), lineno));
 			selections.clear();
 			selections.push_back({lines[lineno-1].offset, 0});
@@ -787,114 +827,79 @@ void View::interpret() {
 	}
 }
 
-bool View::autocomplete() {
-	if (selections.size() > 1U) return false;
+std::vector<std::string> View::autocomplete() {
+	if (selections.size() > 1U) return {};
 	int cursor = selections.back().offset;
-	autoStrings = syntax->matches(text, cursor);
-	if (!autoStrings.size()) return false;
-	autoPrefix = autoStrings.front();
-	autoStrings.erase(autoStrings.begin());
-	autoComp.start(&autoStrings);
-	autoComp.search = autoPrefix;
-	return true;
+	return syntax->matches(text, cursor);
 }
 
 void View::input() {
-	if (findTag.active) {
-		findTag.input();
-		if (!findTag.active && findTag.chosen >= 0) {
-			selections = {tagRegions[findTag.filtered[findTag.chosen]]};
-			int lineno = 0;
-			auto& selection = selections.back();
-			for (auto& line: lines) {
-				if (line.offset <= selection.offset) lineno++;
-			}
-			top = std::max(0, lineno-10);
-			sanity();
-		}
-		return;
-	}
+	ImGuiIO& io = ImGui::GetIO();
 
-	if (autoComp.active) {
-		autoComp.input();
-		if (!autoComp.active && autoComp.chosen >= 0) {
-			std::string autoMatch = autoStrings[autoComp.filtered[autoComp.chosen]];
-			for (int i = 0; i < (int)autoMatch.size(); i++) {
-				if (i < (int)autoPrefix.size()) continue;
-				insert(autoMatch[i]);
-			}
-		}
-		return;
-	}
+	if (ImGui::IsKeyReleased(SDL_SCANCODE_ESCAPE)) { single(); sanity(); return; }
 
-	if (prompt.active) {
-		prompt.input();
-		if (!prompt.active) {
-			interpret();
-		}
-		return;
-	}
+	if (io.KeyAlt && io.KeyShift && ImGui::IsKeyDown(SDL_SCANCODE_DOWN)) { addCursorDown(); return; }
+	if (io.KeyAlt && io.KeyShift && ImGui::IsKeyDown(SDL_SCANCODE_UP)) { addCursorUp(); return; }
 
-	if (tui.keys.esc && selections.size() > 1) { single(); sanity(); return; }
+	if (io.KeyCtrl && io.KeyShift && ImGui::IsKeyDown(SDL_SCANCODE_RIGHT)) { selectRightBoundary(); return; }
+	if (io.KeyCtrl && io.KeyShift && ImGui::IsKeyDown(SDL_SCANCODE_LEFT)) { selectLeftBoundary(); return; }
 
-	if (tui.keys.alt && tui.keys.shift && tui.keysym == "Down") { addCursorDown(); return; }
-	if (tui.keys.alt && tui.keys.shift && tui.keysym == "Up") { addCursorUp(); return; }
+	if (io.KeyShift && ImGui::IsKeyDown(SDL_SCANCODE_RIGHT)) { selectRight(); return; }
+	if (io.KeyShift && ImGui::IsKeyDown(SDL_SCANCODE_LEFT)) { selectLeft(); return; }
 
-	if (tui.keys.ctrl && tui.keysym == "Right") { boundaryRight(); return; }
-	if (tui.keys.ctrl && tui.keysym == "Left") { boundaryLeft(); return; }
+	if (io.KeyCtrl && ImGui::IsKeyDown(SDL_SCANCODE_RIGHT)) { boundaryRight(); return; }
+	if (io.KeyCtrl && ImGui::IsKeyDown(SDL_SCANCODE_LEFT)) { boundaryLeft(); return; }
 
-	if (tui.keys.shift && tui.keysym == "Right") { selectRight(); return; }
-	if (tui.keys.shift && tui.keysym == "Left") { selectLeft(); return; }
+	if (io.KeyCtrl && ImGui::IsKeyDown(SDL_SCANCODE_DOWN)) { bumpdown(); return; }
+	if (io.KeyCtrl && ImGui::IsKeyDown(SDL_SCANCODE_UP)) { bumpup(); return; }
 
-	if (tui.keys.shift && tui.keysym == "Down") { selectDown(); return; }
-	if (tui.keys.shift && tui.keysym == "Up") { selectUp(); return; }
+	if (io.KeyShift && ImGui::IsKeyDown(SDL_SCANCODE_DOWN)) { selectDown(); return; }
+	if (io.KeyShift && ImGui::IsKeyDown(SDL_SCANCODE_UP)) { selectUp(); return; }
 
-	if (tui.keys.shift && tui.keys.tab) { outdent(); return; }
-	if (!tui.keys.shift && tui.keys.tab) { autocomplete() || indent(); return; }
+	if (io.KeyShift && ImGui::IsKeyDown(SDL_SCANCODE_TAB)) { outdent(); return; }
+	if (!io.KeyShift && ImGui::IsKeyDown(SDL_SCANCODE_TAB)) { indent(); return; }
 
-	if (tui.keys.ctrl && tui.keysym == "M") { insert('\n', true); return; }
-	if (tui.keys.ctrl && tui.keysym == "Z") { undo(); return; }
-	if (tui.keys.ctrl && tui.keysym == "Y") { redo(); return; }
-	if (tui.keys.ctrl && tui.keysym == "X") { cut(); return; }
-	if (tui.keys.ctrl && tui.keysym == "C") { copy(); return; }
-	if (tui.keys.ctrl && tui.keysym == "V") { paste(); return; }
-	if (tui.keys.ctrl && tui.keysym == "D") { selectNext() || dup(); return; }
-	if (tui.keys.ctrl && tui.keysym == "K") { selectSkip(); return; }
-	if (tui.keys.ctrl && tui.keysym == "B") { unwind(); return; }
-	if (tui.keys.ctrl && tui.keysym == "R") { findTags(); return; }
-	if (tui.keys.ctrl && tui.keysym == "E") { prompt.start(""); return; }
-	if (tui.keys.ctrl && tui.keysym == "F") { prompt.start("find "); return; }
-	if (tui.keys.ctrl && tui.keysym == "G") { prompt.start("go "); return; }
-	if (tui.keys.ctrl && tui.keysym == "S") { save(); return; }
-	if (tui.keys.ctrl && tui.keysym == "L") { reload(); return; }
+	if (io.KeyCtrl && ImGui::IsKeyDown(SDL_SCANCODE_Z)) { undo(); return; }
+	if (io.KeyCtrl && ImGui::IsKeyDown(SDL_SCANCODE_Y)) { redo(); return; }
+	if (io.KeyCtrl && ImGui::IsKeyDown(SDL_SCANCODE_X)) { cut(); return; }
+	if (io.KeyCtrl && ImGui::IsKeyDown(SDL_SCANCODE_C)) { copy(); return; }
+	if (io.KeyCtrl && ImGui::IsKeyDown(SDL_SCANCODE_V)) { paste(); return; }
+	if (io.KeyCtrl && ImGui::IsKeyDown(SDL_SCANCODE_D)) { selectNext() || dup(); return; }
+	if (io.KeyCtrl && ImGui::IsKeyDown(SDL_SCANCODE_K)) { selectSkip(); return; }
+	if (io.KeyCtrl && ImGui::IsKeyDown(SDL_SCANCODE_B)) { unwind(); return; }
+	if (io.KeyCtrl && ImGui::IsKeyDown(SDL_SCANCODE_S)) { save(); return; }
+	if (io.KeyCtrl && ImGui::IsKeyDown(SDL_SCANCODE_L)) { reload(); return; }
 
-	if (!tui.keys.mods && tui.keysym == "Up") { up(); return; }
-	if (!tui.keys.mods && tui.keysym == "Down") { down(); return; }
-	if (!tui.keys.mods && tui.keysym == "Right") { right(); return; }
-	if (!tui.keys.mods && tui.keysym == "Left") { left(); return; }
-	if (!tui.keys.mods && tui.keysym == "Home") { home(); return; }
-	if (!tui.keys.mods && tui.keysym == "End") { end(); return; }
+	bool mods = io.KeyCtrl || io.KeyShift || io.KeyAlt || io.KeySuper;
 
-	if (!tui.keys.mods && tui.keysym == "PageUp") { pgup(); return; }
-	if (!tui.keys.mods && tui.keysym == "PageDown") { pgdown(); return; }
+	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_RETURN)) { insert('\n', true); return; }
+	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_UP)) { up(); return; }
+	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_DOWN)) { down(); return; }
+	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_RIGHT)) { right(); return; }
+	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_LEFT)) { left(); return; }
+	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_HOME)) { home(); return; }
+	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_END)) { end(); return; }
 
-	if (!tui.keys.mods && tui.keys.back) { back(); return; }
-	if (!tui.keys.mods && tui.keys.del) { del(); return; }
+	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_PAGEUP)) { pgup(); return; }
+	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_PAGEDOWN)) { pgdown(); return; }
 
-	if (tui.mouse.wheel) {
+	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_BACKSPACE)) { back(); return; }
+	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_DELETE)) { del(); return; }
+
+	if (io.MouseWheel > 0.0f || io.MouseWheel < 0.0f) {
 		auto now = std::chrono::system_clock::now();
 		auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now-lastWheel);
-		int steps = ms < config.mouse.wheelSpeedStep ? 3: 1;
-		if (tui.mouse.wheel < 0) { for (int i = 0; i < steps; i++) up(); }
-		if (tui.mouse.wheel > 0) { for (int i = 0; i < steps; i++) down(); }
+		int steps = ms < config.mouse.wheelSpeedStep ? 5: 1;
+		if (io.MouseWheel > 0) { for (int i = 0; i < steps; i++) up(); }
+		if (io.MouseWheel < 0) { for (int i = 0; i < steps; i++) down(); }
 		lastWheel = now;
 		return;
 	}
 
-	if (tui.escseq.size()) return;
-
-	if (!tui.keys.ctrl && tui.keycode&0xff00) { insert(tui.keycode); return; }
-	if (!tui.keys.ctrl && tui.keysym.size() == 1) { insert(tui.keysym.front()); return; }
+	if (!io.KeyCtrl && !io.KeyAlt && !io.KeySuper) {
+		for (auto c: io.InputQueueCharacters) insert(c);
+		io.ClearInputCharacters();
+	}
 }
 
 void View::open(std::string path) {
@@ -985,19 +990,38 @@ void View::reload() {
 }
 
 void View::draw() {
-	std::string blank;
-	blank.resize(w, ' ');
-
 	int row = 0;
 	int col = 0;
 	int cursor = 0;
 	int selecting = 0;
 
+	auto origin = ImGui::GetCursorPos();
+	origin.x += ImGui::GetWindowPos().x;
+	origin.y += ImGui::GetWindowPos().y;
+
+	auto cell = ImGui::CalcTextSize("X");
+	cell.y = ImGui::GetTextLineHeightWithSpacing();
+
+	auto region = ImGui::GetContentRegionAvail();
+
+	w = std::ceil(region.x/cell.x);
+	h = std::ceil(region.y/cell.y);
+
+	struct Output {
+		int x = 0;
+		int y = 0;
+		uint fg = 0xffffffff;
+		uint bg = 0x00000000;
+		std::vector<ImWchar> text;
+	};
+
+	std::vector<Output> out;
+
 	auto token = Syntax::Token::None;
 	auto state = Theme::State::Plain;
 
 	int lineCol = std::ceil(std::log10((int)lines.size()+1));
-	std::string lineFmt = fmt("%s\e[38;5;238m%%0%dd ", theme.highlight[token][state].bg, lineCol);
+	std::string lineFmt = fmt("%%0%dd ", lineCol);
 	int lineNo = top+1;
 
 	int textCol = 0;
@@ -1012,36 +1036,8 @@ void View::draw() {
 	int leftOffset = std::max(0, textCol-(w-lineCol-2));
 	int leftRemaining = 0;
 
-	tui.to(x,y);
-	tui.print("\e[38;5;255m");
-	tui.print("\e[48;5;22m");
-
-	auto left = fmt(" %s %llu %s", path, selections.size(), tui.escseq);
-	auto right = fmt("%dkB %s ", std::max(1, (int)(text.size()/1024U)), modified ? "modified": "saved");
-
-	tui.print(left);
-	if ((int)(left.size()+right.size()) < w) {
-		tui.print(blank.substr(left.size()+right.size()));
-	}
-	tui.print(right);
-
-	tui.format(theme.highlight[token][state]);
-
-	if (findTag.active) {
-		findTag.draw(x, y+1, w, h-1);
-		return;
-	}
-
-	if (autoComp.active) {
-		autoComp.draw(x, y+1, w, h-1);
-		return;
-	}
-
-	row++;
-	col = 0;
-
-	tui.to(x+col,y+row);
-	cursor = lines[top].offset;
+	unsigned int fg = 0xffffffff;
+	unsigned int bg = 0x00000000;
 
 	auto emit = [&](int c) {
 		if (leftRemaining > 0) {
@@ -1049,16 +1045,33 @@ void View::draw() {
 			return;
 		}
 		if (col < w) {
-			tui.emit(c);
+			if (!out.back().text.size()) {
+				out.back().fg = fg;
+				out.back().bg = bg;
+			}
+
+			if (out.back().fg != fg || out.back().bg != bg) {
+				out.push_back({col,row,fg,bg,{}});
+			}
+
+			out.back().text.push_back(c);
 		}
 		col++;
 	};
 
-	auto eraseEol = [&]() {
-		int spaces = std::max(0, w-col);
-		tui.print(blank.substr(w-spaces));
-		col += spaces;
+	auto format = [&](auto f) {
+		fg = f.fg;
+		bg = f.bg;
 	};
+
+	auto cr = [&]() {
+		col = 0;
+		row++;
+	};
+
+	format(theme.highlight[token][state]);
+
+	cursor = lines[top].offset;
 
 	// detect large selection starting off screen
 	for (auto& selection: selections) {
@@ -1072,10 +1085,13 @@ void View::draw() {
 	while (cursor <= (int)text.size() && row < h) {
 
 		if (col == 0) {
-			tui.to(x+col,y+row);
-			tui.print(fmt(lineFmt.c_str(), lineNo++));
-			col += lineCol+1;
-			tui.format(theme.highlight[token][state]);
+			fg = 0x666666ff;
+			bg = 0;
+			auto line = fmt(lineFmt.c_str(), lineNo++);
+			out.push_back({col,row,fg,bg,{line.begin(),line.end()}});
+			col = lineCol+1;
+			format(theme.highlight[token][state]);
+			out.push_back({col,row,fg,bg,{}});
 			leftRemaining = leftOffset;
 		}
 
@@ -1097,7 +1113,7 @@ void View::draw() {
 		if (newToken != token || newState != state) {
 			token = newToken;
 			state = newState;
-			tui.format(theme.highlight[token][state]);
+			format(theme.highlight[token][state]);
 		}
 
 		int c = cursor < (int)text.size() ? text[cursor]: '\n';
@@ -1106,27 +1122,18 @@ void View::draw() {
 		if (c == '\n') {
 			if (selecting) {
 				emit(' ');
-				if (col < w) {
-					tui.format(theme.highlight[Syntax::Token::None][Theme::State::Plain]);
-					eraseEol();
-					tui.format(theme.highlight[token][state]);
-				}
 			}
-			else {
-				eraseEol();
-			}
-			row++;
-			col = 0;
+			cr();
 			continue;
 		}
 
 		if (col < w && c == '\t') {
 			if (selecting) {
 				emit(' ');
-				tui.format(theme.highlight[Syntax::Token::None][Theme::State::Plain]);
+				format(theme.highlight[Syntax::Token::None][Theme::State::Plain]);
 				int spaces = std::min(w-col, tabs.width-1);
 				for (int i = 0; i < spaces; i++) emit(' ');
-				tui.format(theme.highlight[token][state]);
+				format(theme.highlight[token][state]);
 			}
 			else {
 				int spaces = std::min(w-col, tabs.width);
@@ -1138,183 +1145,30 @@ void View::draw() {
 		emit(c);
 	}
 
-	tui.format(theme.highlight[Syntax::Token::None][Theme::State::Plain]);
+	auto max = ImVec2(origin.x+region.x, origin.y+region.y);
+	ImGui::GetWindowDrawList()->AddRectFilled(origin, max, ImGui::GetColorU32(ImGuiCol_FrameBg));
 
-	while (row < h) {
-		tui.to(x+col,y+row);
-		eraseEol();
-		row++;
-		col = 0;
-	}
+	for (auto& chunk: out) {
+		if (!chunk.text.size()) continue;
 
-	if (prompt.active) {
-		prompt.draw(x, y+1, w, 1);
-	}
-}
+		auto min = (ImVec2){origin.x+chunk.x*cell.x, origin.y+chunk.y*cell.y};
+		auto max = ImVec2(min.x+(cell.x*chunk.text.size()), min.y+cell.y);
 
-void SelectList::start(std::vector<std::string>* items) {
-	active = true;
-	search = "";
-	selected = 0;
-	chosen = -1;
-	all = items;
-	filter();
-}
+		max.x = std::min(max.x, origin.x+region.x);
+		max.y = std::min(max.y, origin.y+region.y);
 
-void SelectList::input() {
-	if (tui.keys.esc) {
-		active = false;
-		return;
-	}
+		if (min.y+cell.y > origin.y+region.y) continue;
 
-	if (!tui.keys.ctrl && tui.keys.back && search.size()) {
-		search = search.substr(0, search.size()-1);
-		filter();
-		return;
-	}
-
-	if (!tui.keys.ctrl && tui.keysym.size() == 1) {
-		search += tui.keysym;
-		filter();
-		return;
-	}
-
-	if (tui.keys.ctrl && tui.keysym == "M" && filtered.size() > 0) {
-		chosen = selected;
-		active = false;
-		return;
-	}
-
-	if (tui.keysym == "Down") {
-		selected = std::max(0, std::min(selected+1, ((int)filtered.size())-1));
-		return;
-	}
-
-	if (tui.keysym == "Up") {
-		selected = std::max(0, std::min(selected-1, ((int)filtered.size())-1));
-		return;
-	}
-}
-
-void SelectList::filter() {
-	filtered.clear();
-	for (int i = 0; i < (int)all->size(); i++) {
-		auto& item = (*all)[i];
-		if (!search.size()) {
-			filtered.push_back(i);
-			continue;
-		}
-		auto it = std::search(
-			item.begin(), item.end(),
-			search.begin(), search.end(),
-			[](int a, int b) {
-				return std::toupper(a) == std::toupper(b);
-			}
-		);
-		if (it != item.end()) {
-			filtered.push_back(i);
-		}
-	}
-	selected = std::max(0, std::min(((int)filtered.size())-1, selected));
-}
-
-void SelectList::draw(int x, int y, int w, int h) {
-	std::string blank;
-	blank.resize(w, ' ');
-
-	int col = 0;
-	int row = 0;
-	tui.to(x+col, y+row);
-
-	auto format = [&]() {
-		tui.print("\e[38;5;255m\e[48;5;235m");
-	};
-
-	format();
-
-	tui.emit('>');
-	col++;
-	int swidth = std::min((int)search.size(), w-2);
-	tui.print(search, swidth);
-	col += swidth;
-	tui.print(blank.substr(col));
-	row++;
-	col = 0;
-	tui.to(x+col,y+row);
-
-	for (int i = 0; i < (int)filtered.size() && row < h; i++) {
-		auto& item = (*all)[filtered[i]];
-
-		tui.emit(' ');
-		col++;
-
-		if (selected == i) {
-			tui.format(theme.highlight[Syntax::Token::None][Theme::State::Selected]);
-		}
-		else
-		if (std::find(item.begin(), item.end(), '*') != item.end()) {
-			tui.print("\e[38;5;226m");
+		if (chunk.bg) {
+			ImGui::GetWindowDrawList()->AddRectFilled(min, max, ImGui::ImColorSRGB(chunk.bg));
 		}
 
-		int iwidth = std::min((int)item.size(), w-col-1);
-		tui.print(item, iwidth);
-		col += iwidth;
-
-		format();
-
-		tui.print(blank.substr(col));
-		row++;
-		col = 0;
-		tui.to(x+col,y+row);
+		for (uint i = 0; i < chunk.text.size(); i++) {
+			auto c = chunk.text[i];
+			ImVec2 pos = (ImVec2){min.x+(i*cell.x),min.y};
+			ImGui::GetFont()->RenderChar(ImGui::GetWindowDrawList(), -1.0f, pos, ImGui::ImColorSRGB(chunk.fg), c);
+		}
 	}
 
-	format();
-
-	while (row < h) {
-		tui.print(blank.substr(col));
-		row++;
-		col = 0;
-		tui.to(x+col,y+row);
-	}
-}
-
-void InputBox::start(std::string prefix) {
-	active = true;
-	content = prefix;
-}
-
-void InputBox::input() {
-	if (tui.keys.esc) {
-		active = false;
-		return;
-	}
-
-	if (tui.keys.ctrl && tui.keysym == "M") {
-		active = false;
-		return;
-	}
-
-	if (!tui.keys.ctrl && tui.keys.back && content.size()) {
-		content = content.substr(0, content.size()-1);
-		return;
-	}
-
-	if (!tui.keys.ctrl && tui.keysym.size() == 1) {
-		content += tui.keysym;
-		return;
-	}
-}
-
-void InputBox::draw(int x, int y, int w, int h) {
-	tui.to(x,y);
-	tui.print("\e[38;5;255m\e[48;5;235m>");
-	int col = 1;
-	int cwidth = std::min((int)content.size(), w-2);
-	tui.print(content, cwidth);
-	col += cwidth;
-	tui.format(theme.highlight[Syntax::Token::None][Theme::State::Selected]);
-	tui.emit(' ');
-	col++;
-	tui.print("\e[38;5;255m\e[48;5;235m");
-	while (col < w) { tui.emit(' '); col++; }
+	ImGui::SetCursorPos((ImVec2){origin.x+(w*cell.x), origin.y+(h*cell.y)});
 }

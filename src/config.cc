@@ -6,6 +6,12 @@ using namespace std::chrono_literals;
 void Config::args(int argc, const char** argv) {
 	mouse.wheelSpeedStep = 30ms;
 
+	font.view.face = "font/LiberationMono-Regular.ttf";
+	font.view.size = 18.0f;
+
+	font.ui.face = "font/LiberationSans-Regular.ttf";
+	font.ui.size = 20.0f;
+
 	for (int i = 1; i < argc; i++) {
 		bool next = i < argc-1;
 		auto arg = std::string(argv[i]);
@@ -15,12 +21,12 @@ void Config::args(int argc, const char** argv) {
 		if (next) ensure(std::strlen(argv[i+1]) < 100);
 
 		if (arg == "-tabs" && next) {
-			ensuref(2 == std::sscanf(argv[i+1], "%4s,%d", pad, &tabs.width),
-				"what? %s", argv[i+1]
+			i++;
+			ensuref(2 == std::sscanf(argv[i], "%4s,%d", pad, &tabs.width),
+				"what? %s", argv[i]
 			);
 			tabs.hard = std::string(pad) != "soft";
 			note() << fmt("tabs { hard = %s, width = %d }", (tabs.hard ? "hard": "soft"), tabs.width);
-			i++;
 			continue;
 		}
 

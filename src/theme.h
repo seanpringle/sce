@@ -1,6 +1,5 @@
 #pragma once
 
-#include "tui.h"
 #include "syntax.h"
 #include <map>
 
@@ -11,7 +10,12 @@ struct Theme {
 		Selected,
 	};
 
-	std::map<Syntax::Token,std::map<State,TUI::Format>> highlight;
+	struct Format {
+		uint fg = 0xffffffff;
+		uint bg = 0x000000ff;
+	};
+
+	std::map<Syntax::Token,std::map<State,Format>> highlight;
 
 	Theme();
 };
