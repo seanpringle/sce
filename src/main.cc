@@ -18,6 +18,44 @@ Theme theme;
 Config config;
 Project project;
 
+std::vector<std::vector<View*>> groups;
+
+int group(View* view) {
+	if (!view) return 0;
+	for (int i = 0; i < (int)groups.size(); i++) {
+		auto& group = groups[i];
+		auto it = std::find(group.begin(), group.end(), view);
+		if (it != group.end()) return i;
+	}
+	throw view;
+}
+
+void forget(View* view) {
+	for (auto& src: groups) {
+		src.erase(std::remove(src.begin(), src.end(), view), src.end());
+	}
+}
+
+void sanity() {
+	std::set<View*> views = {project.views.begin(), project.views.end()};
+	for (auto it = groups.begin(); it != groups.end(); ) {
+		auto &group = *it;
+		if (!group.size()) {
+			it = groups.erase(it);
+			continue;
+		}
+		for (auto view: group) {
+			ensure(views.count(view));
+			views.erase(view);
+		}
+		++it;
+	}
+	ensure(!views.size());
+	if (!groups.size()) {
+		groups.resize(1);
+	}
+}
+
 struct ViewTitle {
 	char text[100] = {0};
 };
@@ -30,6 +68,13 @@ int main(int argc, const char* argv[])
 
 	for (int i = 1; i < argc; i++) {
 		project.open(argv[i]);
+	}
+
+	project.active = 0;
+	groups.resize(1);
+
+	for (auto view: project.views) {
+		groups.front().push_back(view);
 	}
 
 	ensuref(0 == SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO), "%s", SDL_GetError());
@@ -159,8 +204,8 @@ int main(int argc, const char* argv[])
 		if (inputActivity) {
 			using namespace ImGui;
 
-			if (io.KeyCtrl && IsKeyDown(SDL_SCANCODE_PAGEUP)) project.active--;
-			if (io.KeyCtrl && IsKeyDown(SDL_SCANCODE_PAGEDOWN)) project.active++;
+			if (io.KeyCtrl && !io.KeyShift && IsKeyDown(SDL_SCANCODE_PAGEUP)) project.active--;
+			if (io.KeyCtrl && !io.KeyShift && IsKeyDown(SDL_SCANCODE_PAGEDOWN)) project.active++;
 
 			project.sanity();
 
@@ -170,8 +215,49 @@ int main(int argc, const char* argv[])
 			open = io.KeyCtrl && IsKeyDown(SDL_SCANCODE_P);
 			comp = io.KeyCtrl && IsKeyDown(SDL_SCANCODE_TAB);
 
-			if (io.KeyCtrl && IsKeyDown(SDL_SCANCODE_W) && project.view()) {
-				if (!project.view()->modified) project.close();
+			if (project.view()) {
+
+				if (io.KeyCtrl && IsKeyDown(SDL_SCANCODE_W)) {
+					if (!project.view()->modified) {
+						forget(project.view());
+						project.close();
+						sanity();
+					}
+				}
+
+				if (io.KeyCtrl && io.KeyShift && IsKeyDown(SDL_SCANCODE_PAGEUP)) {
+					auto active = group(project.view());
+					if (active == 0) {
+						groups.insert(groups.begin(), {project.view()});
+						forget(project.view());
+					} else {
+						auto& dst = groups[active-1];
+						forget(project.view());
+						dst.insert(dst.begin(), project.view());
+					}
+					sanity();
+				}
+
+				if (io.KeyCtrl && io.KeyShift && IsKeyDown(SDL_SCANCODE_PAGEDOWN)) {
+					auto active = group(project.view());
+					if (active == (int)groups.size()-1) {
+						groups.push_back({project.view()});
+						forget(project.view());
+					} else {
+						auto& dst = groups[active+1];
+						forget(project.view());
+						dst.insert(dst.begin(), project.view());
+					}
+					sanity();
+				}
+			}
+
+			auto& grp = groups[group(project.view())];
+
+			if (project.view() && grp.front() != project.view()) {
+				forget(project.view());
+				grp.insert(grp.begin(), project.view());
+				sanity();
 			}
 		}
 
@@ -215,21 +301,14 @@ int main(int argc, const char* argv[])
 					OpenPopup("#comp");
 				}
 
-				bool viewHasInput = project.views.size()
-					&& !IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup)
-					&& GetMousePos().x > 300
-				;
-
-				if (inputActivity && viewHasInput) {
-					project.view()->input();
-				}
-
 				viewTitles.clear();
 				viewTitles.resize(project.views.size());
 
-				if (BeginTable("#layout", 2)) {
+				if (BeginTable("#layout", groups.size()+1)) {
 					TableSetupColumn("#side", ImGuiTableColumnFlags_WidthFixed, 300);
-					TableSetupColumn("#view", ImGuiTableColumnFlags_WidthStretch);
+					for (uint i = 0; i < groups.size(); i++) {
+						TableSetupColumn(fmtc("#group-%u", i), ImGuiTableColumnFlags_WidthStretch);
+					}
 					TableNextRow();
 					TableNextColumn();
 					PushFont(fontUI);
@@ -249,12 +328,16 @@ int main(int argc, const char* argv[])
 						EndListBox();
 					}
 					PopFont();
-					TableNextColumn();
-					if (project.views.size()) {
-						PushFont(fontView);
-						project.view()->draw();
-						PopFont();
+					PushFont(fontView);
+					for (auto& group: groups) {
+						TableNextColumn();
+						if (!group.size()) continue;
+						auto view = group.front();
+						bool viewHasInput = !IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup) && project.view() == view;
+						if (inputActivity && viewHasInput) view->input();
+						view->draw();
 					}
+					PopFont();
 					EndTable();
 				}
 
@@ -484,8 +567,11 @@ int main(int argc, const char* argv[])
 						if (IsKeyDown(SDL_SCANCODE_UP)) openSelected--;
 						openSelected = std::max(0, std::min((int)visible.size()-1, openSelected));
 
-						auto openView = [&](auto& openPath) {
-							project.open(openPath);
+						auto openView = [&](const std::string& openPath) {
+							int active = group(project.view());
+							auto view = project.open(openPath);
+							forget(view);
+							groups[active].push_back(view);
 						};
 
 						if (IsKeyDown(SDL_SCANCODE_RETURN)) {

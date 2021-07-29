@@ -21,19 +21,21 @@ View* Project::view() {
 	return views.size() ? views[active]: nullptr;
 }
 
-void Project::open(const std::string& path) {
+View* Project::open(const std::string& path) {
 	active = find(path);
 
 	if (active < 0) {
-		auto view = new View();
-		view->open(path);
-		views.push_back(view);
+		auto v = new View();
+		v->open(path);
+		views.push_back(v);
 
 		std::sort(views.begin(), views.end(), [](auto a, auto b) { return a->path < b->path; });
 
 		active = find(path);
 		ensure(active >= 0);
 	}
+
+	return view();
 }
 
 void Project::close() {

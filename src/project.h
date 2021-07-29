@@ -8,7 +8,7 @@ struct Project {
 
 	Project() = default;
 	~Project();
-	void open(const std::string& path);
+	View* open(const std::string& path);
 	int find(const std::string& path);
 	void sanity();
 	View* view();
