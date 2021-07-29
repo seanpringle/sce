@@ -12,6 +12,8 @@
 #include <filesystem>
 #include <experimental/filesystem>
 
+using namespace std::literals::chrono_literals;
+
 Theme theme;
 Config config;
 
@@ -82,11 +84,11 @@ int main(int argc, const char* argv[])
 	auto& fonts = ImGui::GetIO().Fonts;
 	fonts->Clear();
 
-	auto fontUI = config.font.ui.face
+	auto fontUI = config.font.ui.face && std::filesystem::exists(config.font.ui.face)
 		? fonts->AddFontFromFileTTF(config.font.ui.face, config.font.ui.size)
 		: fonts->AddFontDefault();
 
-	auto fontView = config.font.view.face
+	auto fontView = config.font.view.face && std::filesystem::exists(config.font.view.face)
 		? fonts->AddFontFromFileTTF(config.font.view.face, config.font.view.size)
 		: fonts->AddFontDefault();
 
@@ -127,16 +129,19 @@ int main(int argc, const char* argv[])
 
 	for (bool done = false; !done;)
 	{
+		//std::this_thread::sleep_for(16ms);
+
 		SDL_Event event;
-		SDL_WaitEvent(&event);
-		ImGui_ImplSDL2_ProcessEvent(&event);
+		if (SDL_WaitEvent(&event)) {
+			ImGui_ImplSDL2_ProcessEvent(&event);
 
-		if (event.type == SDL_QUIT) {
-			done = true;
-		}
+			if (event.type == SDL_QUIT) {
+				done = true;
+			}
 
-		if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window)) {
-			done = true;
+			if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window)) {
+				done = true;
+			}
 		}
 
 		SDL_GetWindowSize(window, &config.window.width, &config.window.height);
@@ -195,7 +200,12 @@ int main(int argc, const char* argv[])
 					OpenPopup("#comp");
 				}
 
-				if (views.size() && !IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup)) {
+				bool viewHasInput = views.size()
+					&& !IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup)
+					&& GetMousePos().x > 300
+				;
+
+				if (viewHasInput) {
 					views[active]->input();
 				}
 
