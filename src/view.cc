@@ -446,8 +446,8 @@ void View::paste() {
 	for (int i = selections.size()-1; i >= 0; --i) {
 		auto& selection = selections[i];
 		// when single clip/selection, clipboard takes precedence
-		auto clipText = nclips > 0 && nclips > i ? clips[i].text: clipstring;
-		auto clipLine = nclips > 0 && nclips > i ? clips[i].line: false;
+		auto clipText = nclips > 1 && nclips > i ? clips[i].text: clipstring;
+		auto clipLine = nclips > 1 && nclips > i ? clips[i].line: false;
 		int offset = selection.offset;
 
 		if (clipLine) {
@@ -836,42 +836,49 @@ std::vector<std::string> View::autocomplete() {
 void View::input() {
 	ImGuiIO& io = ImGui::GetIO();
 
-	if (ImGui::IsKeyReleased(SDL_SCANCODE_ESCAPE)) { single(); sanity(); return; }
+	//bool Alt = !io.KeyCtrl && io.KeyAlt && !io.KeyShift && !io.KeySuper;
+	bool Ctrl = io.KeyCtrl && !io.KeyAlt && !io.KeyShift && !io.KeySuper;
+	bool Shift = !io.KeyCtrl && !io.KeyAlt && io.KeyShift && !io.KeySuper;
 
-	if (io.KeyAlt && io.KeyShift && ImGui::IsKeyDown(SDL_SCANCODE_DOWN)) { addCursorDown(); return; }
-	if (io.KeyAlt && io.KeyShift && ImGui::IsKeyDown(SDL_SCANCODE_UP)) { addCursorUp(); return; }
+	bool AltShift = !io.KeyCtrl && io.KeyAlt && io.KeyShift && !io.KeySuper;
+	bool CtrlShift = io.KeyCtrl && !io.KeyAlt && io.KeyShift && !io.KeySuper;
 
-	if (io.KeyCtrl && io.KeyShift && ImGui::IsKeyDown(SDL_SCANCODE_RIGHT)) { selectRightBoundary(); return; }
-	if (io.KeyCtrl && io.KeyShift && ImGui::IsKeyDown(SDL_SCANCODE_LEFT)) { selectLeftBoundary(); return; }
+	if (AltShift && ImGui::IsKeyDown(SDL_SCANCODE_DOWN)) { addCursorDown(); return; }
+	if (AltShift && ImGui::IsKeyDown(SDL_SCANCODE_UP)) { addCursorUp(); return; }
 
-	if (io.KeyShift && ImGui::IsKeyDown(SDL_SCANCODE_RIGHT)) { selectRight(); return; }
-	if (io.KeyShift && ImGui::IsKeyDown(SDL_SCANCODE_LEFT)) { selectLeft(); return; }
+	if (CtrlShift && ImGui::IsKeyDown(SDL_SCANCODE_RIGHT)) { selectRightBoundary(); return; }
+	if (CtrlShift && ImGui::IsKeyDown(SDL_SCANCODE_LEFT)) { selectLeftBoundary(); return; }
 
-	if (io.KeyCtrl && ImGui::IsKeyDown(SDL_SCANCODE_RIGHT)) { boundaryRight(); return; }
-	if (io.KeyCtrl && ImGui::IsKeyDown(SDL_SCANCODE_LEFT)) { boundaryLeft(); return; }
+	if (Shift && ImGui::IsKeyDown(SDL_SCANCODE_RIGHT)) { selectRight(); return; }
+	if (Shift && ImGui::IsKeyDown(SDL_SCANCODE_LEFT)) { selectLeft(); return; }
 
-	if (io.KeyCtrl && ImGui::IsKeyDown(SDL_SCANCODE_DOWN)) { bumpdown(); return; }
-	if (io.KeyCtrl && ImGui::IsKeyDown(SDL_SCANCODE_UP)) { bumpup(); return; }
+	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_RIGHT)) { boundaryRight(); return; }
+	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_LEFT)) { boundaryLeft(); return; }
 
-	if (io.KeyShift && ImGui::IsKeyDown(SDL_SCANCODE_DOWN)) { selectDown(); return; }
-	if (io.KeyShift && ImGui::IsKeyDown(SDL_SCANCODE_UP)) { selectUp(); return; }
+	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_DOWN)) { bumpdown(); return; }
+	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_UP)) { bumpup(); return; }
 
-	if (io.KeyShift && ImGui::IsKeyDown(SDL_SCANCODE_TAB)) { outdent(); return; }
-	if (!io.KeyShift && ImGui::IsKeyDown(SDL_SCANCODE_TAB)) { indent(); return; }
+	if (Shift && ImGui::IsKeyDown(SDL_SCANCODE_DOWN)) { selectDown(); return; }
+	if (Shift && ImGui::IsKeyDown(SDL_SCANCODE_UP)) { selectUp(); return; }
 
-	if (io.KeyCtrl && ImGui::IsKeyDown(SDL_SCANCODE_Z)) { undo(); return; }
-	if (io.KeyCtrl && ImGui::IsKeyDown(SDL_SCANCODE_Y)) { redo(); return; }
-	if (io.KeyCtrl && ImGui::IsKeyDown(SDL_SCANCODE_X)) { cut(); return; }
-	if (io.KeyCtrl && ImGui::IsKeyDown(SDL_SCANCODE_C)) { copy(); return; }
-	if (io.KeyCtrl && ImGui::IsKeyDown(SDL_SCANCODE_V)) { paste(); return; }
-	if (io.KeyCtrl && ImGui::IsKeyDown(SDL_SCANCODE_D)) { selectNext() || dup(); return; }
-	if (io.KeyCtrl && ImGui::IsKeyDown(SDL_SCANCODE_K)) { selectSkip(); return; }
-	if (io.KeyCtrl && ImGui::IsKeyDown(SDL_SCANCODE_B)) { unwind(); return; }
-	if (io.KeyCtrl && ImGui::IsKeyDown(SDL_SCANCODE_S)) { save(); return; }
-	if (io.KeyCtrl && ImGui::IsKeyDown(SDL_SCANCODE_L)) { reload(); return; }
+	if (Shift && ImGui::IsKeyDown(SDL_SCANCODE_TAB)) { outdent(); return; }
+
+	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_Z)) { undo(); return; }
+	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_Y)) { redo(); return; }
+	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_X)) { cut(); return; }
+	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_C)) { copy(); return; }
+	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_V)) { paste(); return; }
+	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_D)) { selectNext() || dup(); return; }
+	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_K)) { selectSkip(); return; }
+	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_B)) { unwind(); return; }
+	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_S)) { save(); return; }
+	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_L)) { reload(); return; }
 
 	bool mods = io.KeyCtrl || io.KeyShift || io.KeyAlt || io.KeySuper;
 
+	if (ImGui::IsKeyReleased(SDL_SCANCODE_ESCAPE)) { single(); sanity(); return; }
+
+	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_TAB)) { indent(); return; }
 	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_RETURN)) { insert('\n', true); return; }
 	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_UP)) { up(); return; }
 	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_DOWN)) { down(); return; }

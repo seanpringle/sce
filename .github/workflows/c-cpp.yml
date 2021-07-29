@@ -13,8 +13,8 @@ jobs:
     - name: checkout
       uses: actions/checkout@v2
     - name: deps
-      run: sudo apt install build-essential gcc-9 g++-9 cmake 
+      run: sudo apt install build-essential gcc-9 g++-9 cmake libsdl2-dev libglew-dev
     - name: gcc
       run: sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-9 90 --slave /usr/bin/g++ g++ /usr/bin/g++-9 --slave /usr/bin/gcov gcov /usr/bin/gcov-9
     - name: make
-      run: make -j4 linux
+      run: make -j4

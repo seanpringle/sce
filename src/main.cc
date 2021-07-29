@@ -4,10 +4,10 @@
 #include "../imgui/imgui_impl_opengl3.h"
 #include <SDL.h>
 #include <GL/glew.h>
-#include <thread>
 
 #include "theme.h"
 #include "config.h"
+#include "project.h"
 #include "view.h"
 #include <filesystem>
 #include <experimental/filesystem>
@@ -16,9 +16,7 @@ using namespace std::literals::chrono_literals;
 
 Theme theme;
 Config config;
-
-int active = 0;
-std::vector<View*> views;
+Project project;
 
 struct ViewTitle {
 	char text[100] = {0};
@@ -31,13 +29,8 @@ int main(int argc, const char* argv[])
 	config.args(argc, argv);
 
 	for (int i = 1; i < argc; i++) {
-		views.insert(views.begin(), new View());
-		views.front()->open(argv[i]);
+		project.open(argv[i]);
 	}
-
-	std::sort(views.begin(), views.end(), [&](auto a, auto b) {
-		return a->path < b->path;
-	});
 
 	ensuref(0 == SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO), "%s", SDL_GetError());
 
@@ -127,13 +120,30 @@ int main(int argc, const char* argv[])
 	std::vector<std::string> compStrings;
 	std::memset(compInput, 0, sizeof(compInput));
 
+	auto now = []() {
+		return std::chrono::system_clock::now();
+	};
+
+	auto gotFocus = now();
+	auto lostFocus = now() - 24h;
+
 	for (bool done = false; !done;)
 	{
-		//std::this_thread::sleep_for(16ms);
+		bool inputActivity = false;
 
 		SDL_Event event;
 		if (SDL_WaitEvent(&event)) {
-			ImGui_ImplSDL2_ProcessEvent(&event);
+
+			if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
+				gotFocus = now();
+			}
+
+			if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
+				lostFocus = now();
+			}
+
+			inputActivity = ImGui_ImplSDL2_ProcessEvent(&event)
+				&& gotFocus > lostFocus && gotFocus < now() - 300ms;
 
 			if (event.type == SDL_QUIT) {
 				done = true;
@@ -146,13 +156,13 @@ int main(int argc, const char* argv[])
 
 		SDL_GetWindowSize(window, &config.window.width, &config.window.height);
 
-		{
+		if (inputActivity) {
 			using namespace ImGui;
 
-			if (io.KeyCtrl && IsKeyDown(SDL_SCANCODE_PAGEUP)) active--;
-			if (io.KeyCtrl && IsKeyDown(SDL_SCANCODE_PAGEDOWN)) active++;
+			if (io.KeyCtrl && IsKeyDown(SDL_SCANCODE_PAGEUP)) project.active--;
+			if (io.KeyCtrl && IsKeyDown(SDL_SCANCODE_PAGEDOWN)) project.active++;
 
-			active = std::max(0, std::min((int)views.size()-1, active));
+			project.sanity();
 
 			find = io.KeyCtrl && IsKeyDown(SDL_SCANCODE_F);
 			line = io.KeyCtrl && IsKeyDown(SDL_SCANCODE_G);
@@ -160,11 +170,8 @@ int main(int argc, const char* argv[])
 			open = io.KeyCtrl && IsKeyDown(SDL_SCANCODE_P);
 			comp = io.KeyCtrl && IsKeyDown(SDL_SCANCODE_TAB);
 
-			if (io.KeyCtrl && IsKeyDown(SDL_SCANCODE_W) && views.size()) {
-				auto view = views[active];
-				if (!view->modified) {
-					views.erase(views.begin()+active);
-				}
+			if (io.KeyCtrl && IsKeyDown(SDL_SCANCODE_W) && project.view()) {
+				if (!project.view()->modified) project.close();
 			}
 		}
 
@@ -178,7 +185,15 @@ int main(int argc, const char* argv[])
 			SetNextWindowPos(ImVec2(0,0));
 			SetNextWindowSize(ImVec2(config.window.width,config.window.height));
 
-			Begin("#bg", nullptr, ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+			uint flags = ImGuiWindowFlags_NoNav
+				| ImGuiWindowFlags_NoDecoration
+				| ImGuiWindowFlags_NoSavedSettings
+				| ImGuiWindowFlags_NoBringToFrontOnFocus
+				| ImGuiWindowFlags_NoScrollbar
+				| ImGuiWindowFlags_NoScrollWithMouse
+			;
+
+			Begin("#bg", nullptr, flags);
 
 				if (find) {
 					OpenPopup("#find");
@@ -200,17 +215,17 @@ int main(int argc, const char* argv[])
 					OpenPopup("#comp");
 				}
 
-				bool viewHasInput = views.size()
+				bool viewHasInput = project.views.size()
 					&& !IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup)
 					&& GetMousePos().x > 300
 				;
 
-				if (viewHasInput) {
-					views[active]->input();
+				if (inputActivity && viewHasInput) {
+					project.view()->input();
 				}
 
 				viewTitles.clear();
-				viewTitles.resize(views.size());
+				viewTitles.resize(project.views.size());
 
 				if (BeginTable("#layout", 2)) {
 					TableSetupColumn("#side", ImGuiTableColumnFlags_WidthFixed, 300);
@@ -219,8 +234,8 @@ int main(int argc, const char* argv[])
 					TableNextColumn();
 					PushFont(fontUI);
 					if (BeginListBox("#open", ImVec2(300,-1))) {
-						for (uint i = 0; i < views.size(); i++) {
-							auto view = views[i];
+						for (uint i = 0; i < project.views.size(); i++) {
+							auto view = project.views[i];
 							char* title = viewTitles[i].text;
 							uint size = sizeof(viewTitles[i].text);
 
@@ -228,16 +243,16 @@ int main(int argc, const char* argv[])
 							std::snprintf(title, size, "%s%s", view->path.c_str(), modified);
 
 							PushStyleColor(ImGuiCol_Text, view->modified ? ImColorSRGB(0xffff00ff) : GetColorU32(ImGuiCol_Text));
-							if (Selectable(title, active == (int)i)) active = i;
+							if (Selectable(title, project.active == (int)i)) project.active = i;
 							PopStyleColor(1);
 						}
 						EndListBox();
 					}
 					PopFont();
 					TableNextColumn();
-					if (views.size()) {
+					if (project.views.size()) {
 						PushFont(fontView);
-						views[active]->draw();
+						project.view()->draw();
 						PopFont();
 					}
 					EndTable();
@@ -257,9 +272,9 @@ int main(int argc, const char* argv[])
 						SetKeyboardFocusHere();
 						find = false;
 					}
-					if (InputText("#find-input", findInput, sizeof(findInput), ImGuiInputTextFlags_EnterReturnsTrue|ImGuiInputTextFlags_AutoSelectAll)) {
+					if (InputText("find#find-input", findInput, sizeof(findInput), ImGuiInputTextFlags_EnterReturnsTrue|ImGuiInputTextFlags_AutoSelectAll)) {
 						CloseCurrentPopup();
-						views[active]->interpret(fmt("find %s", findInput));
+						project.view()->interpret(fmt("find %s", findInput));
 					}
 					if (IsKeyDown(SDL_SCANCODE_ESCAPE)) {
 						CloseCurrentPopup();
@@ -274,9 +289,9 @@ int main(int argc, const char* argv[])
 						SetKeyboardFocusHere();
 						line = false;
 					}
-					if (InputText("#line-input", lineInput, sizeof(lineInput), ImGuiInputTextFlags_EnterReturnsTrue|ImGuiInputTextFlags_AutoSelectAll)) {
+					if (InputText("line#line-input", lineInput, sizeof(lineInput), ImGuiInputTextFlags_EnterReturnsTrue|ImGuiInputTextFlags_AutoSelectAll)) {
 						CloseCurrentPopup();
-						views[active]->interpret(fmt("go %s", lineInput));
+						project.view()->interpret(fmt("go %s", lineInput));
 					}
 					if (IsKeyDown(SDL_SCANCODE_ESCAPE)) {
 						CloseCurrentPopup();
@@ -294,8 +309,8 @@ int main(int argc, const char* argv[])
 						compPrefix.clear();
 						compSelected = 0;
 						compInput[0] = 0;
-						if (views.size()) {
-							auto view = views[active];
+						if (project.views.size()) {
+							auto view = project.view();
 							compStrings = view->autocomplete();
 							if (compStrings.size()) {
 								compPrefix = compStrings.front();
@@ -307,7 +322,7 @@ int main(int argc, const char* argv[])
 
 					InputText("#comp-input", compInput, sizeof(compInput));
 
-					if (BeginListBox("#comp-matches", ImVec2(-1,-1))) {
+					if (BeginListBox("autocomplete#comp-matches", ImVec2(-1,-1))) {
 						auto filter = std::string(compInput);
 						std::vector<int> visible;
 
@@ -325,7 +340,7 @@ int main(int argc, const char* argv[])
 						auto compInsert = [&](std::string compString) {
 							for (int i = 0; i < (int)compString.size(); i++) {
 								if (i < (int)compPrefix.size()) continue;
-								views[active]->insert(compString[i]);
+								project.view()->insert(compString[i]);
 							}
 						};
 
@@ -366,8 +381,8 @@ int main(int argc, const char* argv[])
 						tagStrings.clear();
 						tagSelected = 0;
 						tagsInput[0] = 0;
-						if (views.size()) {
-							auto view = views[active];
+						if (project.views.size()) {
+							auto view = project.view();
 							auto it = view->text.begin();
 							tagRegions = view->syntax->tags(view->text);
 							for (auto region: tagRegions) {
@@ -377,7 +392,7 @@ int main(int argc, const char* argv[])
 						}
 					}
 
-					InputText("#tags-input", tagsInput, sizeof(tagsInput));
+					InputText("symbol#tags-input", tagsInput, sizeof(tagsInput));
 
 					if (BeginListBox("#tags-matches", ImVec2(-1,-1))) {
 						auto filter = std::string(tagsInput);
@@ -397,7 +412,7 @@ int main(int argc, const char* argv[])
 						if (IsKeyDown(SDL_SCANCODE_RETURN)) {
 							if (visible.size()) {
 								auto& tagRegion = tagRegions[visible[tagSelected]];
-								views[active]->single(tagRegion);
+								project.view()->single(tagRegion);
 							}
 							CloseCurrentPopup();
 						}
@@ -406,7 +421,7 @@ int main(int argc, const char* argv[])
 							auto& tagRegion = tagRegions[visible[i]];
 							auto& tagString = tagStrings[visible[i]];
 							if (Selectable(tagString.c_str(), i == tagSelected)) {
-								views[active]->single(tagRegion);
+								project.view()->single(tagRegion);
 								CloseCurrentPopup();
 							}
 							if (i == tagSelected) {
@@ -470,19 +485,7 @@ int main(int argc, const char* argv[])
 						openSelected = std::max(0, std::min((int)visible.size()-1, openSelected));
 
 						auto openView = [&](auto& openPath) {
-							for (int i = 0; i < (int)views.size(); i++) {
-								if (views[i]->path == openPath) {
-									active = i;
-									return;
-								}
-							}
-							auto view = new View();
-							view->open(openPath);
-							views.insert(views.begin(), view);
-							std::sort(views.begin(), views.end(), [&](auto a, auto b) {
-								return a->path < b->path;
-							});
-							active = std::find(views.begin(), views.end(), view) - views.begin();
+							project.open(openPath);
 						};
 
 						if (IsKeyDown(SDL_SCANCODE_RETURN)) {
