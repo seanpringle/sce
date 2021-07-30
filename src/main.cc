@@ -9,6 +9,7 @@
 #include "config.h"
 #include "project.h"
 #include "view.h"
+#include "keys.h"
 #include <filesystem>
 #include <experimental/filesystem>
 
@@ -17,6 +18,40 @@ using namespace std::literals::chrono_literals;
 Theme theme;
 Config config;
 Project project;
+
+int KeyMap[100] = {
+	[KEY_ESCAPE] = SDL_SCANCODE_ESCAPE,
+	[KEY_BACKSPACE] = SDL_SCANCODE_BACKSPACE,
+	[KEY_DELETE] = SDL_SCANCODE_DELETE,
+	[KEY_TAB] = SDL_SCANCODE_TAB,
+	[KEY_HOME] = SDL_SCANCODE_HOME,
+	[KEY_END] = SDL_SCANCODE_END,
+	[KEY_PAGEDOWN] = SDL_SCANCODE_PAGEDOWN,
+	[KEY_PAGEUP] = SDL_SCANCODE_PAGEUP,
+	[KEY_RETURN] = SDL_SCANCODE_RETURN,
+	[KEY_LEFT] = SDL_SCANCODE_LEFT,
+	[KEY_RIGHT] = SDL_SCANCODE_RIGHT,
+	[KEY_UP] = SDL_SCANCODE_UP,
+	[KEY_DOWN] = SDL_SCANCODE_DOWN,
+	[KEY_B] = SDL_SCANCODE_B,
+	[KEY_C] = SDL_SCANCODE_C,
+	[KEY_D] = SDL_SCANCODE_D,
+	[KEY_F] = SDL_SCANCODE_F,
+	[KEY_F1] = SDL_SCANCODE_F1,
+	[KEY_F2] = SDL_SCANCODE_F2,
+	[KEY_F12] = SDL_SCANCODE_F12,
+	[KEY_G] = SDL_SCANCODE_G,
+	[KEY_K] = SDL_SCANCODE_K,
+	[KEY_L] = SDL_SCANCODE_L,
+	[KEY_P] = SDL_SCANCODE_P,
+	[KEY_R] = SDL_SCANCODE_R,
+	[KEY_S] = SDL_SCANCODE_S,
+	[KEY_V] = SDL_SCANCODE_V,
+	[KEY_W] = SDL_SCANCODE_W,
+	[KEY_X] = SDL_SCANCODE_X,
+	[KEY_Y] = SDL_SCANCODE_Y,
+	[KEY_Z] = SDL_SCANCODE_Z,
+};
 
 std::vector<std::vector<View*>> groups;
 
@@ -245,22 +280,22 @@ int main(int argc, const char* argv[])
 		if (inputActivity) {
 			using namespace ImGui;
 
-			if (io.KeyCtrl && !io.KeyShift && IsKeyDown(SDL_SCANCODE_PAGEUP)) project.active--;
-			if (io.KeyCtrl && !io.KeyShift && IsKeyDown(SDL_SCANCODE_PAGEDOWN)) project.active++;
+			if (io.KeyCtrl && !io.KeyShift && IsKeyDown(KeyMap[KEY_PAGEUP])) project.active--;
+			if (io.KeyCtrl && !io.KeyShift && IsKeyDown(KeyMap[KEY_PAGEDOWN])) project.active++;
 
 			project.sanity();
 
-			find = io.KeyCtrl && IsKeyReleased(SDL_SCANCODE_F);
-			line = io.KeyCtrl && IsKeyReleased(SDL_SCANCODE_G);
-			tags = io.KeyCtrl && IsKeyReleased(SDL_SCANCODE_R);
-			open = io.KeyCtrl && IsKeyReleased(SDL_SCANCODE_P);
-			comp = io.KeyCtrl && IsKeyReleased(SDL_SCANCODE_TAB);
+			find = io.KeyCtrl && IsKeyReleased(KeyMap[KEY_F]);
+			line = io.KeyCtrl && IsKeyReleased(KeyMap[KEY_G]);
+			tags = io.KeyCtrl && IsKeyReleased(KeyMap[KEY_R]);
+			open = io.KeyCtrl && IsKeyReleased(KeyMap[KEY_P]);
+			comp = io.KeyCtrl && IsKeyReleased(KeyMap[KEY_TAB]);
 
-			if (IsKeyReleased(SDL_SCANCODE_F12)) {
+			if (IsKeyReleased(KeyMap[KEY_F12])) {
 				done = true;
 			}
 
-			if (IsKeyReleased(SDL_SCANCODE_F1)) {
+			if (IsKeyReleased(KeyMap[KEY_F1])) {
 				immediate = true;
 				groups.clear();
 				groups.resize(1);
@@ -269,7 +304,7 @@ int main(int argc, const char* argv[])
 				}
 			}
 
-			if (IsKeyReleased(SDL_SCANCODE_F2)) {
+			if (IsKeyReleased(KeyMap[KEY_F2])) {
 				immediate = true;
 				groups.clear();
 				groups.resize(2);
@@ -280,7 +315,7 @@ int main(int argc, const char* argv[])
 			}
 
 			if (project.view()) {
-				if (io.KeyCtrl && IsKeyReleased(SDL_SCANCODE_W)) {
+				if (io.KeyCtrl && IsKeyReleased(KeyMap[KEY_W])) {
 					immediate = true;
 					if (!project.view()->modified) {
 						forget(project.view());
@@ -289,7 +324,7 @@ int main(int argc, const char* argv[])
 					}
 				}
 
-				if (io.KeyCtrl && io.KeyShift && IsKeyReleased(SDL_SCANCODE_PAGEUP)) {
+				if (io.KeyCtrl && io.KeyShift && IsKeyReleased(KeyMap[KEY_PAGEUP])) {
 					immediate = true;
 					auto active = group(project.view());
 					if (active == 0) {
@@ -303,7 +338,7 @@ int main(int argc, const char* argv[])
 					sanity();
 				}
 
-				if (io.KeyCtrl && io.KeyShift && IsKeyReleased(SDL_SCANCODE_PAGEDOWN)) {
+				if (io.KeyCtrl && io.KeyShift && IsKeyReleased(KeyMap[KEY_PAGEDOWN])) {
 					immediate = true;
 					auto active = group(project.view());
 					if (active == (int)groups.size()-1) {
@@ -422,7 +457,7 @@ int main(int argc, const char* argv[])
 						CloseCurrentPopup();
 						project.view()->interpret(fmt("find %s", findInput));
 					}
-					if (IsKeyReleased(SDL_SCANCODE_ESCAPE)) {
+					if (IsKeyReleased(KeyMap[KEY_ESCAPE])) {
 						immediate = true;
 						CloseCurrentPopup();
 					}
@@ -440,7 +475,7 @@ int main(int argc, const char* argv[])
 						CloseCurrentPopup();
 						project.view()->interpret(fmt("go %s", lineInput));
 					}
-					if (IsKeyReleased(SDL_SCANCODE_ESCAPE)) {
+					if (IsKeyReleased(KeyMap[KEY_ESCAPE])) {
 						immediate = true;
 						CloseCurrentPopup();
 					}
@@ -481,8 +516,8 @@ int main(int argc, const char* argv[])
 							visible.push_back(i);
 						}
 
-						if (IsKeyDown(SDL_SCANCODE_DOWN)) compSelected++;
-						if (IsKeyDown(SDL_SCANCODE_UP)) compSelected--;
+						if (IsKeyDown(KeyMap[KEY_DOWN])) compSelected++;
+						if (IsKeyDown(KeyMap[KEY_UP])) compSelected--;
 						compSelected = std::max(0, std::min((int)visible.size()-1, compSelected));
 
 						auto compInsert = [&](std::string compString) {
@@ -492,7 +527,7 @@ int main(int argc, const char* argv[])
 							}
 						};
 
-						if (IsKeyReleased(SDL_SCANCODE_RETURN)) {
+						if (IsKeyReleased(KeyMap[KEY_RETURN])) {
 							immediate = true;
 							if (visible.size()) {
 								compInsert(compStrings[visible[compSelected]]);
@@ -514,7 +549,7 @@ int main(int argc, const char* argv[])
 						EndListBox();
 					}
 
-					if (IsKeyReleased(SDL_SCANCODE_ESCAPE)) {
+					if (IsKeyReleased(KeyMap[KEY_ESCAPE])) {
 						immediate = true;
 						CloseCurrentPopup();
 					}
@@ -555,11 +590,11 @@ int main(int argc, const char* argv[])
 							visible.push_back(i);
 						}
 
-						if (IsKeyDown(SDL_SCANCODE_DOWN)) tagSelected++;
-						if (IsKeyDown(SDL_SCANCODE_UP)) tagSelected--;
+						if (IsKeyDown(KeyMap[KEY_DOWN])) tagSelected++;
+						if (IsKeyDown(KeyMap[KEY_UP])) tagSelected--;
 						tagSelected = std::max(0, std::min((int)visible.size()-1, tagSelected));
 
-						if (IsKeyReleased(SDL_SCANCODE_RETURN)) {
+						if (IsKeyReleased(KeyMap[KEY_RETURN])) {
 							immediate = true;
 							if (visible.size()) {
 								auto& tagRegion = tagRegions[visible[tagSelected]];
@@ -583,7 +618,7 @@ int main(int argc, const char* argv[])
 						EndListBox();
 					}
 
-					if (IsKeyReleased(SDL_SCANCODE_ESCAPE)) {
+					if (IsKeyReleased(KeyMap[KEY_ESCAPE])) {
 						immediate = true;
 						CloseCurrentPopup();
 					}
@@ -630,8 +665,8 @@ int main(int argc, const char* argv[])
 							visible.push_back(i);
 						}
 
-						if (IsKeyDown(SDL_SCANCODE_DOWN)) openSelected++;
-						if (IsKeyDown(SDL_SCANCODE_UP)) openSelected--;
+						if (IsKeyDown(KeyMap[KEY_DOWN])) openSelected++;
+						if (IsKeyDown(KeyMap[KEY_UP])) openSelected--;
 						openSelected = std::max(0, std::min((int)visible.size()-1, openSelected));
 
 						auto openView = [&](const std::string& openPath) {
@@ -642,7 +677,7 @@ int main(int argc, const char* argv[])
 							}
 						};
 
-						if (IsKeyReleased(SDL_SCANCODE_RETURN)) {
+						if (IsKeyReleased(KeyMap[KEY_RETURN])) {
 							immediate = true;
 							if (visible.size()) {
 								openView(openPaths[visible[openSelected]]);
@@ -664,7 +699,7 @@ int main(int argc, const char* argv[])
 						EndListBox();
 					}
 
-					if (IsKeyReleased(SDL_SCANCODE_ESCAPE)) {
+					if (IsKeyReleased(KeyMap[KEY_ESCAPE])) {
 						immediate = true;
 						CloseCurrentPopup();
 					}

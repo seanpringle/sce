@@ -3,13 +3,13 @@
 #include "syntax.h"
 #include "theme.h"
 #include "config.h"
+#include "keys.h"
 #include <fstream>
 #include <filesystem>
 #include <chrono>
 #include "../imgui/imgui.h"
 #include "../imgui/imgui_impl_sdl.h"
 #include "../imgui/imgui_impl_opengl3.h"
-#include <SDL.h>
 
 extern Theme theme;
 extern Config config;
@@ -843,53 +843,53 @@ bool View::input() {
 	bool AltShift = !io.KeyCtrl && io.KeyAlt && io.KeyShift && !io.KeySuper;
 	bool CtrlShift = io.KeyCtrl && !io.KeyAlt && io.KeyShift && !io.KeySuper;
 
-	if (AltShift && ImGui::IsKeyDown(SDL_SCANCODE_DOWN)) { addCursorDown(); return false; }
-	if (AltShift && ImGui::IsKeyDown(SDL_SCANCODE_UP)) { addCursorUp(); return false; }
+	if (AltShift && ImGui::IsKeyDown(KeyMap[KEY_DOWN])) { addCursorDown(); return false; }
+	if (AltShift && ImGui::IsKeyDown(KeyMap[KEY_UP])) { addCursorUp(); return false; }
 
-	if (CtrlShift && ImGui::IsKeyDown(SDL_SCANCODE_RIGHT)) { selectRightBoundary(); return false; }
-	if (CtrlShift && ImGui::IsKeyDown(SDL_SCANCODE_LEFT)) { selectLeftBoundary(); return false; }
-	if (CtrlShift && ImGui::IsKeyDown(SDL_SCANCODE_D)) { dup(); return false; }
+	if (CtrlShift && ImGui::IsKeyDown(KeyMap[KEY_RIGHT])) { selectRightBoundary(); return false; }
+	if (CtrlShift && ImGui::IsKeyDown(KeyMap[KEY_LEFT])) { selectLeftBoundary(); return false; }
+	if (CtrlShift && ImGui::IsKeyDown(KeyMap[KEY_D])) { dup(); return false; }
 
-	if (Shift && ImGui::IsKeyDown(SDL_SCANCODE_RIGHT)) { selectRight(); return false; }
-	if (Shift && ImGui::IsKeyDown(SDL_SCANCODE_LEFT)) { selectLeft(); return false; }
-	if (Shift && ImGui::IsKeyDown(SDL_SCANCODE_DOWN)) { selectDown(); return false; }
-	if (Shift && ImGui::IsKeyDown(SDL_SCANCODE_UP)) { selectUp(); return false; }
-	if (Shift && ImGui::IsKeyDown(SDL_SCANCODE_TAB)) { outdent(); return false; }
+	if (Shift && ImGui::IsKeyDown(KeyMap[KEY_RIGHT])) { selectRight(); return false; }
+	if (Shift && ImGui::IsKeyDown(KeyMap[KEY_LEFT])) { selectLeft(); return false; }
+	if (Shift && ImGui::IsKeyDown(KeyMap[KEY_DOWN])) { selectDown(); return false; }
+	if (Shift && ImGui::IsKeyDown(KeyMap[KEY_UP])) { selectUp(); return false; }
+	if (Shift && ImGui::IsKeyDown(KeyMap[KEY_TAB])) { outdent(); return false; }
 
-	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_RIGHT)) { boundaryRight(); return false; }
-	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_LEFT)) { boundaryLeft(); return false; }
-	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_DOWN)) { bumpdown(); return false; }
-	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_UP)) { bumpup(); return false; }
-	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_Z)) { undo(); return false; }
-	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_Y)) { redo(); return false; }
-	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_X)) { cut(); return false; }
-	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_C)) { copy(); return false; }
-	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_V)) { paste(); return false; }
-	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_D)) { selectNext(); return false; }
-	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_K)) { selectSkip(); return false; }
-	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_B)) { unwind(); return false; }
+	if (Ctrl && ImGui::IsKeyDown(KeyMap[KEY_RIGHT])) { boundaryRight(); return false; }
+	if (Ctrl && ImGui::IsKeyDown(KeyMap[KEY_LEFT])) { boundaryLeft(); return false; }
+	if (Ctrl && ImGui::IsKeyDown(KeyMap[KEY_DOWN])) { bumpdown(); return false; }
+	if (Ctrl && ImGui::IsKeyDown(KeyMap[KEY_UP])) { bumpup(); return false; }
+	if (Ctrl && ImGui::IsKeyDown(KeyMap[KEY_Z])) { undo(); return false; }
+	if (Ctrl && ImGui::IsKeyDown(KeyMap[KEY_Y])) { redo(); return false; }
+	if (Ctrl && ImGui::IsKeyDown(KeyMap[KEY_X])) { cut(); return false; }
+	if (Ctrl && ImGui::IsKeyDown(KeyMap[KEY_C])) { copy(); return false; }
+	if (Ctrl && ImGui::IsKeyDown(KeyMap[KEY_V])) { paste(); return false; }
+	if (Ctrl && ImGui::IsKeyDown(KeyMap[KEY_D])) { selectNext(); return false; }
+	if (Ctrl && ImGui::IsKeyDown(KeyMap[KEY_K])) { selectSkip(); return false; }
+	if (Ctrl && ImGui::IsKeyDown(KeyMap[KEY_B])) { unwind(); return false; }
 
-	if (Ctrl && ImGui::IsKeyReleased(SDL_SCANCODE_S)) { save(); return true; }
-	if (Ctrl && ImGui::IsKeyReleased(SDL_SCANCODE_L)) { reload(); return true; }
+	if (Ctrl && ImGui::IsKeyReleased(KeyMap[KEY_S])) { save(); return true; }
+	if (Ctrl && ImGui::IsKeyReleased(KeyMap[KEY_L])) { reload(); return true; }
 
 	bool mods = io.KeyCtrl || io.KeyShift || io.KeyAlt || io.KeySuper;
 
-	if (ImGui::IsKeyReleased(SDL_SCANCODE_ESCAPE)) { single(); sanity(); return true; }
+	if (ImGui::IsKeyReleased(KeyMap[KEY_ESCAPE])) { single(); sanity(); return true; }
 
-	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_TAB)) { indent(); return false; }
-	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_RETURN)) { insert('\n', true); return false; }
-	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_UP)) { up(); return false; }
-	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_DOWN)) { down(); return false; }
-	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_RIGHT)) { right(); return false; }
-	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_LEFT)) { left(); return false; }
-	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_HOME)) { home(); return false; }
-	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_END)) { end(); return false; }
+	if (!mods && ImGui::IsKeyDown(KeyMap[KEY_TAB])) { indent(); return false; }
+	if (!mods && ImGui::IsKeyDown(KeyMap[KEY_RETURN])) { insert('\n', true); return false; }
+	if (!mods && ImGui::IsKeyDown(KeyMap[KEY_UP])) { up(); return false; }
+	if (!mods && ImGui::IsKeyDown(KeyMap[KEY_DOWN])) { down(); return false; }
+	if (!mods && ImGui::IsKeyDown(KeyMap[KEY_RIGHT])) { right(); return false; }
+	if (!mods && ImGui::IsKeyDown(KeyMap[KEY_LEFT])) { left(); return false; }
+	if (!mods && ImGui::IsKeyDown(KeyMap[KEY_HOME])) { home(); return false; }
+	if (!mods && ImGui::IsKeyDown(KeyMap[KEY_END])) { end(); return false; }
 
-	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_PAGEUP)) { pgup(); return false; }
-	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_PAGEDOWN)) { pgdown(); return false; }
+	if (!mods && ImGui::IsKeyDown(KeyMap[KEY_PAGEUP])) { pgup(); return false; }
+	if (!mods && ImGui::IsKeyDown(KeyMap[KEY_PAGEDOWN])) { pgdown(); return false; }
 
-	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_BACKSPACE)) { back(); return false; }
-	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_DELETE)) { del(); return false; }
+	if (!mods && ImGui::IsKeyDown(KeyMap[KEY_BACKSPACE])) { back(); return false; }
+	if (!mods && ImGui::IsKeyDown(KeyMap[KEY_DELETE])) { del(); return false; }
 
 	if (mouseOver && (io.MouseWheel > 0.0f || io.MouseWheel < 0.0f)) {
 		auto now = std::chrono::system_clock::now();

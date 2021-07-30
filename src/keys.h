@@ -1,0 +1,37 @@
+#pragma once
+
+extern int KeyMap[100];
+
+enum {
+	KEY_ESCAPE = 0,
+	KEY_BACKSPACE,
+	KEY_DELETE,
+	KEY_TAB,
+	KEY_HOME,
+	KEY_END,
+	KEY_PAGEDOWN,
+	KEY_PAGEUP,
+	KEY_RETURN,
+	KEY_LEFT,
+	KEY_RIGHT,
+	KEY_UP,
+	KEY_DOWN,
+	KEY_B,
+	KEY_C,
+	KEY_D,
+	KEY_F,
+	KEY_F1,
+	KEY_F2,
+	KEY_F12,
+	KEY_G,
+	KEY_K,
+	KEY_L,
+	KEY_P,
+	KEY_R,
+	KEY_S,
+	KEY_V,
+	KEY_W,
+	KEY_X,
+	KEY_Y,
+	KEY_Z,
+};
