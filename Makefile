@@ -11,8 +11,8 @@ linux:
 
 clean:
 	rm -rf build
-	rm -f /tmp/ed1.prof
+	rm -f /tmp/sce.prof
 
 prof: dev
-	LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libprofiler.so.0 CPUPROFILE=/tmp/ed1.prof build/ed1
-	google-pprof --web build/ed1 /tmp/ed1.prof
+	LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libprofiler.so.0 CPUPROFILE=/tmp/sce.prof build/sce
+	google-pprof --web build/sce /tmp/sce.prof

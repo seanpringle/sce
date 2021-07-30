@@ -34,7 +34,7 @@ struct View {
 	std::vector<ViewRegion> selections;
 
 	struct Clip {
-		std::string text;
+		std::vector<int> text;
 		bool line = false;
 	};
 

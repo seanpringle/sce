@@ -16,6 +16,7 @@ enum {
 	KEY_RIGHT,
 	KEY_UP,
 	KEY_DOWN,
+	KEY_SPACE,
 	KEY_B,
 	KEY_C,
 	KEY_D,

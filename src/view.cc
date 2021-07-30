@@ -425,7 +425,8 @@ void View::clip() {
 		lines.pop_front();
 		clips.push_back(clip);
 	}
-	ImGui::SetClipboardText(clips.front().text.c_str());
+	auto cliptext = std::string({clips.front().text.begin(), clips.front().text.end()});
+	ImGui::SetClipboardText(cliptext.c_str());
 }
 
 void View::cut() {
@@ -441,8 +442,20 @@ void View::copy() {
 void View::paste() {
 	erase();
 	int nclips = clips.size();
-	auto cliptext = ImGui::GetClipboardText();
-	auto clipstring = std::string(cliptext ? cliptext: "");
+
+	std::vector<int> clipstring;
+	const char* cliptext = ImGui::GetClipboardText();
+
+	while (cliptext && *cliptext) {
+		unsigned char c = *cliptext++;
+		if (c == 0xc2) {
+			unsigned char d = *cliptext++;
+			clipstring.push_back(((unsigned int)c << 8)|(unsigned int)d);
+			continue;
+		}
+		clipstring.push_back(c);
+	}
+
 	for (int i = selections.size()-1; i >= 0; --i) {
 		auto& selection = selections[i];
 		// when single clip/selection, clipboard takes precedence
@@ -716,10 +729,11 @@ void View::single() {
 		clips.push_back({});
 		auto& clip = clips.back();
 		for (auto c: clips) {
-			clip.text += c.text;
-			clip.text += '\n';
+			clip.text.insert(clip.text.end(), c.text.begin(), c.text.end());
+			clip.text.push_back('\n');
 		}
-		ImGui::SetClipboardText(clip.text.c_str());
+		auto cliptext = std::string({clip.text.begin(), clip.text.end()});
+		ImGui::SetClipboardText(cliptext.c_str());
 	}
 }
 
@@ -843,31 +857,31 @@ bool View::input() {
 	bool AltShift = !io.KeyCtrl && io.KeyAlt && io.KeyShift && !io.KeySuper;
 	bool CtrlShift = io.KeyCtrl && !io.KeyAlt && io.KeyShift && !io.KeySuper;
 
-	if (AltShift && ImGui::IsKeyDown(KeyMap[KEY_DOWN])) { addCursorDown(); return false; }
-	if (AltShift && ImGui::IsKeyDown(KeyMap[KEY_UP])) { addCursorUp(); return false; }
+	if (AltShift && ImGui::IsKeyPressed(KeyMap[KEY_DOWN])) { addCursorDown(); return false; }
+	if (AltShift && ImGui::IsKeyPressed(KeyMap[KEY_UP])) { addCursorUp(); return false; }
 
-	if (CtrlShift && ImGui::IsKeyDown(KeyMap[KEY_RIGHT])) { selectRightBoundary(); return false; }
-	if (CtrlShift && ImGui::IsKeyDown(KeyMap[KEY_LEFT])) { selectLeftBoundary(); return false; }
-	if (CtrlShift && ImGui::IsKeyDown(KeyMap[KEY_D])) { dup(); return false; }
+	if (CtrlShift && ImGui::IsKeyPressed(KeyMap[KEY_RIGHT])) { selectRightBoundary(); return false; }
+	if (CtrlShift && ImGui::IsKeyPressed(KeyMap[KEY_LEFT])) { selectLeftBoundary(); return false; }
+	if (CtrlShift && ImGui::IsKeyPressed(KeyMap[KEY_D])) { dup(); return false; }
 
-	if (Shift && ImGui::IsKeyDown(KeyMap[KEY_RIGHT])) { selectRight(); return false; }
-	if (Shift && ImGui::IsKeyDown(KeyMap[KEY_LEFT])) { selectLeft(); return false; }
-	if (Shift && ImGui::IsKeyDown(KeyMap[KEY_DOWN])) { selectDown(); return false; }
-	if (Shift && ImGui::IsKeyDown(KeyMap[KEY_UP])) { selectUp(); return false; }
-	if (Shift && ImGui::IsKeyDown(KeyMap[KEY_TAB])) { outdent(); return false; }
+	if (Shift && ImGui::IsKeyPressed(KeyMap[KEY_RIGHT])) { selectRight(); return false; }
+	if (Shift && ImGui::IsKeyPressed(KeyMap[KEY_LEFT])) { selectLeft(); return false; }
+	if (Shift && ImGui::IsKeyPressed(KeyMap[KEY_DOWN])) { selectDown(); return false; }
+	if (Shift && ImGui::IsKeyPressed(KeyMap[KEY_UP])) { selectUp(); return false; }
+	if (Shift && ImGui::IsKeyPressed(KeyMap[KEY_TAB])) { outdent(); return false; }
 
-	if (Ctrl && ImGui::IsKeyDown(KeyMap[KEY_RIGHT])) { boundaryRight(); return false; }
-	if (Ctrl && ImGui::IsKeyDown(KeyMap[KEY_LEFT])) { boundaryLeft(); return false; }
-	if (Ctrl && ImGui::IsKeyDown(KeyMap[KEY_DOWN])) { bumpdown(); return false; }
-	if (Ctrl && ImGui::IsKeyDown(KeyMap[KEY_UP])) { bumpup(); return false; }
-	if (Ctrl && ImGui::IsKeyDown(KeyMap[KEY_Z])) { undo(); return false; }
-	if (Ctrl && ImGui::IsKeyDown(KeyMap[KEY_Y])) { redo(); return false; }
-	if (Ctrl && ImGui::IsKeyDown(KeyMap[KEY_X])) { cut(); return false; }
-	if (Ctrl && ImGui::IsKeyDown(KeyMap[KEY_C])) { copy(); return false; }
-	if (Ctrl && ImGui::IsKeyDown(KeyMap[KEY_V])) { paste(); return false; }
-	if (Ctrl && ImGui::IsKeyDown(KeyMap[KEY_D])) { selectNext(); return false; }
-	if (Ctrl && ImGui::IsKeyDown(KeyMap[KEY_K])) { selectSkip(); return false; }
-	if (Ctrl && ImGui::IsKeyDown(KeyMap[KEY_B])) { unwind(); return false; }
+	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_RIGHT])) { boundaryRight(); return false; }
+	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_LEFT])) { boundaryLeft(); return false; }
+	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_DOWN])) { bumpdown(); return false; }
+	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_UP])) { bumpup(); return false; }
+	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_Z])) { undo(); return false; }
+	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_Y])) { redo(); return false; }
+	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_X])) { cut(); return false; }
+	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_C])) { copy(); return false; }
+	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_V])) { paste(); return false; }
+	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_D])) { selectNext(); return false; }
+	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_K])) { selectSkip(); return false; }
+	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_B])) { unwind(); return false; }
 
 	if (Ctrl && ImGui::IsKeyReleased(KeyMap[KEY_S])) { save(); return true; }
 	if (Ctrl && ImGui::IsKeyReleased(KeyMap[KEY_L])) { reload(); return true; }
@@ -876,20 +890,20 @@ bool View::input() {
 
 	if (ImGui::IsKeyReleased(KeyMap[KEY_ESCAPE])) { single(); sanity(); return true; }
 
-	if (!mods && ImGui::IsKeyDown(KeyMap[KEY_TAB])) { indent(); return false; }
-	if (!mods && ImGui::IsKeyDown(KeyMap[KEY_RETURN])) { insert('\n', true); return false; }
-	if (!mods && ImGui::IsKeyDown(KeyMap[KEY_UP])) { up(); return false; }
-	if (!mods && ImGui::IsKeyDown(KeyMap[KEY_DOWN])) { down(); return false; }
-	if (!mods && ImGui::IsKeyDown(KeyMap[KEY_RIGHT])) { right(); return false; }
-	if (!mods && ImGui::IsKeyDown(KeyMap[KEY_LEFT])) { left(); return false; }
-	if (!mods && ImGui::IsKeyDown(KeyMap[KEY_HOME])) { home(); return false; }
-	if (!mods && ImGui::IsKeyDown(KeyMap[KEY_END])) { end(); return false; }
+	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_TAB])) { indent(); return false; }
+	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_RETURN])) { insert('\n', true); return false; }
+	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_UP])) { up(); return false; }
+	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_DOWN])) { down(); return false; }
+	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_RIGHT])) { right(); return false; }
+	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_LEFT])) { left(); return false; }
+	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_HOME])) { home(); return false; }
+	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_END])) { end(); return false; }
 
-	if (!mods && ImGui::IsKeyDown(KeyMap[KEY_PAGEUP])) { pgup(); return false; }
-	if (!mods && ImGui::IsKeyDown(KeyMap[KEY_PAGEDOWN])) { pgdown(); return false; }
+	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_PAGEUP])) { pgup(); return false; }
+	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_PAGEDOWN])) { pgdown(); return false; }
 
-	if (!mods && ImGui::IsKeyDown(KeyMap[KEY_BACKSPACE])) { back(); return false; }
-	if (!mods && ImGui::IsKeyDown(KeyMap[KEY_DELETE])) { del(); return false; }
+	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_BACKSPACE])) { back(); return false; }
+	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_DELETE])) { del(); return false; }
 
 	if (mouseOver && (io.MouseWheel > 0.0f || io.MouseWheel < 0.0f)) {
 		auto now = std::chrono::system_clock::now();
@@ -915,11 +929,11 @@ void View::open(std::string path) {
 	delete syntax;
 	auto fpath = std::filesystem::path(path);
 
-	if (contains(std::vector<std::string>{".cc", ".cpp", ".c", ".h"}, fpath.extension().string())) {
+	if ((std::set<std::string>{".cc", ".cpp", ".c", ".h"}).count(fpath.extension().string())) {
 		syntax = new CPP();
 	}
 	else
-	if (contains(std::vector<std::string>{".scad"}, fpath.extension().string())) {
+	if ((std::set<std::string>{".scad"}).count(fpath.extension().string())) {
 		syntax = new OpenSCAD();
 	}
 	else {
@@ -1025,7 +1039,7 @@ void View::draw() {
 		int y = 0;
 		uint fg = 0xffffffff;
 		uint bg = 0x00000000;
-		std::vector<ImWchar> text;
+		std::vector<int> text;
 	};
 
 	std::vector<Output> out;
@@ -1175,10 +1189,12 @@ void View::draw() {
 		}
 
 		for (uint i = 0; i < chunk.text.size(); i++) {
-			auto c = chunk.text[i];
+			ImWchar c = chunk.text[i];
 			ImVec2 pos = (ImVec2){min.x+(i*cell.x),min.y};
 			if (pos.x+cell.x > origin.x+region.x) break;
 			if (pos.y+cell.y > origin.y+region.y) break;
+			ensuref(c >= 32, "bad character %d", c);
+			if (c>>8 == 0xc2) c &= 0xff;
 			ImGui::GetFont()->RenderChar(ImGui::GetWindowDrawList(), -1.0f, pos, ImGui::ImColorSRGB(chunk.fg), c);
 		}
 	}

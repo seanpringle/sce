@@ -33,6 +33,7 @@ int KeyMap[100] = {
 	[KEY_RIGHT] = SDL_SCANCODE_RIGHT,
 	[KEY_UP] = SDL_SCANCODE_UP,
 	[KEY_DOWN] = SDL_SCANCODE_DOWN,
+	[KEY_SPACE] = SDL_SCANCODE_SPACE,
 	[KEY_B] = SDL_SCANCODE_B,
 	[KEY_C] = SDL_SCANCODE_C,
 	[KEY_D] = SDL_SCANCODE_D,
@@ -175,12 +176,14 @@ int main(int argc, const char* argv[])
 	auto& fonts = ImGui::GetIO().Fonts;
 	fonts->Clear();
 
+    static const ImWchar uniPlane0[] = { 0x0020, 0xFFFF, 0, };
+
 	auto fontUI = config.font.ui.face && std::filesystem::exists(config.font.ui.face)
-		? fonts->AddFontFromFileTTF(config.font.ui.face, config.font.ui.size)
+		? fonts->AddFontFromFileTTF(config.font.ui.face, config.font.ui.size, nullptr, uniPlane0)
 		: fonts->AddFontDefault();
 
 	auto fontView = config.font.view.face && std::filesystem::exists(config.font.view.face)
-		? fonts->AddFontFromFileTTF(config.font.view.face, config.font.view.size)
+		? fonts->AddFontFromFileTTF(config.font.view.face, config.font.view.size, nullptr, uniPlane0)
 		: fonts->AddFontDefault();
 
 	fonts->Build();
@@ -225,7 +228,7 @@ int main(int argc, const char* argv[])
 	auto gotFocus = now();
 	auto lostFocus = now() - 24h;
 
-	// Parts of IMGUI such as IsKeyReleased assume a rapid refresh rate to work
+	// Parts of IMGUI such as IsKeyPressed assume a rapid refresh rate to work
 	// properly, but since we're using SDL_WaitEvent that assumption breaks.
 	// Setting immediate=true anywhere forces a quick additional refresh pass
 	// before falling back into waiting for events.
@@ -285,17 +288,17 @@ int main(int argc, const char* argv[])
 
 			project.sanity();
 
-			find = io.KeyCtrl && IsKeyReleased(KeyMap[KEY_F]);
-			line = io.KeyCtrl && IsKeyReleased(KeyMap[KEY_G]);
-			tags = io.KeyCtrl && IsKeyReleased(KeyMap[KEY_R]);
-			open = io.KeyCtrl && IsKeyReleased(KeyMap[KEY_P]);
-			comp = io.KeyCtrl && IsKeyReleased(KeyMap[KEY_TAB]);
+			find = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_F]);
+			line = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_G]);
+			tags = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_R]);
+			open = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_P]);
+			comp = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_TAB]);
 
-			if (IsKeyReleased(KeyMap[KEY_F12])) {
+			if (IsKeyPressed(KeyMap[KEY_F12])) {
 				done = true;
 			}
 
-			if (IsKeyReleased(KeyMap[KEY_F1])) {
+			if (IsKeyPressed(KeyMap[KEY_F1])) {
 				immediate = true;
 				groups.clear();
 				groups.resize(1);
@@ -304,7 +307,7 @@ int main(int argc, const char* argv[])
 				}
 			}
 
-			if (IsKeyReleased(KeyMap[KEY_F2])) {
+			if (IsKeyPressed(KeyMap[KEY_F2])) {
 				immediate = true;
 				groups.clear();
 				groups.resize(2);
@@ -315,7 +318,7 @@ int main(int argc, const char* argv[])
 			}
 
 			if (project.view()) {
-				if (io.KeyCtrl && IsKeyReleased(KeyMap[KEY_W])) {
+				if (io.KeyCtrl && IsKeyPressed(KeyMap[KEY_W])) {
 					immediate = true;
 					if (!project.view()->modified) {
 						forget(project.view());
@@ -324,7 +327,25 @@ int main(int argc, const char* argv[])
 					}
 				}
 
-				if (io.KeyCtrl && io.KeyShift && IsKeyReleased(KeyMap[KEY_PAGEUP])) {
+				if (io.KeyCtrl && IsKeyPressed(KeyMap[KEY_SPACE]) && groups.size() > 1U) {
+					immediate = true;
+					bool found = false;
+					auto active = group(project.view());
+					for (int i = active+1; !found && i < (int)groups.size(); i++) {
+						if (groups[i].size()) {
+							project.active = project.find(groups[i].front());
+							found = true;
+						}
+					}
+					for (int i = 0; !found && i < active; i++) {
+						if (groups[i].size()) {
+							project.active = project.find(groups[i].front());
+							found = true;
+						}
+					}
+				}
+
+				if (io.KeyCtrl && io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEUP])) {
 					immediate = true;
 					auto active = group(project.view());
 					if (active == 0) {
@@ -338,7 +359,7 @@ int main(int argc, const char* argv[])
 					sanity();
 				}
 
-				if (io.KeyCtrl && io.KeyShift && IsKeyReleased(KeyMap[KEY_PAGEDOWN])) {
+				if (io.KeyCtrl && io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEDOWN])) {
 					immediate = true;
 					auto active = group(project.view());
 					if (active == (int)groups.size()-1) {
@@ -397,14 +418,34 @@ int main(int argc, const char* argv[])
 				viewTitles.clear();
 				viewTitles.resize(project.views.size());
 
+				PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(2,4));
+
 				if (BeginTable("#layout", groups.size()+1)) {
-					TableSetupColumn("#side", ImGuiTableColumnFlags_WidthFixed, config.sidebar.width);
+					PushFont(fontUI);
+					TableSetupColumn("files", ImGuiTableColumnFlags_WidthFixed, config.sidebar.width);
 					for (uint i = 0; i < groups.size(); i++) {
-						TableSetupColumn(fmtc("#group-%u", i), ImGuiTableColumnFlags_WidthStretch);
+						TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch);
 					}
 					TableNextRow();
 					TableNextColumn();
-					PushFont(fontUI);
+
+					TableSetBgColor(ImGuiTableBgTarget_CellBg, GetColorU32(ImGuiCol_FrameBg));
+
+					Text("files");
+					for (uint i = 0; i < groups.size(); i++) {
+						TableNextColumn();
+						auto& group = groups[i];
+						if (!group.size()) continue;
+						auto view = group.front();
+
+						TableSetBgColor(ImGuiTableBgTarget_CellBg,
+							GetColorU32(project.view() == view ? ImGuiCol_TitleBgActive: ImGuiCol_FrameBg)
+						);
+
+						Text("%s", view->path.c_str());
+					}
+					TableNextRow();
+					TableNextColumn();
 					if (BeginListBox("#open", ImVec2(-1,-1))) {
 						for (uint i = 0; i < project.views.size(); i++) {
 							auto view = project.views[i];
@@ -415,6 +456,7 @@ int main(int argc, const char* argv[])
 							std::snprintf(title, size, "%s%s", view->path.c_str(), modified);
 
 							PushStyleColor(ImGuiCol_Text, view->modified ? ImColorSRGB(0xffff00ff) : GetColorU32(ImGuiCol_Text));
+
 							if (Selectable(title, project.active == (int)i)) {
 								project.active = i;
 								bubble();
@@ -423,21 +465,35 @@ int main(int argc, const char* argv[])
 						}
 						EndListBox();
 					}
+
 					PopFont();
 					PushFont(fontView);
+
 					for (auto& group: groups) {
 						TableNextColumn();
 						if (!group.size()) continue;
 						auto view = group.front();
-						bool viewHasInput = !IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup) && project.view() == view;
+
+						bool viewHasInput = project.view() == view
+							&& !IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup);
+
 						if (inputActivity && viewHasInput) {
 							immediate = view->input() || immediate;
 						}
+
 						view->draw();
+
+						if (IsAnyMouseDown() && view->mouseOver) {
+							project.active = project.find(view->path);
+						}
 					}
 					PopFont();
 					EndTable();
 				}
+
+				PopStyleVar(1);
+
+				PushFont(fontUI);
 
 				auto nextPopup = [&](int h = -1) {
 					h = std::min(config.window.height, h);
@@ -457,7 +513,7 @@ int main(int argc, const char* argv[])
 						CloseCurrentPopup();
 						project.view()->interpret(fmt("find %s", findInput));
 					}
-					if (IsKeyReleased(KeyMap[KEY_ESCAPE])) {
+					if (IsKeyPressed(KeyMap[KEY_ESCAPE])) {
 						immediate = true;
 						CloseCurrentPopup();
 					}
@@ -475,7 +531,7 @@ int main(int argc, const char* argv[])
 						CloseCurrentPopup();
 						project.view()->interpret(fmt("go %s", lineInput));
 					}
-					if (IsKeyReleased(KeyMap[KEY_ESCAPE])) {
+					if (IsKeyPressed(KeyMap[KEY_ESCAPE])) {
 						immediate = true;
 						CloseCurrentPopup();
 					}
@@ -527,7 +583,7 @@ int main(int argc, const char* argv[])
 							}
 						};
 
-						if (IsKeyReleased(KeyMap[KEY_RETURN])) {
+						if (IsKeyPressed(KeyMap[KEY_RETURN])) {
 							immediate = true;
 							if (visible.size()) {
 								compInsert(compStrings[visible[compSelected]]);
@@ -549,7 +605,7 @@ int main(int argc, const char* argv[])
 						EndListBox();
 					}
 
-					if (IsKeyReleased(KeyMap[KEY_ESCAPE])) {
+					if (IsKeyPressed(KeyMap[KEY_ESCAPE])) {
 						immediate = true;
 						CloseCurrentPopup();
 					}
@@ -594,7 +650,7 @@ int main(int argc, const char* argv[])
 						if (IsKeyDown(KeyMap[KEY_UP])) tagSelected--;
 						tagSelected = std::max(0, std::min((int)visible.size()-1, tagSelected));
 
-						if (IsKeyReleased(KeyMap[KEY_RETURN])) {
+						if (IsKeyPressed(KeyMap[KEY_RETURN])) {
 							immediate = true;
 							if (visible.size()) {
 								auto& tagRegion = tagRegions[visible[tagSelected]];
@@ -618,7 +674,7 @@ int main(int argc, const char* argv[])
 						EndListBox();
 					}
 
-					if (IsKeyReleased(KeyMap[KEY_ESCAPE])) {
+					if (IsKeyPressed(KeyMap[KEY_ESCAPE])) {
 						immediate = true;
 						CloseCurrentPopup();
 					}
@@ -677,7 +733,7 @@ int main(int argc, const char* argv[])
 							}
 						};
 
-						if (IsKeyReleased(KeyMap[KEY_RETURN])) {
+						if (IsKeyPressed(KeyMap[KEY_RETURN])) {
 							immediate = true;
 							if (visible.size()) {
 								openView(openPaths[visible[openSelected]]);
@@ -699,12 +755,13 @@ int main(int argc, const char* argv[])
 						EndListBox();
 					}
 
-					if (IsKeyReleased(KeyMap[KEY_ESCAPE])) {
+					if (IsKeyPressed(KeyMap[KEY_ESCAPE])) {
 						immediate = true;
 						CloseCurrentPopup();
 					}
 					EndPopup();
 				}
+				PopFont();
 			End();
 		}
 

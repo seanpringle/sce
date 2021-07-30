@@ -11,6 +11,7 @@ struct Project {
 	~Project();
 	View* open(const std::string& path);
 	int find(const std::string& path);
+	int find(View* view);
 	void sanity();
 	View* view();
 	void close();

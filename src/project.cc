@@ -16,6 +16,12 @@ int Project::find(const std::string& path) {
 	return it == views.end() ? -1: it-views.begin();
 }
 
+int Project::find(View* view) {
+	sanity();
+	auto it = std::find(views.begin(), views.end(), view);
+	return it == views.end() ? -1: it-views.begin();
+}
+
 View* Project::view() {
 	sanity();
 	return views.size() ? views[active]: nullptr;
