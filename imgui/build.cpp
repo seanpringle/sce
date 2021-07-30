@@ -3,8 +3,6 @@
 #include <SDL.h>
 
 #include "imgui.cpp"
-// https://github.com/ocornut/imgui/issues/4171
-#include "imgui_demo.cpp"
 #include "imgui_draw.cpp"
 #include "imgui_widgets.cpp"
 #include "imgui_tables.cpp"
