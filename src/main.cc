@@ -20,6 +20,19 @@ Project project;
 
 std::vector<std::vector<View*>> groups;
 
+void forget(View* view) {
+	for (auto& src: groups) {
+		src.erase(std::remove(src.begin(), src.end(), view), src.end());
+	}
+}
+
+bool known(View* view) {
+	for (auto& src: groups) {
+		if (std::find(src.begin(), src.end(), view) != src.end()) return true;
+	}
+	return false;
+}
+
 int group(View* view) {
 	if (!view) return 0;
 	for (int i = 0; i < (int)groups.size(); i++) {
@@ -28,12 +41,6 @@ int group(View* view) {
 		if (it != group.end()) return i;
 	}
 	throw view;
-}
-
-void forget(View* view) {
-	for (auto& src: groups) {
-		src.erase(std::remove(src.begin(), src.end(), view), src.end());
-	}
 }
 
 void sanity() {
@@ -56,6 +63,16 @@ void sanity() {
 	}
 }
 
+void bubble() {
+	auto& grp = groups[group(project.view())];
+
+	if (project.view() && grp.front() != project.view()) {
+		forget(project.view());
+		grp.insert(grp.begin(), project.view());
+		sanity();
+	}
+}
+
 struct ViewTitle {
 	char text[100] = {0};
 };
@@ -64,10 +81,18 @@ std::vector<ViewTitle> viewTitles;
 
 int main(int argc, const char* argv[])
 {
-	config.args(argc, argv);
+	for (auto arg: config.args(argc, argv)) {
+		auto path = std::filesystem::path(arg);
+		if (std::filesystem::is_regular_file(path)) {
+			project.open(arg);
+		}
+		if (std::filesystem::is_directory(path)) {
+			project.paths.push_back(arg);
+		}
+	}
 
-	for (int i = 1; i < argc; i++) {
-		project.open(argv[i]);
+	if (!project.paths.size()) {
+		project.paths.push_back(".");
 	}
 
 	project.active = 0;
@@ -77,19 +102,13 @@ int main(int argc, const char* argv[])
 		groups.front().push_back(view);
 	}
 
-	ensuref(0 == SDL_Init(SDL_INIT_VIDEO|SDL_INIT_AUDIO), "%s", SDL_GetError());
+	ensuref(0 == SDL_Init(SDL_INIT_VIDEO|SDL_INIT_EVENTS), "%s", SDL_GetError());
 
-	const char* glsl_version = "#version 130";
-
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, 0);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
+	const char* glsl_version = "#version 330";
 	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 0);
-	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
-	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
-	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
+	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
 
-	SDL_WindowFlags window_flags = (SDL_WindowFlags)(SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
+	auto window_flags = (SDL_WindowFlags)(SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
 
 	SDL_Window* window = SDL_CreateWindow("SCE",
 		SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
@@ -113,7 +132,6 @@ int main(int argc, const char* argv[])
 	io.IniFilename = nullptr;
 	io.WantSaveIniSettings = false;
 
-	//ImGui::StyleColorsDark();
 	ImGui::StyleColorsClassic();
 
 	ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
@@ -172,12 +190,18 @@ int main(int argc, const char* argv[])
 	auto gotFocus = now();
 	auto lostFocus = now() - 24h;
 
+	// Parts of IMGUI such as IsKeyReleased assume a rapid refresh rate to work
+	// properly, but since we're using SDL_WaitEvent that assumption breaks.
+	// Setting immediate=true anywhere forces a quick additional refresh pass
+	// before falling back into waiting for events.
+	bool immediate = false;
+
 	for (bool done = false; !done;)
 	{
 		bool inputActivity = false;
 
-		SDL_Event event;
-		if (SDL_WaitEvent(&event)) {
+		for (SDL_Event event; !immediate; ) {
+			if (!SDL_WaitEvent(&event)) continue;
 
 			if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
 				gotFocus = now();
@@ -197,9 +221,26 @@ int main(int argc, const char* argv[])
 			if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window)) {
 				done = true;
 			}
+
+			SDL_PumpEvents();
+			// compress subsequent events of the same type
+			if ((std::set<int>{SDL_MOUSEMOTION, SDL_MOUSEWHEEL, SDL_TEXTINPUT}).count(event.type)) {
+				SDL_Event extra;
+				while (SDL_PeepEvents(&extra, 1, SDL_GETEVENT, event.type, event.type)) {
+					ImGui_ImplSDL2_ProcessEvent(&extra);
+				}
+			}
+
+			break;
 		}
 
+		immediate = false;
+
 		SDL_GetWindowSize(window, &config.window.width, &config.window.height);
+
+		ImGui_ImplOpenGL3_NewFrame();
+		ImGui_ImplSDL2_NewFrame(window);
+		ImGui::NewFrame();
 
 		if (inputActivity) {
 			using namespace ImGui;
@@ -209,15 +250,38 @@ int main(int argc, const char* argv[])
 
 			project.sanity();
 
-			find = io.KeyCtrl && IsKeyDown(SDL_SCANCODE_F);
-			line = io.KeyCtrl && IsKeyDown(SDL_SCANCODE_G);
-			tags = io.KeyCtrl && IsKeyDown(SDL_SCANCODE_R);
-			open = io.KeyCtrl && IsKeyDown(SDL_SCANCODE_P);
-			comp = io.KeyCtrl && IsKeyDown(SDL_SCANCODE_TAB);
+			find = io.KeyCtrl && IsKeyReleased(SDL_SCANCODE_F);
+			line = io.KeyCtrl && IsKeyReleased(SDL_SCANCODE_G);
+			tags = io.KeyCtrl && IsKeyReleased(SDL_SCANCODE_R);
+			open = io.KeyCtrl && IsKeyReleased(SDL_SCANCODE_P);
+			comp = io.KeyCtrl && IsKeyReleased(SDL_SCANCODE_TAB);
+
+			if (IsKeyReleased(SDL_SCANCODE_F12)) {
+				done = true;
+			}
+
+			if (IsKeyReleased(SDL_SCANCODE_F1)) {
+				immediate = true;
+				groups.clear();
+				groups.resize(1);
+				for (auto view: project.views) {
+					groups[0].push_back(view);
+				}
+			}
+
+			if (IsKeyReleased(SDL_SCANCODE_F2)) {
+				immediate = true;
+				groups.clear();
+				groups.resize(2);
+				for (auto view: project.views) {
+					int g = view->path.find(".h") != std::string::npos ? 0:1;
+					groups[g].push_back(view);
+				}
+			}
 
 			if (project.view()) {
-
-				if (io.KeyCtrl && IsKeyDown(SDL_SCANCODE_W)) {
+				if (io.KeyCtrl && IsKeyReleased(SDL_SCANCODE_W)) {
+					immediate = true;
 					if (!project.view()->modified) {
 						forget(project.view());
 						project.close();
@@ -225,11 +289,12 @@ int main(int argc, const char* argv[])
 					}
 				}
 
-				if (io.KeyCtrl && io.KeyShift && IsKeyDown(SDL_SCANCODE_PAGEUP)) {
+				if (io.KeyCtrl && io.KeyShift && IsKeyReleased(SDL_SCANCODE_PAGEUP)) {
+					immediate = true;
 					auto active = group(project.view());
 					if (active == 0) {
-						groups.insert(groups.begin(), {project.view()});
 						forget(project.view());
+						groups.insert(groups.begin(), {project.view()});
 					} else {
 						auto& dst = groups[active-1];
 						forget(project.view());
@@ -238,11 +303,12 @@ int main(int argc, const char* argv[])
 					sanity();
 				}
 
-				if (io.KeyCtrl && io.KeyShift && IsKeyDown(SDL_SCANCODE_PAGEDOWN)) {
+				if (io.KeyCtrl && io.KeyShift && IsKeyReleased(SDL_SCANCODE_PAGEDOWN)) {
+					immediate = true;
 					auto active = group(project.view());
 					if (active == (int)groups.size()-1) {
-						groups.push_back({project.view()});
 						forget(project.view());
+						groups.push_back({project.view()});
 					} else {
 						auto& dst = groups[active+1];
 						forget(project.view());
@@ -252,18 +318,10 @@ int main(int argc, const char* argv[])
 				}
 			}
 
-			auto& grp = groups[group(project.view())];
-
-			if (project.view() && grp.front() != project.view()) {
-				forget(project.view());
-				grp.insert(grp.begin(), project.view());
-				sanity();
-			}
+			immediate = immediate || find || line || tags || open || comp || done;
 		}
 
-		ImGui_ImplOpenGL3_NewFrame();
-		ImGui_ImplSDL2_NewFrame(window);
-		ImGui::NewFrame();
+		bubble();
 
 		{
 			using namespace ImGui;
@@ -305,14 +363,14 @@ int main(int argc, const char* argv[])
 				viewTitles.resize(project.views.size());
 
 				if (BeginTable("#layout", groups.size()+1)) {
-					TableSetupColumn("#side", ImGuiTableColumnFlags_WidthFixed, 300);
+					TableSetupColumn("#side", ImGuiTableColumnFlags_WidthFixed, config.sidebar.width);
 					for (uint i = 0; i < groups.size(); i++) {
 						TableSetupColumn(fmtc("#group-%u", i), ImGuiTableColumnFlags_WidthStretch);
 					}
 					TableNextRow();
 					TableNextColumn();
 					PushFont(fontUI);
-					if (BeginListBox("#open", ImVec2(300,-1))) {
+					if (BeginListBox("#open", ImVec2(-1,-1))) {
 						for (uint i = 0; i < project.views.size(); i++) {
 							auto view = project.views[i];
 							char* title = viewTitles[i].text;
@@ -322,7 +380,10 @@ int main(int argc, const char* argv[])
 							std::snprintf(title, size, "%s%s", view->path.c_str(), modified);
 
 							PushStyleColor(ImGuiCol_Text, view->modified ? ImColorSRGB(0xffff00ff) : GetColorU32(ImGuiCol_Text));
-							if (Selectable(title, project.active == (int)i)) project.active = i;
+							if (Selectable(title, project.active == (int)i)) {
+								project.active = i;
+								bubble();
+							}
 							PopStyleColor(1);
 						}
 						EndListBox();
@@ -334,7 +395,9 @@ int main(int argc, const char* argv[])
 						if (!group.size()) continue;
 						auto view = group.front();
 						bool viewHasInput = !IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup) && project.view() == view;
-						if (inputActivity && viewHasInput) view->input();
+						if (inputActivity && viewHasInput) {
+							immediate = view->input() || immediate;
+						}
 						view->draw();
 					}
 					PopFont();
@@ -359,7 +422,8 @@ int main(int argc, const char* argv[])
 						CloseCurrentPopup();
 						project.view()->interpret(fmt("find %s", findInput));
 					}
-					if (IsKeyDown(SDL_SCANCODE_ESCAPE)) {
+					if (IsKeyReleased(SDL_SCANCODE_ESCAPE)) {
+						immediate = true;
 						CloseCurrentPopup();
 					}
 					EndPopup();
@@ -376,13 +440,14 @@ int main(int argc, const char* argv[])
 						CloseCurrentPopup();
 						project.view()->interpret(fmt("go %s", lineInput));
 					}
-					if (IsKeyDown(SDL_SCANCODE_ESCAPE)) {
+					if (IsKeyReleased(SDL_SCANCODE_ESCAPE)) {
+						immediate = true;
 						CloseCurrentPopup();
 					}
 					EndPopup();
 				}
 
-				nextPopup(300);
+				nextPopup(config.window.height/3*2);
 
 				if (BeginPopup("#comp")) {
 					if (comp) {
@@ -427,7 +492,8 @@ int main(int argc, const char* argv[])
 							}
 						};
 
-						if (IsKeyDown(SDL_SCANCODE_RETURN)) {
+						if (IsKeyReleased(SDL_SCANCODE_RETURN)) {
+							immediate = true;
 							if (visible.size()) {
 								compInsert(compStrings[visible[compSelected]]);
 							}
@@ -448,13 +514,14 @@ int main(int argc, const char* argv[])
 						EndListBox();
 					}
 
-					if (IsKeyDown(SDL_SCANCODE_ESCAPE)) {
+					if (IsKeyReleased(SDL_SCANCODE_ESCAPE)) {
+						immediate = true;
 						CloseCurrentPopup();
 					}
 					EndPopup();
 				}
 
-				nextPopup(300);
+				nextPopup(config.window.height/3*2);
 
 				if (BeginPopup("#tags")) {
 					if (tags) {
@@ -492,7 +559,8 @@ int main(int argc, const char* argv[])
 						if (IsKeyDown(SDL_SCANCODE_UP)) tagSelected--;
 						tagSelected = std::max(0, std::min((int)visible.size()-1, tagSelected));
 
-						if (IsKeyDown(SDL_SCANCODE_RETURN)) {
+						if (IsKeyReleased(SDL_SCANCODE_RETURN)) {
+							immediate = true;
 							if (visible.size()) {
 								auto& tagRegion = tagRegions[visible[tagSelected]];
 								project.view()->single(tagRegion);
@@ -515,13 +583,14 @@ int main(int argc, const char* argv[])
 						EndListBox();
 					}
 
-					if (IsKeyDown(SDL_SCANCODE_ESCAPE)) {
+					if (IsKeyReleased(SDL_SCANCODE_ESCAPE)) {
+						immediate = true;
 						CloseCurrentPopup();
 					}
 					EndPopup();
 				}
 
-				nextPopup(300);
+				nextPopup(config.window.height/3*2);
 
 				if (BeginPopup("#open")) {
 					if (open) {
@@ -530,18 +599,16 @@ int main(int argc, const char* argv[])
 						openPaths.clear();
 						openInput[0] = 0;
 
-						//auto path = std::filesystem::current_path().string();
-
-						{
+						for (auto path: project.paths) {
 							using namespace std::experimental::filesystem;
 
-							for (const directory_entry& entry: recursive_directory_iterator(".")) {
+							for (const directory_entry& entry: recursive_directory_iterator(path)) {
 								auto path = entry.path().string();
 								if (path.size() > 1 && path.substr(0,2) == "./") {
 									path = path.substr(2);
 								}
 								if (!is_regular_file(entry)) continue;
-								if (path.find(".git") != std::string::npos) continue;
+								if (path[0] == '.') continue;
 								if (path == "build" || path.find("build/") == 0) continue;
 								openPaths.push_back(path);
 							}
@@ -550,7 +617,7 @@ int main(int argc, const char* argv[])
 						std::sort(openPaths.begin(), openPaths.end());
 					}
 
-					InputText("#open-input", openInput, sizeof(openInput));
+					InputText("open#open-input", openInput, sizeof(openInput));
 
 					if (BeginListBox("#open-matches", ImVec2(-1,-1))) {
 						auto filter = std::string(openInput);
@@ -570,11 +637,13 @@ int main(int argc, const char* argv[])
 						auto openView = [&](const std::string& openPath) {
 							int active = group(project.view());
 							auto view = project.open(openPath);
-							forget(view);
-							groups[active].push_back(view);
+							if (!known(view)) {
+								groups[active].push_back(view);
+							}
 						};
 
-						if (IsKeyDown(SDL_SCANCODE_RETURN)) {
+						if (IsKeyReleased(SDL_SCANCODE_RETURN)) {
+							immediate = true;
 							if (visible.size()) {
 								openView(openPaths[visible[openSelected]]);
 							}
@@ -595,12 +664,12 @@ int main(int argc, const char* argv[])
 						EndListBox();
 					}
 
-					if (IsKeyDown(SDL_SCANCODE_ESCAPE)) {
+					if (IsKeyReleased(SDL_SCANCODE_ESCAPE)) {
+						immediate = true;
 						CloseCurrentPopup();
 					}
 					EndPopup();
 				}
-
 			End();
 		}
 

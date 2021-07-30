@@ -833,7 +833,7 @@ std::vector<std::string> View::autocomplete() {
 	return syntax->matches(text, cursor);
 }
 
-void View::input() {
+bool View::input() {
 	ImGuiIO& io = ImGui::GetIO();
 
 	//bool Alt = !io.KeyCtrl && io.KeyAlt && !io.KeyShift && !io.KeySuper;
@@ -843,70 +843,70 @@ void View::input() {
 	bool AltShift = !io.KeyCtrl && io.KeyAlt && io.KeyShift && !io.KeySuper;
 	bool CtrlShift = io.KeyCtrl && !io.KeyAlt && io.KeyShift && !io.KeySuper;
 
-	if (AltShift && ImGui::IsKeyDown(SDL_SCANCODE_DOWN)) { addCursorDown(); return; }
-	if (AltShift && ImGui::IsKeyDown(SDL_SCANCODE_UP)) { addCursorUp(); return; }
+	if (AltShift && ImGui::IsKeyDown(SDL_SCANCODE_DOWN)) { addCursorDown(); return false; }
+	if (AltShift && ImGui::IsKeyDown(SDL_SCANCODE_UP)) { addCursorUp(); return false; }
 
-	if (CtrlShift && ImGui::IsKeyDown(SDL_SCANCODE_RIGHT)) { selectRightBoundary(); return; }
-	if (CtrlShift && ImGui::IsKeyDown(SDL_SCANCODE_LEFT)) { selectLeftBoundary(); return; }
+	if (CtrlShift && ImGui::IsKeyDown(SDL_SCANCODE_RIGHT)) { selectRightBoundary(); return false; }
+	if (CtrlShift && ImGui::IsKeyDown(SDL_SCANCODE_LEFT)) { selectLeftBoundary(); return false; }
+	if (CtrlShift && ImGui::IsKeyDown(SDL_SCANCODE_D)) { dup(); return false; }
 
-	if (Shift && ImGui::IsKeyDown(SDL_SCANCODE_RIGHT)) { selectRight(); return; }
-	if (Shift && ImGui::IsKeyDown(SDL_SCANCODE_LEFT)) { selectLeft(); return; }
+	if (Shift && ImGui::IsKeyDown(SDL_SCANCODE_RIGHT)) { selectRight(); return false; }
+	if (Shift && ImGui::IsKeyDown(SDL_SCANCODE_LEFT)) { selectLeft(); return false; }
+	if (Shift && ImGui::IsKeyDown(SDL_SCANCODE_DOWN)) { selectDown(); return false; }
+	if (Shift && ImGui::IsKeyDown(SDL_SCANCODE_UP)) { selectUp(); return false; }
+	if (Shift && ImGui::IsKeyDown(SDL_SCANCODE_TAB)) { outdent(); return false; }
 
-	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_RIGHT)) { boundaryRight(); return; }
-	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_LEFT)) { boundaryLeft(); return; }
+	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_RIGHT)) { boundaryRight(); return false; }
+	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_LEFT)) { boundaryLeft(); return false; }
+	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_DOWN)) { bumpdown(); return false; }
+	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_UP)) { bumpup(); return false; }
+	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_Z)) { undo(); return false; }
+	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_Y)) { redo(); return false; }
+	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_X)) { cut(); return false; }
+	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_C)) { copy(); return false; }
+	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_V)) { paste(); return false; }
+	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_D)) { selectNext(); return false; }
+	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_K)) { selectSkip(); return false; }
+	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_B)) { unwind(); return false; }
 
-	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_DOWN)) { bumpdown(); return; }
-	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_UP)) { bumpup(); return; }
-
-	if (Shift && ImGui::IsKeyDown(SDL_SCANCODE_DOWN)) { selectDown(); return; }
-	if (Shift && ImGui::IsKeyDown(SDL_SCANCODE_UP)) { selectUp(); return; }
-
-	if (Shift && ImGui::IsKeyDown(SDL_SCANCODE_TAB)) { outdent(); return; }
-
-	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_Z)) { undo(); return; }
-	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_Y)) { redo(); return; }
-	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_X)) { cut(); return; }
-	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_C)) { copy(); return; }
-	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_V)) { paste(); return; }
-	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_D)) { selectNext() || dup(); return; }
-	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_K)) { selectSkip(); return; }
-	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_B)) { unwind(); return; }
-	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_S)) { save(); return; }
-	if (Ctrl && ImGui::IsKeyDown(SDL_SCANCODE_L)) { reload(); return; }
+	if (Ctrl && ImGui::IsKeyReleased(SDL_SCANCODE_S)) { save(); return true; }
+	if (Ctrl && ImGui::IsKeyReleased(SDL_SCANCODE_L)) { reload(); return true; }
 
 	bool mods = io.KeyCtrl || io.KeyShift || io.KeyAlt || io.KeySuper;
 
-	if (ImGui::IsKeyReleased(SDL_SCANCODE_ESCAPE)) { single(); sanity(); return; }
+	if (ImGui::IsKeyReleased(SDL_SCANCODE_ESCAPE)) { single(); sanity(); return true; }
 
-	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_TAB)) { indent(); return; }
-	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_RETURN)) { insert('\n', true); return; }
-	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_UP)) { up(); return; }
-	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_DOWN)) { down(); return; }
-	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_RIGHT)) { right(); return; }
-	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_LEFT)) { left(); return; }
-	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_HOME)) { home(); return; }
-	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_END)) { end(); return; }
+	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_TAB)) { indent(); return false; }
+	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_RETURN)) { insert('\n', true); return false; }
+	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_UP)) { up(); return false; }
+	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_DOWN)) { down(); return false; }
+	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_RIGHT)) { right(); return false; }
+	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_LEFT)) { left(); return false; }
+	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_HOME)) { home(); return false; }
+	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_END)) { end(); return false; }
 
-	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_PAGEUP)) { pgup(); return; }
-	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_PAGEDOWN)) { pgdown(); return; }
+	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_PAGEUP)) { pgup(); return false; }
+	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_PAGEDOWN)) { pgdown(); return false; }
 
-	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_BACKSPACE)) { back(); return; }
-	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_DELETE)) { del(); return; }
+	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_BACKSPACE)) { back(); return false; }
+	if (!mods && ImGui::IsKeyDown(SDL_SCANCODE_DELETE)) { del(); return false; }
 
-	if (io.MouseWheel > 0.0f || io.MouseWheel < 0.0f) {
+	if (mouseOver && (io.MouseWheel > 0.0f || io.MouseWheel < 0.0f)) {
 		auto now = std::chrono::system_clock::now();
 		auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now-lastWheel);
 		int steps = ms < config.mouse.wheelSpeedStep ? 5: 1;
 		if (io.MouseWheel > 0) { for (int i = 0; i < steps; i++) up(); }
 		if (io.MouseWheel < 0) { for (int i = 0; i < steps; i++) down(); }
 		lastWheel = now;
-		return;
+		return false;
 	}
 
 	if (!io.KeyCtrl && !io.KeyAlt && !io.KeySuper) {
 		for (auto c: io.InputQueueCharacters) insert(c);
 		io.ClearInputCharacters();
 	}
+
+	return false;
 }
 
 void View::open(std::string path) {
@@ -993,7 +993,11 @@ void View::save() {
 }
 
 void View::reload() {
+	single();
+	auto selection = selections.front();
 	if (path.size()) open(path);
+	selections = {selection};
+	sanity();
 }
 
 void View::draw() {
@@ -1010,6 +1014,8 @@ void View::draw() {
 	cell.y = ImGui::GetTextLineHeightWithSpacing();
 
 	auto region = ImGui::GetContentRegionAvail();
+
+	mouseOver = ImGui::IsMouseHoveringRect(origin,(ImVec2){origin.x+region.x, origin.y+region.y});
 
 	w = std::ceil(region.x/cell.x);
 	h = std::ceil(region.y/cell.y);
@@ -1164,8 +1170,6 @@ void View::draw() {
 		max.x = std::min(max.x, origin.x+region.x);
 		max.y = std::min(max.y, origin.y+region.y);
 
-		if (min.y+cell.y > origin.y+region.y) continue;
-
 		if (chunk.bg) {
 			ImGui::GetWindowDrawList()->AddRectFilled(min, max, ImGui::ImColorSRGB(chunk.bg));
 		}
@@ -1173,6 +1177,8 @@ void View::draw() {
 		for (uint i = 0; i < chunk.text.size(); i++) {
 			auto c = chunk.text[i];
 			ImVec2 pos = (ImVec2){min.x+(i*cell.x),min.y};
+			if (pos.x+cell.x > origin.x+region.x) break;
+			if (pos.y+cell.y > origin.y+region.y) break;
 			ImGui::GetFont()->RenderChar(ImGui::GetWindowDrawList(), -1.0f, pos, ImGui::ImColorSRGB(chunk.fg), c);
 		}
 	}

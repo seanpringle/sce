@@ -5,6 +5,7 @@
 struct Project {
 	int active = 0;
 	std::vector<View*> views;
+	std::vector<std::string> paths;
 
 	Project() = default;
 	~Project();

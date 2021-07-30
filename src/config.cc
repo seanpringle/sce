@@ -6,8 +6,7 @@
 using namespace std::chrono_literals;
 IniReader ini;
 
-
-void Config::args(int argc, const char** argv) {
+std::vector<std::string> Config::args(int argc, const char** argv) {
 	auto HOME = std::getenv("HOME");
 	ini = IniReader(fmtc("%s/.sce.ini", HOME));
 
@@ -22,7 +21,13 @@ void Config::args(int argc, const char** argv) {
 	tabs.hard = ini.getString("edit", "tabs", "hard") == "hard";
 	tabs.width = ini.getInteger("edit", "tabs.width", 4);
 
+	sidebar.width = ini.getInteger("sidebar", "width", 300);
+
+	std::vector<std::string> paths;
+
 	for (int i = 1; i < argc; i++) {
 		paths.push_back(argv[i]);
 	}
+
+	return paths;
 }

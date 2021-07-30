@@ -29,7 +29,9 @@ struct Config {
 		} ui;
 	} font;
 
-	std::vector<std::string> paths;
+	struct {
+		int width = 300;
+	} sidebar;
 
-	void args(int argc, const char** argv);
+	std::vector<std::string> args(int argc, const char** argv);
 };

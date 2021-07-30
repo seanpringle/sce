@@ -21,6 +21,7 @@ struct View {
 	std::deque<int> text;
 	std::string path;
 	bool modified = false;
+	bool mouseOver = false;
 	Syntax* syntax = nullptr;
 	std::chrono::time_point<std::chrono::system_clock> lastWheel;
 
@@ -116,7 +117,7 @@ struct View {
 	bool eol(int offset);
 	void index();
 	void move(int xx, int yy, int ww, int hh);
-	void input();
+	bool input();
 	void single();
 	void single(ViewRegion& selection);
 	bool indent();
