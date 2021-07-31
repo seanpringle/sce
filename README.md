@@ -1,4 +1,4 @@
-![screenshot](https://github.com/seanpringle/sce/wiki/images/screenshot1.png)
+![screenshot](https://raw.githubusercontent.com/wiki/seanpringle/sce/screenshot1.png)
 
 A source code editor.
 
