@@ -257,10 +257,9 @@ int main(int argc, const char* argv[])
 	for (bool done = false; !done;)
 	{
 		bool inputActivity = false;
+		SDL_Event event;
 
-		for (SDL_Event event; !immediate; ) {
-			if (!SDL_WaitEvent(&event)) continue;
-
+		auto processEvent = [&]() {
 			if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
 				gotFocus = now();
 			}
@@ -288,8 +287,15 @@ int main(int argc, const char* argv[])
 					ImGui_ImplSDL2_ProcessEvent(&extra);
 				}
 			}
+		};
 
-			break;
+		if (immediate && SDL_PollEvent(&event)) {
+			processEvent();
+		}
+
+		if (!immediate) {
+			while (!SDL_WaitEvent(&event));
+			processEvent();
 		}
 
 		immediate = false;
@@ -303,8 +309,8 @@ int main(int argc, const char* argv[])
 		if (inputActivity) {
 			using namespace ImGui;
 
-			if (io.KeyCtrl && !io.KeyShift && IsKeyDown(KeyMap[KEY_PAGEUP])) project.active--;
-			if (io.KeyCtrl && !io.KeyShift && IsKeyDown(KeyMap[KEY_PAGEDOWN])) project.active++;
+			if (io.KeyCtrl && !io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEUP])) project.active--;
+			if (io.KeyCtrl && !io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEDOWN])) project.active++;
 
 			project.sanity();
 
@@ -577,41 +583,52 @@ int main(int argc, const char* argv[])
 					SetNextWindowSize(ImVec2(w,h));
 				};
 
-				nextPopup();
+				auto filterOptions = [&](const std::vector<std::string>& haystacks, const std::string& needle) {
+					std::vector<int> matches;
+					for (int i = 0, l = (int)haystacks.size(); i < l; i++) {
+						auto& haystack = haystacks[i];
+						if (needle.size() > haystack.size()) continue;
+						if (haystack.find(needle) == std::string::npos) continue;
+						matches.push_back(i);
+					}
+					return matches;
+				};
 
-				if (BeginPopup("#find")) {
-					if (find) {
-						SetKeyboardFocusHere();
-						find = false;
-					}
-					if (InputText("find#find-input", findInput, sizeof(findInput), ImGuiInputTextFlags_EnterReturnsTrue|ImGuiInputTextFlags_AutoSelectAll)) {
-						CloseCurrentPopup();
-						project.view()->interpret(fmt("find %s", findInput));
-					}
-					if (IsKeyPressed(KeyMap[KEY_ESCAPE])) {
-						immediate = true;
-						CloseCurrentPopup();
-					}
-					EndPopup();
-				}
+				auto selectNavigate = [&](int size, int& selected) {
+					if (IsKeyPressed(KeyMap[KEY_DOWN])) selected++;
+					if (IsKeyPressed(KeyMap[KEY_UP])) selected--;
+					if (IsKeyPressed(KeyMap[KEY_PAGEDOWN])) selected += 10;
+					if (IsKeyPressed(KeyMap[KEY_PAGEUP])) selected -= 10;
+					selected = std::max(0, std::min(size-1, selected));
+				};
 
-				nextPopup();
+				auto inputPopup = [&](auto name, bool& toggle, char* input, uint size, auto cb) {
+					nextPopup();
 
-				if (BeginPopup("#line")) {
-					if (line) {
-						SetKeyboardFocusHere();
-						line = false;
+					if (BeginPopup(fmtc("#%s", name))) {
+						if (toggle) {
+							SetKeyboardFocusHere();
+							toggle = false;
+						}
+						if (InputText(fmtc("%s#%s-input", name, name), input, size, ImGuiInputTextFlags_EnterReturnsTrue|ImGuiInputTextFlags_AutoSelectAll)) {
+							CloseCurrentPopup();
+							cb();
+						}
+						if (IsKeyPressed(KeyMap[KEY_ESCAPE])) {
+							immediate = true;
+							CloseCurrentPopup();
+						}
+						EndPopup();
 					}
-					if (InputText("line#line-input", lineInput, sizeof(lineInput), ImGuiInputTextFlags_EnterReturnsTrue|ImGuiInputTextFlags_AutoSelectAll)) {
-						CloseCurrentPopup();
-						project.view()->interpret(fmt("go %s", lineInput));
-					}
-					if (IsKeyPressed(KeyMap[KEY_ESCAPE])) {
-						immediate = true;
-						CloseCurrentPopup();
-					}
-					EndPopup();
-				}
+				};
+
+				inputPopup("find", find, findInput, sizeof(findInput), [&]() {
+					project.view()->interpret(fmt("find %s", findInput));
+				});
+
+				inputPopup("line", line, lineInput, sizeof(lineInput), [&]() {
+					project.view()->interpret(fmt("go %s", lineInput));
+				});
 
 				nextPopup(config.window.height/3*2);
 
@@ -638,18 +655,8 @@ int main(int argc, const char* argv[])
 
 					if (BeginListBox("autocomplete#comp-matches", ImVec2(-1,-1))) {
 						auto filter = std::string(compInput);
-						std::vector<int> visible;
-
-						for (int i = 0; i < (int)compStrings.size(); i++) {
-							auto& compString = compStrings[i];
-							if (filter.size() > compString.size()) continue;
-							if (compString.find(filter) == std::string::npos) continue;
-							visible.push_back(i);
-						}
-
-						if (IsKeyDown(KeyMap[KEY_DOWN])) compSelected++;
-						if (IsKeyDown(KeyMap[KEY_UP])) compSelected--;
-						compSelected = std::max(0, std::min((int)visible.size()-1, compSelected));
+						std::vector<int> visible = filterOptions(compStrings, filter);
+						selectNavigate(visible.size(), compSelected);
 
 						auto compInsert = [&](std::string compString) {
 							for (int i = 0; i < (int)compString.size(); i++) {
@@ -672,8 +679,9 @@ int main(int argc, const char* argv[])
 								compInsert(compString);
 								CloseCurrentPopup();
 							}
-							if (i == compSelected) {
+							if (compSelected == i) {
 								SetScrollHereY();
+								immediate = true;
 							}
 						}
 
@@ -712,18 +720,8 @@ int main(int argc, const char* argv[])
 
 					if (BeginListBox("#tags-matches", ImVec2(-1,-1))) {
 						auto filter = std::string(tagsInput);
-						std::vector<int> visible;
-
-						for (int i = 0; i < (int)tagRegions.size(); i++) {
-							auto& tagString = tagStrings[i];
-							if (filter.size() > tagString.size()) continue;
-							if (tagString.find(filter) == std::string::npos) continue;
-							visible.push_back(i);
-						}
-
-						if (IsKeyDown(KeyMap[KEY_DOWN])) tagSelected++;
-						if (IsKeyDown(KeyMap[KEY_UP])) tagSelected--;
-						tagSelected = std::max(0, std::min((int)visible.size()-1, tagSelected));
+						std::vector<int> visible = filterOptions(tagStrings, filter);
+						selectNavigate(visible.size(), tagSelected);
 
 						if (IsKeyPressed(KeyMap[KEY_RETURN])) {
 							immediate = true;
@@ -737,15 +735,17 @@ int main(int argc, const char* argv[])
 						for (int i = 0; i < (int)visible.size(); i++) {
 							auto& tagRegion = tagRegions[visible[i]];
 							auto& tagString = tagStrings[visible[i]];
+
 							if (Selectable(tagString.c_str(), i == tagSelected)) {
 								project.view()->single(tagRegion);
 								CloseCurrentPopup();
 							}
-							if (i == tagSelected) {
+
+							if (tagSelected == i) {
 								SetScrollHereY();
+								immediate = true;
 							}
 						}
-
 						EndListBox();
 					}
 
@@ -787,18 +787,8 @@ int main(int argc, const char* argv[])
 
 					if (BeginListBox("#open-matches", ImVec2(-1,-1))) {
 						auto filter = std::string(openInput);
-						std::vector<int> visible;
-
-						for (int i = 0; i < (int)openPaths.size(); i++) {
-							auto& openPath = openPaths[i];
-							if (filter.size() > openPath.size()) continue;
-							if (openPath.find(filter) == std::string::npos) continue;
-							visible.push_back(i);
-						}
-
-						if (IsKeyDown(KeyMap[KEY_DOWN])) openSelected++;
-						if (IsKeyDown(KeyMap[KEY_UP])) openSelected--;
-						openSelected = std::max(0, std::min((int)visible.size()-1, openSelected));
+						std::vector<int> visible = filterOptions(openPaths, filter);
+						selectNavigate(visible.size(), openSelected);
 
 						auto openView = [&](const std::string& openPath) {
 							int active = group(project.view());
@@ -822,8 +812,9 @@ int main(int argc, const char* argv[])
 								openView(openPath);
 								CloseCurrentPopup();
 							}
-							if (i == openSelected) {
+							if (openSelected == i) {
 								SetScrollHereY();
+								immediate = true;
 							}
 						}
 
