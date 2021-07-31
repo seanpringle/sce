@@ -724,16 +724,19 @@ void View::boundaryLeft() {
 
 void View::single() {
 	skip = {-1,-1};
-	selections = {selections.back()};
-	if (clips.size()) {
-		clips.push_back({});
-		auto& clip = clips.back();
-		for (auto c: clips) {
-			clip.text.insert(clip.text.end(), c.text.begin(), c.text.end());
-			clip.text.push_back('\n');
+	if (selections.size() > 1) {
+		selections = {selections.back()};
+		if (clips.size() > 1) {
+			Clip clip;
+			for (auto c: clips) {
+				clip.text.insert(clip.text.end(), c.text.begin(), c.text.end());
+				clip.text.push_back('\n');
+			}
+			auto cliptext = std::string({clip.text.begin(), clip.text.end()});
+			ImGui::SetClipboardText(cliptext.c_str());
+			clips.clear();
+			clips = {clip};
 		}
-		auto cliptext = std::string({clip.text.begin(), clip.text.end()});
-		ImGui::SetClipboardText(cliptext.c_str());
 	}
 }
 
