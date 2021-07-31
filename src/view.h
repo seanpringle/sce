@@ -64,7 +64,7 @@ struct View {
 
 	View();
 	~View();
-	void open(std::string path);
+	bool open(std::string path);
 	void save();
 	void reload();
 	void nav();

@@ -926,7 +926,11 @@ bool View::input() {
 	return false;
 }
 
-void View::open(std::string path) {
+bool View::open(std::string path) {
+	// figure out why wifstream doesn't work
+	auto in = std::ifstream(path);
+	if (!in) return false;
+
 	this->path = path;
 
 	delete syntax;
@@ -951,8 +955,6 @@ void View::open(std::string path) {
 	undos.clear();
 	redos.clear();
 
-	// figure out why wifstream doesn't work
-	auto in = std::ifstream(path);
 	int c = 0;
 
 	while ((c = in.get()) && c != EOF) {
@@ -986,6 +988,7 @@ void View::open(std::string path) {
 	sanity();
 	undos.clear();
 	redos.clear();
+	return true;
 }
 
 void View::save() {

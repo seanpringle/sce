@@ -1,5 +1,6 @@
 #include "common.h"
 #include <chrono>
+#include <set>
 
 struct Config {
 	struct {
@@ -20,18 +21,33 @@ struct Config {
 
 	struct {
 		struct {
-			const char* face = nullptr;
+			std::string face;
 			float size = 0.0f;
-		} view;
+		} prop;
 		struct {
-			const char* face = nullptr;
+			std::string face;
 			float size = 0.0f;
-		} ui;
+		} mono;
 	} font;
 
 	struct {
-		int width = 300;
+		float font = 1.0f;
+	} view;
+
+	struct {
+		float font = 1.0f;
+		float split = 0.1f;
 	} sidebar;
+
+	struct {
+		float font = 1.0f;
+		float width = 0.25f;
+	} popup;
+
+	struct {
+		std::set<std::string> left;
+		float split = 0.0f;
+	} layout2;
 
 	std::vector<std::string> args(int argc, const char** argv);
 };

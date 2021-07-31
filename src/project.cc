@@ -32,7 +32,12 @@ View* Project::open(const std::string& path) {
 
 	if (active < 0) {
 		auto v = new View();
-		v->open(path);
+
+		if (!v->open(path)) {
+			delete v;
+			return nullptr;
+		}
+
 		views.push_back(v);
 
 		std::sort(views.begin(), views.end(), [](auto a, auto b) { return a->path < b->path; });

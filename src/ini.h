@@ -4,6 +4,7 @@
 #include <string>
 #include <fstream>
 #include <algorithm>
+#include "catenate.h"
 
 class IniReader {
 private:
@@ -109,11 +110,11 @@ public:
         return has(section, key) ? sections[section][key].c_str(): def;
     }
 
-    std::string getString(const std::string& section, const std::string& key, std::string def) {
+    std::string getString(const std::string& section, const std::string& key, std::string def = "") {
         return has(section, key) ? sections[section][key]: def;
     }
 
-    int64_t getInteger(const std::string& section, const std::string& key, int64_t def) {
+    int64_t getInteger(const std::string& section, const std::string& key, int64_t def = 0) {
         if (has(section, key)) {
             auto& val = sections[section][key];
             int base = starts_with(val, "0x") || ends_with(val, "h") ? 16: 10;
@@ -128,7 +129,7 @@ public:
         return def;
     }
 
-    double getDouble(const std::string& section, const std::string& key, double def) {
+    double getDouble(const std::string& section, const std::string& key, double def = 0.0f) {
         if (has(section, key)) {
             auto& val = sections[section][key];
             const char* start = val.c_str();
@@ -140,5 +141,14 @@ public:
             fprintf(stderr, "IniReader: invalid double %s\n", val.c_str());
         }
         return def;
+    }
+
+    std::set<std::string> getWords(const std::string& section, const std::string& key) {
+        std::set<std::string> words;
+        if (has(section, key)) {
+            auto split = discatenate(sections[section][key], " ");
+            words = {split.begin(), split.end()};
+        }
+        return words;
     }
 };

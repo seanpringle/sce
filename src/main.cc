@@ -40,8 +40,10 @@ int KeyMap[100] = {
 	[KEY_F] = SDL_SCANCODE_F,
 	[KEY_F1] = SDL_SCANCODE_F1,
 	[KEY_F2] = SDL_SCANCODE_F2,
+	[KEY_F3] = SDL_SCANCODE_F3,
 	[KEY_F12] = SDL_SCANCODE_F12,
 	[KEY_G] = SDL_SCANCODE_G,
+	[KEY_H] = SDL_SCANCODE_H,
 	[KEY_K] = SDL_SCANCODE_K,
 	[KEY_L] = SDL_SCANCODE_L,
 	[KEY_P] = SDL_SCANCODE_P,
@@ -55,6 +57,7 @@ int KeyMap[100] = {
 };
 
 std::vector<std::vector<View*>> groups;
+int layout = 0;
 
 void forget(View* view) {
 	for (auto& src: groups) {
@@ -176,15 +179,32 @@ int main(int argc, const char* argv[])
 	auto& fonts = ImGui::GetIO().Fonts;
 	fonts->Clear();
 
-    static const ImWchar uniPlane0[] = { 0x0020, 0xFFFF, 0, };
+	ImFont* fontDef = fonts->AddFontDefault();
 
-	auto fontUI = config.font.ui.face && std::filesystem::exists(config.font.ui.face)
-		? fonts->AddFontFromFileTTF(config.font.ui.face, config.font.ui.size, nullptr, uniPlane0)
-		: fonts->AddFontDefault();
+	static const ImWchar uniPlane0[] = { 0x0020, 0xFFFF, 0, };
 
-	auto fontView = config.font.view.face && std::filesystem::exists(config.font.view.face)
-		? fonts->AddFontFromFileTTF(config.font.view.face, config.font.view.size, nullptr, uniPlane0)
-		: fonts->AddFontDefault();
+	bool haveFontProp = config.font.prop.face.size() && std::filesystem::exists(config.font.prop.face);
+	bool haveFontMono = config.font.mono.face.size() && std::filesystem::exists(config.font.mono.face);
+
+	ImFont* fontProp = haveFontProp
+		? fonts->AddFontFromFileTTF(config.font.prop.face.c_str(), config.font.prop.size, nullptr, uniPlane0)
+		: fontDef;
+
+	ImFont* fontMono = haveFontMono
+		? fonts->AddFontFromFileTTF(config.font.mono.face.c_str(), config.font.mono.size, nullptr, uniPlane0)
+		: fontDef;
+
+	ImFont* fontView = haveFontMono && (config.view.font > 1.0f || config.view.font < 1.0f)
+		? fonts->AddFontFromFileTTF(config.font.mono.face.c_str(), config.font.mono.size * config.view.font, nullptr, uniPlane0)
+		: fontMono;
+
+	ImFont* fontSidebar = haveFontProp && (config.sidebar.font > 1.0f || config.sidebar.font < 1.0f)
+		? fonts->AddFontFromFileTTF(config.font.prop.face.c_str(), config.font.prop.size * config.sidebar.font, nullptr, uniPlane0)
+		: fontProp;
+
+	ImFont* fontPopup = haveFontProp && (config.popup.font > 1.0f || config.popup.font < 1.0f)
+		? fonts->AddFontFromFileTTF(config.font.prop.face.c_str(), config.font.prop.size * config.popup.font, nullptr, uniPlane0)
+		: fontProp;
 
 	fonts->Build();
 
@@ -302,6 +322,7 @@ int main(int argc, const char* argv[])
 				immediate = true;
 				groups.clear();
 				groups.resize(1);
+				layout = 1;
 				for (auto view: project.views) {
 					groups[0].push_back(view);
 				}
@@ -311,8 +332,12 @@ int main(int argc, const char* argv[])
 				immediate = true;
 				groups.clear();
 				groups.resize(2);
+				layout = 2;
 				for (auto view: project.views) {
-					int g = view->path.find(".h") != std::string::npos ? 0:1;
+					auto path = std::filesystem::path(view->path);
+					auto ext = path.extension().string();
+					if (ext.front() == '.') ext = ext.substr(1);
+					int g = config.layout2.left.count(ext) ? 0:1;
 					groups[g].push_back(view);
 				}
 			}
@@ -325,6 +350,40 @@ int main(int argc, const char* argv[])
 						project.close();
 						sanity();
 					}
+				}
+
+				if (IsKeyPressed(KeyMap[KEY_F3])) {
+					immediate = true;
+					auto active = group(project.view());
+					auto path = std::filesystem::path(project.view()->path);
+					auto ext = path.extension().string();
+
+					auto open = [&](auto rep) {
+						auto rpath = path.replace_extension(rep).string();
+						auto view = project.open(rpath);
+						if (view && !known(view)) {
+							groups[active].push_back(view);
+						}
+						return view ? true:false;
+					};
+
+					if (ext == ".c") {
+						open(".h");
+					}
+					if (ext == ".cc" || ext == ".cpp") {
+						open(".hpp") ||
+						open(".h");
+					}
+					if (ext == ".h") {
+						open(".c") ||
+						open(".cc") ||
+						open(".cpp");
+					}
+					if (ext == ".hpp") {
+						open(".cpp") ||
+						open(".cc");
+					}
+					sanity();
 				}
 
 				if (io.KeyCtrl && IsKeyPressed(KeyMap[KEY_SPACE]) && groups.size() > 1U) {
@@ -379,6 +438,10 @@ int main(int argc, const char* argv[])
 
 		bubble();
 
+		auto vsplit = [](float space, float split) {
+			return split < 1.0f ? space * split: split;
+		};
+
 		{
 			using namespace ImGui;
 
@@ -394,6 +457,7 @@ int main(int argc, const char* argv[])
 			;
 
 			Begin("#bg", nullptr, flags);
+				PushFont(fontProp);
 
 				if (find) {
 					OpenPopup("#find");
@@ -421,17 +485,27 @@ int main(int argc, const char* argv[])
 				PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(2,4));
 
 				if (BeginTable("#layout", groups.size()+1)) {
-					PushFont(fontUI);
-					TableSetupColumn("files", ImGuiTableColumnFlags_WidthFixed, config.sidebar.width);
-					for (uint i = 0; i < groups.size(); i++) {
+
+					float sidebarWidth = vsplit(config.window.width, config.sidebar.split);
+					TableSetupColumn("files", ImGuiTableColumnFlags_WidthFixed, sidebarWidth);
+
+					if (layout == 2 && groups.size() == 2U && config.layout2.split > 0.01f) {
+						float leftWidth = vsplit(config.window.width, config.layout2.split);
+						TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, leftWidth);
 						TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch);
 					}
+					else {
+						for (uint i = 0; i < groups.size(); i++) {
+							TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch);
+						}
+					}
+
 					TableNextRow();
+
 					TableNextColumn();
-
 					TableSetBgColor(ImGuiTableBgTarget_CellBg, GetColorU32(ImGuiCol_FrameBg));
-
 					Text("files");
+
 					for (uint i = 0; i < groups.size(); i++) {
 						TableNextColumn();
 						auto& group = groups[i];
@@ -444,8 +518,11 @@ int main(int argc, const char* argv[])
 
 						Text("%s", view->path.c_str());
 					}
+
 					TableNextRow();
+
 					TableNextColumn();
+					PushFont(fontSidebar);
 					if (BeginListBox("#open", ImVec2(-1,-1))) {
 						for (uint i = 0; i < project.views.size(); i++) {
 							auto view = project.views[i];
@@ -465,10 +542,9 @@ int main(int argc, const char* argv[])
 						}
 						EndListBox();
 					}
-
 					PopFont();
-					PushFont(fontView);
 
+					PushFont(fontView);
 					for (auto& group: groups) {
 						TableNextColumn();
 						if (!group.size()) continue;
@@ -492,13 +568,12 @@ int main(int argc, const char* argv[])
 				}
 
 				PopStyleVar(1);
-
-				PushFont(fontUI);
+				PushFont(fontPopup);
 
 				auto nextPopup = [&](int h = -1) {
 					h = std::min(config.window.height, h);
-					int w = std::max(config.window.width/3, 400);
-					SetNextWindowPos(ImVec2((config.window.width-w)/2,0));
+					int w = std::min(config.window.width, (int)vsplit(config.window.width, config.popup.width));
+					SetNextWindowPos(ImVec2((config.window.width-w)/2,(config.window.height-h)/2));
 					SetNextWindowSize(ImVec2(w,h));
 				};
 
@@ -761,6 +836,7 @@ int main(int argc, const char* argv[])
 					}
 					EndPopup();
 				}
+				PopFont();
 				PopFont();
 			End();
 		}
