@@ -117,7 +117,7 @@ struct View {
 	bool eol(int offset);
 	void index();
 	void move(int xx, int yy, int ww, int hh);
-	bool input();
+	void input();
 	void single();
 	void single(ViewRegion& selection);
 	bool indent();

@@ -850,7 +850,7 @@ std::vector<std::string> View::autocomplete() {
 	return syntax->matches(text, cursor);
 }
 
-bool View::input() {
+void View::input() {
 	ImGuiIO& io = ImGui::GetIO();
 
 	//bool Alt = !io.KeyCtrl && io.KeyAlt && !io.KeyShift && !io.KeySuper;
@@ -860,53 +860,53 @@ bool View::input() {
 	bool AltShift = !io.KeyCtrl && io.KeyAlt && io.KeyShift && !io.KeySuper;
 	bool CtrlShift = io.KeyCtrl && !io.KeyAlt && io.KeyShift && !io.KeySuper;
 
-	if (AltShift && ImGui::IsKeyPressed(KeyMap[KEY_DOWN])) { addCursorDown(); return false; }
-	if (AltShift && ImGui::IsKeyPressed(KeyMap[KEY_UP])) { addCursorUp(); return false; }
+	if (AltShift && ImGui::IsKeyPressed(KeyMap[KEY_DOWN])) { addCursorDown(); return; }
+	if (AltShift && ImGui::IsKeyPressed(KeyMap[KEY_UP])) { addCursorUp(); return; }
 
-	if (CtrlShift && ImGui::IsKeyPressed(KeyMap[KEY_RIGHT])) { selectRightBoundary(); return false; }
-	if (CtrlShift && ImGui::IsKeyPressed(KeyMap[KEY_LEFT])) { selectLeftBoundary(); return false; }
-	if (CtrlShift && ImGui::IsKeyPressed(KeyMap[KEY_D])) { dup(); return false; }
+	if (CtrlShift && ImGui::IsKeyPressed(KeyMap[KEY_RIGHT])) { selectRightBoundary(); return; }
+	if (CtrlShift && ImGui::IsKeyPressed(KeyMap[KEY_LEFT])) { selectLeftBoundary(); return; }
+	if (CtrlShift && ImGui::IsKeyPressed(KeyMap[KEY_D])) { dup(); return; }
 
-	if (Shift && ImGui::IsKeyPressed(KeyMap[KEY_RIGHT])) { selectRight(); return false; }
-	if (Shift && ImGui::IsKeyPressed(KeyMap[KEY_LEFT])) { selectLeft(); return false; }
-	if (Shift && ImGui::IsKeyPressed(KeyMap[KEY_DOWN])) { selectDown(); return false; }
-	if (Shift && ImGui::IsKeyPressed(KeyMap[KEY_UP])) { selectUp(); return false; }
-	if (Shift && ImGui::IsKeyPressed(KeyMap[KEY_TAB])) { outdent(); return false; }
+	if (Shift && ImGui::IsKeyPressed(KeyMap[KEY_RIGHT])) { selectRight(); return; }
+	if (Shift && ImGui::IsKeyPressed(KeyMap[KEY_LEFT])) { selectLeft(); return; }
+	if (Shift && ImGui::IsKeyPressed(KeyMap[KEY_DOWN])) { selectDown(); return; }
+	if (Shift && ImGui::IsKeyPressed(KeyMap[KEY_UP])) { selectUp(); return; }
+	if (Shift && ImGui::IsKeyPressed(KeyMap[KEY_TAB])) { outdent(); return; }
 
-	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_RIGHT])) { boundaryRight(); return false; }
-	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_LEFT])) { boundaryLeft(); return false; }
-	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_DOWN])) { bumpdown(); return false; }
-	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_UP])) { bumpup(); return false; }
-	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_Z])) { undo(); return false; }
-	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_Y])) { redo(); return false; }
-	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_X])) { cut(); return false; }
-	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_C])) { copy(); return false; }
-	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_V])) { paste(); return false; }
-	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_D])) { selectNext(); return false; }
-	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_K])) { selectSkip(); return false; }
-	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_B])) { unwind(); return false; }
+	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_RIGHT])) { boundaryRight(); return; }
+	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_LEFT])) { boundaryLeft(); return; }
+	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_DOWN])) { bumpdown(); return; }
+	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_UP])) { bumpup(); return; }
+	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_Z])) { undo(); return; }
+	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_Y])) { redo(); return; }
+	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_X])) { cut(); return; }
+	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_C])) { copy(); return; }
+	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_V])) { paste(); return; }
+	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_D])) { selectNext(); return; }
+	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_K])) { selectSkip(); return; }
+	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_B])) { unwind(); return; }
 
-	if (Ctrl && ImGui::IsKeyReleased(KeyMap[KEY_S])) { save(); return true; }
-	if (Ctrl && ImGui::IsKeyReleased(KeyMap[KEY_L])) { reload(); return true; }
+	if (Ctrl && ImGui::IsKeyReleased(KeyMap[KEY_S])) { save(); return; }
+	if (Ctrl && ImGui::IsKeyReleased(KeyMap[KEY_L])) { reload(); return; }
 
 	bool mods = io.KeyCtrl || io.KeyShift || io.KeyAlt || io.KeySuper;
 
-	if (ImGui::IsKeyReleased(KeyMap[KEY_ESCAPE])) { single(); sanity(); return true; }
+	if (ImGui::IsKeyReleased(KeyMap[KEY_ESCAPE])) { single(); sanity(); return; }
 
-	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_TAB])) { indent(); return false; }
-	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_RETURN])) { insert('\n', true); return false; }
-	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_UP])) { up(); return false; }
-	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_DOWN])) { down(); return false; }
-	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_RIGHT])) { right(); return false; }
-	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_LEFT])) { left(); return false; }
-	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_HOME])) { home(); return false; }
-	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_END])) { end(); return false; }
+	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_TAB])) { indent(); return; }
+	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_RETURN])) { insert('\n', true); return; }
+	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_UP])) { up(); return; }
+	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_DOWN])) { down(); return; }
+	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_RIGHT])) { right(); return; }
+	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_LEFT])) { left(); return; }
+	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_HOME])) { home(); return; }
+	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_END])) { end(); return; }
 
-	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_PAGEUP])) { pgup(); return false; }
-	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_PAGEDOWN])) { pgdown(); return false; }
+	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_PAGEUP])) { pgup(); return; }
+	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_PAGEDOWN])) { pgdown(); return; }
 
-	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_BACKSPACE])) { back(); return false; }
-	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_DELETE])) { del(); return false; }
+	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_BACKSPACE])) { back(); return; }
+	if (!mods && ImGui::IsKeyPressed(KeyMap[KEY_DELETE])) { del(); return; }
 
 	if (mouseOver && (io.MouseWheel > 0.0f || io.MouseWheel < 0.0f)) {
 		auto now = std::chrono::system_clock::now();
@@ -915,15 +915,13 @@ bool View::input() {
 		if (io.MouseWheel > 0) { for (int i = 0; i < steps; i++) up(); }
 		if (io.MouseWheel < 0) { for (int i = 0; i < steps; i++) down(); }
 		lastWheel = now;
-		return false;
+		return;
 	}
 
 	if (!io.KeyCtrl && !io.KeyAlt && !io.KeySuper) {
 		for (auto c: io.InputQueueCharacters) insert(c);
 		io.ClearInputCharacters();
 	}
-
-	return false;
 }
 
 bool View::open(std::string path) {
@@ -1161,17 +1159,10 @@ void View::draw() {
 		}
 
 		if (col < w && c == '\t') {
-			if (selecting) {
-				emit(' ');
-				format(theme.highlight[Syntax::Token::None][Theme::State::Plain]);
-				int spaces = std::min(w-col, tabs.width-1);
-				for (int i = 0; i < spaces; i++) emit(' ');
-				format(theme.highlight[token][state]);
-			}
-			else {
-				int spaces = std::min(w-col, tabs.width);
-				for (int i = 0; i < spaces; i++) emit(' ');
-			}
+			format(theme.highlight[Syntax::Token::Comment][selecting ? Theme::State::Selected: Theme::State::Plain]);
+			int spaces = std::min(w-col, tabs.width);
+			for (int i = 0; i < spaces; i++) emit(i ? 0x20: 0xc2b7);
+			format(theme.highlight[token][state]);
 			continue;
 		}
 

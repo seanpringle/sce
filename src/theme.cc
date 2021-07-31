@@ -16,7 +16,7 @@ Theme::Theme() {
 	uint directive = keyword;
 
 	highlight[Syntax::Token::None][State::Plain] = { .fg = text, .bg = 0x00000000 };
-	highlight[Syntax::Token::None][State::Selected] = { .fg = 0x000000ff, .bg = 0xffffffff };
+	highlight[Syntax::Token::None][State::Selected] = { .fg = 0x000000ff, .bg = 0xddddddff };
 
 	highlight[Syntax::Token::Comment][State::Plain] = highlight[Syntax::Token::None][State::Plain];
 	highlight[Syntax::Token::Comment][State::Selected] = highlight[Syntax::Token::None][State::Selected];

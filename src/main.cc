@@ -256,7 +256,6 @@ int main(int argc, const char* argv[])
 
 	for (bool done = false; !done;)
 	{
-		bool inputActivity = false;
 		SDL_Event event;
 
 		auto processEvent = [&]() {
@@ -268,7 +267,7 @@ int main(int argc, const char* argv[])
 				lostFocus = now();
 			}
 
-			inputActivity = ImGui_ImplSDL2_ProcessEvent(&event)
+			immediate = ImGui_ImplSDL2_ProcessEvent(&event)
 				&& gotFocus > lostFocus && gotFocus < now() - 300ms;
 
 			if (event.type == SDL_QUIT) {
@@ -298,15 +297,13 @@ int main(int argc, const char* argv[])
 			processEvent();
 		}
 
-		immediate = false;
-
 		SDL_GetWindowSize(window, &config.window.width, &config.window.height);
 
 		ImGui_ImplOpenGL3_NewFrame();
 		ImGui_ImplSDL2_NewFrame(window);
 		ImGui::NewFrame();
 
-		if (inputActivity) {
+		{
 			using namespace ImGui;
 
 			if (io.KeyCtrl && !io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEUP])) project.active--;
@@ -325,7 +322,6 @@ int main(int argc, const char* argv[])
 			}
 
 			if (IsKeyPressed(KeyMap[KEY_F1])) {
-				immediate = true;
 				groups.clear();
 				groups.resize(1);
 				layout = 1;
@@ -335,7 +331,6 @@ int main(int argc, const char* argv[])
 			}
 
 			if (IsKeyPressed(KeyMap[KEY_F2])) {
-				immediate = true;
 				groups.clear();
 				groups.resize(2);
 				layout = 2;
@@ -350,7 +345,6 @@ int main(int argc, const char* argv[])
 
 			if (project.view()) {
 				if (io.KeyCtrl && IsKeyPressed(KeyMap[KEY_W])) {
-					immediate = true;
 					if (!project.view()->modified) {
 						forget(project.view());
 						project.close();
@@ -359,7 +353,6 @@ int main(int argc, const char* argv[])
 				}
 
 				if (IsKeyPressed(KeyMap[KEY_F3])) {
-					immediate = true;
 					auto active = group(project.view());
 					auto path = std::filesystem::path(project.view()->path);
 					auto ext = path.extension().string();
@@ -393,7 +386,6 @@ int main(int argc, const char* argv[])
 				}
 
 				if (io.KeyCtrl && IsKeyPressed(KeyMap[KEY_SPACE]) && groups.size() > 1U) {
-					immediate = true;
 					bool found = false;
 					auto active = group(project.view());
 					for (int i = active+1; !found && i < (int)groups.size(); i++) {
@@ -411,7 +403,6 @@ int main(int argc, const char* argv[])
 				}
 
 				if (io.KeyCtrl && io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEUP])) {
-					immediate = true;
 					auto active = group(project.view());
 					if (active == 0) {
 						forget(project.view());
@@ -425,7 +416,6 @@ int main(int argc, const char* argv[])
 				}
 
 				if (io.KeyCtrl && io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEDOWN])) {
-					immediate = true;
 					auto active = group(project.view());
 					if (active == (int)groups.size()-1) {
 						forget(project.view());
@@ -439,17 +429,11 @@ int main(int argc, const char* argv[])
 				}
 			}
 
-			immediate = immediate || find || line || tags || open || comp || done;
-		}
+			bubble();
 
-		bubble();
-
-		auto vsplit = [](float space, float split) {
-			return split < 1.0f ? space * split: split;
-		};
-
-		{
-			using namespace ImGui;
+			auto vsplit = [](float space, float split) {
+				return split < 1.0f ? space * split: split;
+			};
 
 			SetNextWindowPos(ImVec2(0,0));
 			SetNextWindowSize(ImVec2(config.window.width,config.window.height));
@@ -559,8 +543,8 @@ int main(int argc, const char* argv[])
 						bool viewHasInput = project.view() == view
 							&& !IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup);
 
-						if (inputActivity && viewHasInput) {
-							immediate = view->input() || immediate;
+						if (viewHasInput) {
+							view->input();
 						}
 
 						view->draw();
@@ -615,7 +599,6 @@ int main(int argc, const char* argv[])
 							cb();
 						}
 						if (IsKeyPressed(KeyMap[KEY_ESCAPE])) {
-							immediate = true;
 							CloseCurrentPopup();
 						}
 						EndPopup();
@@ -666,7 +649,6 @@ int main(int argc, const char* argv[])
 						};
 
 						if (IsKeyPressed(KeyMap[KEY_RETURN])) {
-							immediate = true;
 							if (visible.size()) {
 								compInsert(compStrings[visible[compSelected]]);
 							}
@@ -681,7 +663,6 @@ int main(int argc, const char* argv[])
 							}
 							if (compSelected == i) {
 								SetScrollHereY();
-								immediate = true;
 							}
 						}
 
@@ -689,7 +670,6 @@ int main(int argc, const char* argv[])
 					}
 
 					if (IsKeyPressed(KeyMap[KEY_ESCAPE])) {
-						immediate = true;
 						CloseCurrentPopup();
 					}
 					EndPopup();
@@ -724,7 +704,6 @@ int main(int argc, const char* argv[])
 						selectNavigate(visible.size(), tagSelected);
 
 						if (IsKeyPressed(KeyMap[KEY_RETURN])) {
-							immediate = true;
 							if (visible.size()) {
 								auto& tagRegion = tagRegions[visible[tagSelected]];
 								project.view()->single(tagRegion);
@@ -743,14 +722,12 @@ int main(int argc, const char* argv[])
 
 							if (tagSelected == i) {
 								SetScrollHereY();
-								immediate = true;
 							}
 						}
 						EndListBox();
 					}
 
 					if (IsKeyPressed(KeyMap[KEY_ESCAPE])) {
-						immediate = true;
 						CloseCurrentPopup();
 					}
 					EndPopup();
@@ -799,7 +776,6 @@ int main(int argc, const char* argv[])
 						};
 
 						if (IsKeyPressed(KeyMap[KEY_RETURN])) {
-							immediate = true;
 							if (visible.size()) {
 								openView(openPaths[visible[openSelected]]);
 							}
@@ -814,7 +790,6 @@ int main(int argc, const char* argv[])
 							}
 							if (openSelected == i) {
 								SetScrollHereY();
-								immediate = true;
 							}
 						}
 
@@ -822,7 +797,6 @@ int main(int argc, const char* argv[])
 					}
 
 					if (IsKeyPressed(KeyMap[KEY_ESCAPE])) {
-						immediate = true;
 						CloseCurrentPopup();
 					}
 					EndPopup();
