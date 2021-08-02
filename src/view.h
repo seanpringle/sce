@@ -7,6 +7,7 @@ struct ViewRegion;
 #include <vector>
 #include <list>
 #include <string>
+#include "doc.h"
 #include "syntax.h"
 
 struct ViewRegion {
@@ -18,7 +19,7 @@ struct View {
 	int w = 0;
 	int h = 0;
 	int top = 0;
-	std::deque<int> text;
+	Doc text;
 	std::string path;
 	bool modified = false;
 	bool mouseOver = false;
@@ -30,7 +31,6 @@ struct View {
 		int width = 4;
 	} tabs;
 
-	std::vector<ViewRegion> lines;
 	std::vector<ViewRegion> selections;
 
 	struct Clip {

@@ -267,8 +267,7 @@ int main(int argc, const char* argv[])
 				lostFocus = now();
 			}
 
-			immediate = ImGui_ImplSDL2_ProcessEvent(&event)
-				&& gotFocus > lostFocus && gotFocus < now() - 300ms;
+			immediate = ImGui_ImplSDL2_ProcessEvent(&event);
 
 			if (event.type == SDL_QUIT) {
 				done = true;
@@ -288,11 +287,11 @@ int main(int argc, const char* argv[])
 			}
 		};
 
-		if (immediate && SDL_PollEvent(&event)) {
-			processEvent();
+		if (immediate) {
+			immediate = false;
+			if (SDL_PollEvent(&event)) processEvent();
 		}
-
-		if (!immediate) {
+		else {
 			while (!SDL_WaitEvent(&event));
 			processEvent();
 		}
@@ -303,129 +302,134 @@ int main(int argc, const char* argv[])
 		ImGui_ImplSDL2_NewFrame(window);
 		ImGui::NewFrame();
 
+		bool suppressInput = gotFocus < lostFocus || gotFocus > now() - 300ms;
+
 		{
 			using namespace ImGui;
 
-			if (io.KeyCtrl && !io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEUP])) project.active--;
-			if (io.KeyCtrl && !io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEDOWN])) project.active++;
+			if (!suppressInput) {
 
-			project.sanity();
+				if (io.KeyCtrl && !io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEUP])) project.active--;
+				if (io.KeyCtrl && !io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEDOWN])) project.active++;
 
-			find = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_F]);
-			line = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_G]);
-			tags = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_R]);
-			open = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_P]);
-			comp = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_TAB]);
+				project.sanity();
 
-			if (IsKeyPressed(KeyMap[KEY_F12])) {
-				done = true;
-			}
+				find = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_F]);
+				line = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_G]);
+				tags = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_R]);
+				open = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_P]);
+				comp = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_TAB]);
 
-			if (IsKeyPressed(KeyMap[KEY_F1])) {
-				groups.clear();
-				groups.resize(1);
-				layout = 1;
-				for (auto view: project.views) {
-					groups[0].push_back(view);
+				if (IsKeyPressed(KeyMap[KEY_F12])) {
+					done = true;
 				}
-			}
 
-			if (IsKeyPressed(KeyMap[KEY_F2])) {
-				groups.clear();
-				groups.resize(2);
-				layout = 2;
-				for (auto view: project.views) {
-					auto path = std::filesystem::path(view->path);
-					auto ext = path.extension().string();
-					if (ext.front() == '.') ext = ext.substr(1);
-					int g = config.layout2.left.count(ext) ? 0:1;
-					groups[g].push_back(view);
+				if (IsKeyPressed(KeyMap[KEY_F1])) {
+					groups.clear();
+					groups.resize(1);
+					layout = 1;
+					for (auto view: project.views) {
+						groups[0].push_back(view);
+					}
 				}
-			}
 
-			if (project.view()) {
-				if (io.KeyCtrl && IsKeyPressed(KeyMap[KEY_W])) {
-					if (!project.view()->modified) {
-						forget(project.view());
-						project.close();
+				if (IsKeyPressed(KeyMap[KEY_F2])) {
+					groups.clear();
+					groups.resize(2);
+					layout = 2;
+					for (auto view: project.views) {
+						auto path = std::filesystem::path(view->path);
+						auto ext = path.extension().string();
+						if (ext.front() == '.') ext = ext.substr(1);
+						int g = config.layout2.left.count(ext) ? 0:1;
+						groups[g].push_back(view);
+					}
+				}
+
+				if (project.view()) {
+					if (io.KeyCtrl && IsKeyPressed(KeyMap[KEY_W])) {
+						if (!project.view()->modified) {
+							forget(project.view());
+							project.close();
+							sanity();
+						}
+					}
+
+					if (IsKeyPressed(KeyMap[KEY_F3])) {
+						auto active = group(project.view());
+						auto path = std::filesystem::path(project.view()->path);
+						auto ext = path.extension().string();
+
+						auto open = [&](auto rep) {
+							auto rpath = path.replace_extension(rep).string();
+							auto view = project.open(rpath);
+							if (view && !known(view)) {
+								groups[active].push_back(view);
+							}
+							return view ? true:false;
+						};
+
+						if (ext == ".c") {
+							open(".h");
+						}
+						if (ext == ".cc" || ext == ".cpp") {
+							open(".hpp") ||
+							open(".h");
+						}
+						if (ext == ".h") {
+							open(".c") ||
+							open(".cc") ||
+							open(".cpp");
+						}
+						if (ext == ".hpp") {
+							open(".cpp") ||
+							open(".cc");
+						}
 						sanity();
 					}
-				}
 
-				if (IsKeyPressed(KeyMap[KEY_F3])) {
-					auto active = group(project.view());
-					auto path = std::filesystem::path(project.view()->path);
-					auto ext = path.extension().string();
-
-					auto open = [&](auto rep) {
-						auto rpath = path.replace_extension(rep).string();
-						auto view = project.open(rpath);
-						if (view && !known(view)) {
-							groups[active].push_back(view);
+					if (io.KeyCtrl && IsKeyPressed(KeyMap[KEY_SPACE]) && groups.size() > 1U) {
+						bool found = false;
+						auto active = group(project.view());
+						for (int i = active+1; !found && i < (int)groups.size(); i++) {
+							if (groups[i].size()) {
+								project.active = project.find(groups[i].front());
+								found = true;
+							}
 						}
-						return view ? true:false;
-					};
-
-					if (ext == ".c") {
-						open(".h");
-					}
-					if (ext == ".cc" || ext == ".cpp") {
-						open(".hpp") ||
-						open(".h");
-					}
-					if (ext == ".h") {
-						open(".c") ||
-						open(".cc") ||
-						open(".cpp");
-					}
-					if (ext == ".hpp") {
-						open(".cpp") ||
-						open(".cc");
-					}
-					sanity();
-				}
-
-				if (io.KeyCtrl && IsKeyPressed(KeyMap[KEY_SPACE]) && groups.size() > 1U) {
-					bool found = false;
-					auto active = group(project.view());
-					for (int i = active+1; !found && i < (int)groups.size(); i++) {
-						if (groups[i].size()) {
-							project.active = project.find(groups[i].front());
-							found = true;
+						for (int i = 0; !found && i < active; i++) {
+							if (groups[i].size()) {
+								project.active = project.find(groups[i].front());
+								found = true;
+							}
 						}
 					}
-					for (int i = 0; !found && i < active; i++) {
-						if (groups[i].size()) {
-							project.active = project.find(groups[i].front());
-							found = true;
+
+					if (io.KeyCtrl && io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEUP])) {
+						auto active = group(project.view());
+						if (active == 0) {
+							forget(project.view());
+							groups.insert(groups.begin(), {project.view()});
+						} else {
+							auto& dst = groups[active-1];
+							forget(project.view());
+							dst.insert(dst.begin(), project.view());
 						}
+						sanity();
 					}
-				}
 
-				if (io.KeyCtrl && io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEUP])) {
-					auto active = group(project.view());
-					if (active == 0) {
-						forget(project.view());
-						groups.insert(groups.begin(), {project.view()});
-					} else {
-						auto& dst = groups[active-1];
-						forget(project.view());
-						dst.insert(dst.begin(), project.view());
+					if (io.KeyCtrl && io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEDOWN])) {
+						auto active = group(project.view());
+						if (active == (int)groups.size()-1) {
+							forget(project.view());
+							groups.push_back({project.view()});
+						} else {
+							auto& dst = groups[active+1];
+							forget(project.view());
+							dst.insert(dst.begin(), project.view());
+						}
+						sanity();
 					}
-					sanity();
-				}
-
-				if (io.KeyCtrl && io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEDOWN])) {
-					auto active = group(project.view());
-					if (active == (int)groups.size()-1) {
-						forget(project.view());
-						groups.push_back({project.view()});
-					} else {
-						auto& dst = groups[active+1];
-						forget(project.view());
-						dst.insert(dst.begin(), project.view());
-					}
-					sanity();
 				}
 			}
 
@@ -541,7 +545,8 @@ int main(int argc, const char* argv[])
 						auto view = group.front();
 
 						bool viewHasInput = project.view() == view
-							&& !IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup);
+							&& !IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup)
+							&& !suppressInput;
 
 						if (viewHasInput) {
 							view->input();

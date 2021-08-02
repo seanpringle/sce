@@ -90,18 +90,7 @@ bool View::eol(int offset) {
 }
 
 void View::index() {
-	lines.clear();
-	int offset = 0;
-	ViewRegion line = {0,0};
-	for (auto c: text) {
-		line.length++;
-		if (c == '\n') {
-			lines.push_back(line);
-			line = {offset+1,0};
-		}
-		offset++;
-	}
-	top = std::max(0, std::min(top, (int)lines.size()));
+	top = std::max(0, std::min(top, (int)text.lines.size()-1));
 }
 
 void View::nav() {
@@ -396,6 +385,7 @@ void View::del(int c) {
 		for (int i = 0; i < (int)selections.size(); i++) {
 			auto& selection = selections[i];
 			if (c && c != get(selection.offset)) continue;
+			if (selection.offset == text.size()) continue;
 			delAt(selection);
 		}
 		batches++;
@@ -575,7 +565,7 @@ void View::bumpup() {
 }
 
 void View::bumpdown() {
-	top = std::min((int)lines.size()-1, top+1);
+	top = std::min((int)text.lines.size()-1, top+1);
 	sanity();
 }
 
@@ -688,10 +678,7 @@ void View::selectSkip() {
 }
 
 void View::intoView(ViewRegion& selection) {
-	int lineno = 0;
-	for (auto& line: lines) {
-		if (line.offset <= selection.offset+selection.length) lineno++;
-	}
+	int lineno = text.cursor(selection.offset+selection.length).line;
 
 	while (lineno+10 > top+h) {
 		top++;
@@ -701,7 +688,7 @@ void View::intoView(ViewRegion& selection) {
 		top--;
 	}
 
-	top = std::max(0, std::min((int)lines.size()-1, top));
+	top = std::max(0, std::min((int)text.lines.size()-1, top));
 }
 
 void View::boundaryRight() {
@@ -834,10 +821,10 @@ void View::interpret(const std::string& cmd) {
 
 	if (prefix("go ")) {
 		int lineno = 0;
-		if (lines.size() && 1 == std::sscanf(cmd.c_str(), "go %d", &lineno)) {
-			lineno = std::max(1, std::min((int)lines.size(), lineno));
+		if (text.lines.size() && 1 == std::sscanf(cmd.c_str(), "go %d", &lineno)) {
+			lineno = std::max(1, std::min((int)text.lines.size(), lineno));
 			selections.clear();
-			selections.push_back({lines[lineno-1].offset, 0});
+			selections.push_back({(int)text.line_offset(lineno-1), 0});
 		}
 		sanity();
 		return;
@@ -946,7 +933,6 @@ bool View::open(std::string path) {
 	}
 
 	text.clear();
-	lines.clear();
 	selections.clear();
 	batches = 0;
 	modified = false;
@@ -1051,7 +1037,7 @@ void View::draw() {
 	auto token = Syntax::Token::None;
 	auto state = Theme::State::Plain;
 
-	int lineCol = std::ceil(std::log10((int)lines.size()+1));
+	int lineCol = std::ceil(std::log10((int)text.lines.size()+1));
 	std::string lineFmt = fmt("%%0%dd ", lineCol);
 	int lineNo = top+1;
 
@@ -1102,7 +1088,7 @@ void View::draw() {
 
 	format(theme.highlight[token][state]);
 
-	cursor = lines[top].offset;
+	cursor = text.line_offset(top);
 
 	// detect large selection starting off screen
 	for (auto& selection: selections) {

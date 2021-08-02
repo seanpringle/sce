@@ -13,11 +13,11 @@ bool Syntax::isoperator(int c) {
 	return strchr("+-*/%=<>", c);
 }
 
-int Syntax::get(const std::deque<int>& text, int cursor) {
+int Syntax::get(const Doc& text, int cursor) {
 	return cursor >= 0 && cursor < (int)text.size() ? text[cursor]: 0;
 }
 
-bool Syntax::wordset(const std::deque<int>& text, int cursor, const std::set<std::string,std::less<>>& names) {
+bool Syntax::wordset(const Doc& text, int cursor, const std::set<std::string,std::less<>>& names) {
 	char pad[32]; int len = 0;
 	for (int i = 0; i < 31 && isname(get(text, cursor+i)); i++) {
 		pad[len++] = get(text, cursor+i);
@@ -26,19 +26,19 @@ bool Syntax::wordset(const std::deque<int>& text, int cursor, const std::set<std
 	return names.count(std::string_view(pad)) > 0;
 }
 
-std::vector<ViewRegion> PlainText::tags(const std::deque<int>& text) {
+std::vector<ViewRegion> PlainText::tags(const Doc& text) {
 	return {};
 }
 
-std::vector<std::string> PlainText::matches(const std::deque<int>& text, int cursor) {
+std::vector<std::string> PlainText::matches(const Doc& text, int cursor) {
 	return {};
 }
 
-Syntax::Token PlainText::next(const std::deque<int>& text, int cursor, CPP::Token token) {
+Syntax::Token PlainText::next(const Doc& text, int cursor, CPP::Token token) {
 	return Token::None;
 }
 
-std::vector<ViewRegion> CPP::tags(const std::deque<int>& text) {
+std::vector<ViewRegion> CPP::tags(const Doc& text) {
 	std::vector<ViewRegion> hits;
 
 	int cursor = 0;
@@ -69,7 +69,7 @@ std::vector<ViewRegion> CPP::tags(const std::deque<int>& text) {
 	return hits;
 }
 
-std::vector<std::string> CPP::matches(const std::deque<int>& text, int cursor) {
+std::vector<std::string> CPP::matches(const Doc& text, int cursor) {
 	std::set<std::string> hits;
 	std::vector<std::string> results;
 
@@ -128,7 +128,7 @@ bool CPP::isoperator(int c) {
 	return strchr("+-*/%=<>&|^!?:", c);
 }
 
-bool CPP::word(const std::deque<int>& text, int cursor, const std::string& name) {
+bool CPP::word(const Doc& text, int cursor, const std::string& name) {
 	int l = name.size();
 	for (int i = 0; i < l; i++) {
 		if (get(text, cursor+i) != name[i]) return false;
@@ -136,16 +136,16 @@ bool CPP::word(const std::deque<int>& text, int cursor, const std::string& name)
 	return !isname(get(text, cursor+l));
 }
 
-bool CPP::keyword(const std::deque<int>& text, int cursor) {
+bool CPP::keyword(const Doc& text, int cursor) {
 	return wordset(text, cursor, keywords);
 }
 
-bool CPP::specifier(const std::deque<int>& text, int cursor) {
+bool CPP::specifier(const Doc& text, int cursor) {
 	return wordset(text, cursor, specifiers);
 }
 
 // is cursor inside a line // comment
-bool CPP::comment(const std::deque<int>& text, int cursor) {
+bool CPP::comment(const Doc& text, int cursor) {
 	auto c = [&](int offset = 0) {
 		return get(text, cursor+offset);
 	};
@@ -158,7 +158,7 @@ bool CPP::comment(const std::deque<int>& text, int cursor) {
 }
 
 // is cursor in a [namespace::]type[<namespace::type>[&*]]
-bool CPP::typelike(const std::deque<int>& text, int cursor) {
+bool CPP::typelike(const Doc& text, int cursor) {
 	auto prev = [&]() {
 		return get(text, cursor-1);
 	};
@@ -221,7 +221,7 @@ bool CPP::typelike(const std::deque<int>& text, int cursor) {
 }
 
 // is cursor on a struct or class definition name
-bool CPP::matchBlockType(const std::deque<int>& text, int cursor) {
+bool CPP::matchBlockType(const Doc& text, int cursor) {
 	auto c = [&](int offset = 0) {
 		return get(text, cursor+offset);
 	};
@@ -262,7 +262,7 @@ bool CPP::matchBlockType(const std::deque<int>& text, int cursor) {
 }
 
 // is cursor on a function or method name
-bool CPP::matchFunction(const std::deque<int>& text, int cursor) {
+bool CPP::matchFunction(const Doc& text, int cursor) {
 	auto c = [&](int offset = 0) {
 		return get(text, cursor+offset);
 	};
@@ -334,7 +334,7 @@ bool CPP::matchFunction(const std::deque<int>& text, int cursor) {
 	return true;
 }
 
-Syntax::Token CPP::next(const std::deque<int>& text, int cursor, CPP::Token token) {
+Syntax::Token CPP::next(const Doc& text, int cursor, CPP::Token token) {
 
 	auto rget = [&](int offset = 0) {
 		return get(text, cursor+offset);
@@ -481,20 +481,20 @@ Syntax::Token CPP::next(const std::deque<int>& text, int cursor, CPP::Token toke
 	return token;
 }
 
-bool OpenSCAD::keyword(const std::deque<int>& text, int cursor) {
+bool OpenSCAD::keyword(const Doc& text, int cursor) {
 	return wordset(text, cursor, keywords);
 }
 
-std::vector<ViewRegion> OpenSCAD::tags(const std::deque<int>& text) {
+std::vector<ViewRegion> OpenSCAD::tags(const Doc& text) {
 	return {};
 }
 
-std::vector<std::string> OpenSCAD::matches(const std::deque<int>& text, int cursor) {
+std::vector<std::string> OpenSCAD::matches(const Doc& text, int cursor) {
 	return {};
 }
 
 // is cursor inside a line // comment
-bool OpenSCAD::comment(const std::deque<int>& text, int cursor) {
+bool OpenSCAD::comment(const Doc& text, int cursor) {
 	auto c = [&](int offset = 0) {
 		return get(text, cursor+offset);
 	};
@@ -507,7 +507,7 @@ bool OpenSCAD::comment(const std::deque<int>& text, int cursor) {
 }
 
 // is cursor on a module name
-bool OpenSCAD::matchModule(const std::deque<int>& text, int cursor) {
+bool OpenSCAD::matchModule(const Doc& text, int cursor) {
 	auto c = [&](int offset = 0) {
 		return get(text, cursor+offset);
 	};
@@ -545,7 +545,7 @@ bool OpenSCAD::matchModule(const std::deque<int>& text, int cursor) {
 	return c() == '{';
 }
 
-Syntax::Token OpenSCAD::next(const std::deque<int>& text, int cursor, CPP::Token token) {
+Syntax::Token OpenSCAD::next(const Doc& text, int cursor, CPP::Token token) {
 	switch (token) {
 
 		case Token::None: {
