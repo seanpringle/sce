@@ -44,19 +44,23 @@ struct Doc {
 		ensure(index <= size());
 
 		if (index == 0) {
-			return {0,0,0};
+			last = {0,0,0};
+			return last;
 		}
 
 		if (index == size()) {
-			return {index,(uint)lines.size()-1,(uint)lines.back().size()};
+			last = {index,(uint)lines.size()-1,(uint)lines.back().size()};
+			return last;
 		}
 
 		while (last.index > index) {
+			// try to jump straight the beginning of the current line
 			if (last.cell > 0 && last.index-last.cell >= index) {
 				last.index -= last.cell;
 				last.cell = 0;
 				continue;
 			}
+			// walk backward on the current line
 			if (last.cell > 0) {
 				last.cell--;
 				last.index--;
@@ -73,11 +77,13 @@ struct Doc {
 			uint len = lines[last.line].size();
 			ensure(len > 0);
 			uint rem = len-last.cell-1;
+			// try to jump straight the end of the current line
 			if (last.cell < len-1 && last.index+rem <= index) {
 				last.index += rem;
 				last.cell = len-1;
 				continue;
 			}
+			// walk forward on the current line
 			if (last.cell < len-1) {
 				last.cell++;
 				last.index++;
@@ -106,8 +112,8 @@ struct Doc {
 		}
 
 		while (last.line < line) {
-			last.line++;
 			last.index += lines[last.line].size();
+			last.line++;
 		}
 
 		return last.index;
@@ -252,10 +258,6 @@ struct Doc {
 	};
 
 	iterator insert(iterator it, int v) {
-		// move the cached cursor to safe spot
-		if (last.index >= it.ii) {
-			cursor(std::max(0, (int)it.ii-1));
-		}
 		if (!lines.size()) {
 			lines.push_back({v});
 			count++;
@@ -275,7 +277,14 @@ struct Doc {
 			//sanity();
 			return iterator(this, it.ii);
 		}
+
 		auto cur = it.cursor();
+
+		// move the cached cursor out of the way
+		if (last.index >= it.ii) {
+			cursor(std::max(0, (int)it.ii-1));
+		}
+
 		auto& line = lines[cur.line];
 		auto cit = line.begin()+cur.cell;
 		auto pos = line.insert(cit, v);
@@ -302,14 +311,17 @@ struct Doc {
 	};
 
 	iterator erase(iterator it) {
-		// move the cached cursor to safe spot
-		if (last.index >= it.ii) {
-			cursor(std::max(0, (int)it.ii-1));
-		}
 		if (it == end()) {
 			return it;
 		}
+
 		auto cur = it.cursor();
+
+		// move the cached cursor out of the way
+		if (last.index >= it.ii) {
+			cursor(std::max(0, (int)it.ii-1));
+		}
+
 		auto& line = lines[cur.line];
 		ensure(line.size());
 		int c = line[cur.cell];
