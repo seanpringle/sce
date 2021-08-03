@@ -43,7 +43,8 @@ std::vector<std::string> Config::args(int argc, const char** argv) {
 	std::vector<std::string> paths;
 
 	for (int i = 1; i < argc; i++) {
-		paths.push_back(argv[i]);
+		auto arg = std::string(argv[i]);
+		paths.push_back(arg);
 	}
 
 	return paths;

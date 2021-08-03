@@ -1,6 +1,14 @@
 #include "common.h"
 #include "project.h"
+#include "config.h"
 #include <fstream>
+#include <filesystem>
+
+extern Config config;
+
+Project::Project() {
+	groups.resize(1);
+}
 
 Project::~Project() {
 	sanity();
@@ -9,29 +17,49 @@ Project::~Project() {
 
 void Project::sanity() {
 	active = std::max(0, std::min((int)views.size()-1, active));
+
+	std::set<View*> viewset = {views.begin(), views.end()};
+
+	for (auto it = groups.begin(); it != groups.end(); ) {
+		auto &group = *it;
+		if (!group.size() && groups.size() > 1U) {
+			it = groups.erase(it);
+			continue;
+		}
+		for (auto view: group) {
+			ensure(viewset.count(view));
+			viewset.erase(view);
+		}
+		++it;
+	}
+
+	ensure(!viewset.size());
 }
 
 int Project::find(const std::string& path) {
-	sanity();
 	auto it = std::find_if(views.begin(), views.end(), [&](auto view) { return view->path == path; });
 	return it == views.end() ? -1: it-views.begin();
 }
 
 int Project::find(View* view) {
-	sanity();
 	auto it = std::find(views.begin(), views.end(), view);
 	return it == views.end() ? -1: it-views.begin();
 }
 
 View* Project::view() {
-	sanity();
 	return views.size() ? views[active]: nullptr;
 }
 
 View* Project::open(const std::string& path) {
-	active = find(path);
+	if (std::filesystem::path(path).extension().string() == ".sce-project") {
+		load(path);
+		return view();
+	}
 
-	if (active < 0) {
+	int gactive = group(view());
+	int factive = find(path);
+
+	if (factive < 0) {
 		auto v = new View();
 
 		if (!v->open(path)) {
@@ -39,23 +67,28 @@ View* Project::open(const std::string& path) {
 			return nullptr;
 		}
 
+		groups[gactive].push_back(v);
 		views.push_back(v);
 
 		std::sort(views.begin(), views.end(), [](auto a, auto b) { return a->path < b->path; });
 
-		active = find(path);
-		ensure(active >= 0);
+		factive = find(path);
+		ensure(factive >= 0);
 	}
 
+	active = factive;
+
+	bubble();
 	return view();
 }
 
 void Project::close() {
 	auto v = view();
 	if (v) {
+		forget(v);
 		delete v;
 		views.erase(std::find(views.begin(), views.end(), v));
-		sanity();
+		bubble();
 	}
 }
 
@@ -85,24 +118,212 @@ bool Project::interpret(const std::string& cmd) {
 	return false;
 }
 
-bool Project::load(const std::string& path) {
+bool Project::load(const std::string path) {
 	auto in = std::ifstream(path);
 	if (!in) return false;
-	for (std::string line; std::getline(in, line); ) {
+
+	std::string line;
+	int nviews = 0, ngroups = 0, npaths = 0;
+
+	ensure(std::getline(in, line));
+	ensure(1 == std::sscanf(line.c_str(), "%d", &nviews));
+
+	for (int i = 0; i < nviews; i++) {
+		ensure(std::getline(in, line));
 		notef("%s", line);
-		open(line);
+		auto apath = std::filesystem::path(line);
+		auto rpath = std::filesystem::relative(apath);
+		open(rpath.string());
 	}
+
+	ensure(std::getline(in, line));
+	ensure(1 == std::sscanf(line.c_str(), "%d", &active));
+
+	ensure(std::getline(in, line));
+	ensure(1 == std::sscanf(line.c_str(), "%d", &layout));
+
+	ensure(std::getline(in, line));
+	ensure(1 == std::sscanf(line.c_str(), "%d", &ngroups));
+
+	groups.clear();
+	groups.resize(ngroups);
+
+	for (auto& group: groups) {
+		int gsize = 0;
+		ensure(std::getline(in, line));
+		ensure(1 == std::sscanf(line.c_str(), "%d", &gsize));
+		for (int i = 0; i < gsize; i++) {
+			ensure(std::getline(in, line));
+			auto apath = std::filesystem::path(line);
+			auto rpath = std::filesystem::relative(apath);
+			int id = find(rpath.string());
+			if (id >= 0) group.push_back(views[id]);
+		}
+	}
+
+	ensure(std::getline(in, line));
+	ensure(1 == std::sscanf(line.c_str(), "%d", &npaths));
+
+	for (int i = 0; i < npaths; i++) {
+		ensure(std::getline(in, line)); trim(line);
+		auto apath = std::filesystem::path(line);
+		auto rpath = std::filesystem::relative(apath);
+		paths.push_back(rpath.string());
+	}
+
 	in.close();
+
+	bubble();
+
+	ppath = path;
 	return true;
 }
 
-bool Project::save(const std::string& path) {
-	auto out = std::ofstream(path);
+bool Project::save(const std::string path) {
+	const std::string spath = path.empty() ? ppath: path;
+	if (spath.empty()) return false;
+
+	auto out = std::ofstream(spath);
 	if (!out) return false;
+
+	out << fmt("%llu views", views.size()) << '\n';
 	for (auto view: views) {
-		notef("%s", view->path);
-		out << view->path << '\n';
+		auto vpath = std::filesystem::path(view->path);
+		auto apath = std::filesystem::canonical(vpath);
+		out << apath.string() << '\n';
+	}
+	out << fmt("%d active", active) << '\n';
+	out << fmt("%d layout", layout) << '\n';
+	out << fmt("%llu groups", groups.size()) << '\n';
+	for (auto group: groups) {
+		out << fmt("%llu views", group.size()) << '\n';
+		for (auto view: group) {
+			auto vpath = std::filesystem::path(view->path);
+			auto apath = std::filesystem::canonical(vpath);
+			out << apath.string() << '\n';
+		}
+	}
+	out << fmt("%llu paths", paths.size()) << '\n';
+	for (auto searchPath: paths) {
+		auto spath = std::filesystem::path(searchPath);
+		auto apath = std::filesystem::canonical(spath);
+		out << apath.string() << '\n';
 	}
 	out.close();
 	return true;
 }
+
+void Project::forget(View* view) {
+	for (auto& src: groups) {
+		src.erase(std::remove(src.begin(), src.end(), view), src.end());
+	}
+}
+
+bool Project::known(View* view) {
+	for (auto& src: groups) {
+		if (std::find(src.begin(), src.end(), view) != src.end()) return true;
+	}
+	return false;
+}
+
+int Project::group(View* view) {
+	if (!view) return 0;
+	for (int i = 0; i < (int)groups.size(); i++) {
+		auto& group = groups[i];
+		auto it = std::find(group.begin(), group.end(), view);
+		if (it != group.end()) return i;
+	}
+	throw view;
+}
+
+void Project::bubble() {
+	sanity();
+	auto& grp = groups[group(view())];
+
+	if (view() && grp.front() != view()) {
+		forget(view());
+		grp.insert(grp.begin(), view());
+		sanity();
+	}
+}
+
+void Project::layout1() {
+	groups.clear();
+	groups.resize(1);
+	layout = 1;
+	for (auto view: views) {
+		groups[0].push_back(view);
+	}
+	bubble();
+}
+
+void Project::layout2() {
+	groups.clear();
+	groups.resize(2);
+	layout = 2;
+	for (auto view: views) {
+		auto path = std::filesystem::path(view->path);
+		auto ext = path.extension().string();
+		if (ext.front() == '.') ext = ext.substr(1);
+		int g = config.layout2.left.count(ext) ? 0:1;
+		groups[g].push_back(view);
+	}
+	bubble();
+}
+
+void Project::cycle() {
+	if (groups.size() < 2U) return;
+
+	bool found = false;
+	auto gactive = group(view());
+	for (int i = gactive+1; !found && i < (int)groups.size(); i++) {
+		if (groups[i].size()) {
+			gactive = find(groups[i].front());
+			found = true;
+		}
+	}
+	for (int i = 0; !found && i < gactive; i++) {
+		if (groups[i].size()) {
+			gactive = find(groups[i].front());
+			found = true;
+		}
+	}
+	bubble();
+}
+
+void Project::prev() {
+	active--;
+	bubble();
+}
+
+void Project::next() {
+	active++;
+	bubble();
+}
+
+void Project::movePrev() {
+	auto gactive = group(view());
+	if (gactive == 0) {
+		forget(view());
+		groups.insert(groups.begin(), {view()});
+	} else {
+		auto& dst = groups[gactive-1];
+		forget(view());
+		dst.insert(dst.begin(), view());
+	}
+	bubble();
+}
+
+void Project::moveNext() {
+	auto gactive = group(view());
+	if (gactive == (int)groups.size()-1) {
+		forget(view());
+		groups.push_back({view()});
+	} else {
+		auto& dst = groups[gactive+1];
+		forget(view());
+		dst.insert(dst.begin(), view());
+	}
+	bubble();
+}
+

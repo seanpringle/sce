@@ -50,5 +50,7 @@ struct Config {
 		float split = 0.0f;
 	} layout2;
 
+	bool newProject = false;
+
 	std::vector<std::string> args(int argc, const char** argv);
 };

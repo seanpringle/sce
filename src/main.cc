@@ -56,62 +56,6 @@ int KeyMap[100] = {
 	[KEY_Z] = SDL_SCANCODE_Z,
 };
 
-std::vector<std::vector<View*>> groups;
-int layout = 0;
-
-void forget(View* view) {
-	for (auto& src: groups) {
-		src.erase(std::remove(src.begin(), src.end(), view), src.end());
-	}
-}
-
-bool known(View* view) {
-	for (auto& src: groups) {
-		if (std::find(src.begin(), src.end(), view) != src.end()) return true;
-	}
-	return false;
-}
-
-int group(View* view) {
-	if (!view) return 0;
-	for (int i = 0; i < (int)groups.size(); i++) {
-		auto& group = groups[i];
-		auto it = std::find(group.begin(), group.end(), view);
-		if (it != group.end()) return i;
-	}
-	throw view;
-}
-
-void sanity() {
-	std::set<View*> views = {project.views.begin(), project.views.end()};
-	for (auto it = groups.begin(); it != groups.end(); ) {
-		auto &group = *it;
-		if (!group.size()) {
-			it = groups.erase(it);
-			continue;
-		}
-		for (auto view: group) {
-			ensure(views.count(view));
-			views.erase(view);
-		}
-		++it;
-	}
-	ensure(!views.size());
-	if (!groups.size()) {
-		groups.resize(1);
-	}
-}
-
-void bubble() {
-	auto& grp = groups[group(project.view())];
-
-	if (project.view() && grp.front() != project.view()) {
-		forget(project.view());
-		grp.insert(grp.begin(), project.view());
-		sanity();
-	}
-}
-
 struct ViewTitle {
 	char text[100] = {0};
 };
@@ -119,7 +63,7 @@ struct ViewTitle {
 std::vector<ViewTitle> viewTitles;
 
 int main(int argc, const char* argv[]) {
-	notef("hello world");
+	auto HOME = std::getenv("HOME");
 
 	for (auto arg: config.args(argc, argv)) {
 		auto path = std::filesystem::path(arg);
@@ -131,15 +75,12 @@ int main(int argc, const char* argv[]) {
 		}
 	}
 
-	if (!project.paths.size()) {
-		project.paths.push_back(".");
+	if (project.ppath.empty() && project.views.empty()) {
+		project.load(fmt("%s/.sce-project", HOME));
 	}
 
-	project.active = 0;
-	groups.resize(1);
-
-	for (auto view: project.views) {
-		groups.front().push_back(view);
+	if (!project.paths.size()) {
+		project.paths.push_back(".");
 	}
 
 	ensuref(0 == SDL_Init(SDL_INIT_VIDEO|SDL_INIT_EVENTS), "%s", SDL_GetError());
@@ -324,10 +265,8 @@ int main(int argc, const char* argv[]) {
 
 			if (!suppressInput) {
 
-				if (io.KeyCtrl && !io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEUP])) project.active--;
-				if (io.KeyCtrl && !io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEDOWN])) project.active++;
-
-				project.sanity();
+				if (io.KeyCtrl && !io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEUP])) project.prev();
+				if (io.KeyCtrl && !io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEDOWN])) project.next();
 
 				find = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_F]);
 				line = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_G]);
@@ -340,48 +279,27 @@ int main(int argc, const char* argv[]) {
 				}
 
 				if (IsKeyPressed(KeyMap[KEY_F1])) {
-					groups.clear();
-					groups.resize(1);
-					layout = 1;
-					for (auto view: project.views) {
-						groups[0].push_back(view);
-					}
+					project.layout1();
 				}
 
 				if (IsKeyPressed(KeyMap[KEY_F2])) {
-					groups.clear();
-					groups.resize(2);
-					layout = 2;
-					for (auto view: project.views) {
-						auto path = std::filesystem::path(view->path);
-						auto ext = path.extension().string();
-						if (ext.front() == '.') ext = ext.substr(1);
-						int g = config.layout2.left.count(ext) ? 0:1;
-						groups[g].push_back(view);
-					}
+					project.layout2();
 				}
 
 				if (project.view()) {
 					if (io.KeyCtrl && IsKeyPressed(KeyMap[KEY_W])) {
 						if (!project.view()->modified) {
-							forget(project.view());
 							project.close();
-							sanity();
 						}
 					}
 
 					if (IsKeyPressed(KeyMap[KEY_F3])) {
-						auto active = group(project.view());
 						auto path = std::filesystem::path(project.view()->path);
 						auto ext = path.extension().string();
 
 						auto open = [&](auto rep) {
 							auto rpath = path.replace_extension(rep).string();
-							auto view = project.open(rpath);
-							if (view && !known(view)) {
-								groups[active].push_back(view);
-							}
-							return view ? true:false;
+							return project.open(rpath);
 						};
 
 						if (ext == ".c") {
@@ -400,55 +318,21 @@ int main(int argc, const char* argv[]) {
 							open(".cpp") ||
 							open(".cc");
 						}
-						sanity();
 					}
 
-					if (io.KeyCtrl && IsKeyPressed(KeyMap[KEY_SPACE]) && groups.size() > 1U) {
-						bool found = false;
-						auto active = group(project.view());
-						for (int i = active+1; !found && i < (int)groups.size(); i++) {
-							if (groups[i].size()) {
-								project.active = project.find(groups[i].front());
-								found = true;
-							}
-						}
-						for (int i = 0; !found && i < active; i++) {
-							if (groups[i].size()) {
-								project.active = project.find(groups[i].front());
-								found = true;
-							}
-						}
+					if (io.KeyCtrl && IsKeyPressed(KeyMap[KEY_SPACE])) {
+						project.cycle();
 					}
 
 					if (io.KeyCtrl && io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEUP])) {
-						auto active = group(project.view());
-						if (active == 0) {
-							forget(project.view());
-							groups.insert(groups.begin(), {project.view()});
-						} else {
-							auto& dst = groups[active-1];
-							forget(project.view());
-							dst.insert(dst.begin(), project.view());
-						}
-						sanity();
+						project.movePrev();
 					}
 
 					if (io.KeyCtrl && io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEDOWN])) {
-						auto active = group(project.view());
-						if (active == (int)groups.size()-1) {
-							forget(project.view());
-							groups.push_back({project.view()});
-						} else {
-							auto& dst = groups[active+1];
-							forget(project.view());
-							dst.insert(dst.begin(), project.view());
-						}
-						sanity();
+						project.moveNext();
 					}
 				}
 			}
-
-			bubble();
 
 			auto vsplit = [](float space, float split) {
 				return split < 1.0f ? space * split: split;
@@ -501,18 +385,18 @@ int main(int argc, const char* argv[]) {
 
 				PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(2,4));
 
-				if (BeginTable("#layout", groups.size()+1)) {
+				if (BeginTable("#layout", project.groups.size()+1)) {
 
 					float sidebarWidth = vsplit(config.window.width, config.sidebar.split);
 					TableSetupColumn("files", ImGuiTableColumnFlags_WidthFixed, sidebarWidth);
 
-					if (layout == 2 && groups.size() == 2U && config.layout2.split > 0.01f) {
+					if (project.layout == 2 && project.groups.size() == 2U && config.layout2.split > 0.01f) {
 						float leftWidth = vsplit(config.window.width, config.layout2.split);
 						TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed, leftWidth);
 						TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch);
 					}
 					else {
-						for (uint i = 0; i < groups.size(); i++) {
+						for (uint i = 0; i < project.groups.size(); i++) {
 							TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch);
 						}
 					}
@@ -521,11 +405,11 @@ int main(int argc, const char* argv[]) {
 
 					TableNextColumn();
 					TableSetBgColor(ImGuiTableBgTarget_CellBg, GetColorU32(ImGuiCol_FrameBg));
-					Text("files");
+					TextUnformatted(std::filesystem::path(project.ppath).filename().c_str());
 
-					for (uint i = 0; i < groups.size(); i++) {
+					for (uint i = 0; i < project.groups.size(); i++) {
 						TableNextColumn();
-						auto& group = groups[i];
+						auto& group = project.groups[i];
 						if (!group.size()) continue;
 						auto view = group.front();
 
@@ -553,7 +437,7 @@ int main(int argc, const char* argv[]) {
 
 							if (Selectable(title, project.active == (int)i)) {
 								project.active = i;
-								bubble();
+								project.bubble();
 							}
 							PopStyleColor(1);
 						}
@@ -562,7 +446,7 @@ int main(int argc, const char* argv[]) {
 					PopFont();
 
 					PushFont(fontView);
-					for (auto& group: groups) {
+					for (auto& group: project.groups) {
 						TableNextColumn();
 						if (!group.size()) continue;
 						auto view = group.front();
@@ -579,6 +463,7 @@ int main(int argc, const char* argv[]) {
 
 						if (IsAnyMouseDown() && view->mouseOver) {
 							project.active = project.find(view->path);
+							project.bubble();
 						}
 					}
 					PopFont();
@@ -794,11 +679,7 @@ int main(int argc, const char* argv[]) {
 						selectNavigate(visible.size(), openSelected);
 
 						auto openView = [&](const std::string& openPath) {
-							int active = group(project.view());
-							auto view = project.open(openPath);
-							if (!known(view)) {
-								groups[active].push_back(view);
-							}
+							project.open(openPath);
 						};
 
 						if (IsKeyPressed(KeyMap[KEY_RETURN])) {
@@ -839,6 +720,12 @@ int main(int argc, const char* argv[]) {
 		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
 		SDL_GL_SwapWindow(window);
 	}
+
+	if (project.ppath.empty()) {
+		project.ppath = fmt("%s/.sce-project", HOME);
+	}
+
+	project.save();
 
 	ImGui_ImplOpenGL3_Shutdown();
 	ImGui_ImplSDL2_Shutdown();

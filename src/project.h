@@ -5,9 +5,12 @@
 struct Project {
 	int active = 0;
 	std::vector<View*> views;
+	std::string ppath;
 	std::vector<std::string> paths;
+	std::vector<std::vector<View*>> groups;
+	int layout = 0;
 
-	Project() = default;
+	Project();
 	~Project();
 	View* open(const std::string& path);
 	int find(const std::string& path);
@@ -16,6 +19,20 @@ struct Project {
 	View* view();
 	void close();
 	bool interpret(const std::string& cmd);
-	bool load(const std::string& path);
-	bool save(const std::string& path);
+	bool load(const std::string path);
+	bool save(const std::string path = "");
+
+	void forget(View* view);
+	bool known(View* view);
+	int group(View* view);
+	void bubble();
+
+	void layout1();
+	void layout2();
+
+	void cycle();
+	void prev();
+	void next();
+	void movePrev();
+	void moveNext();
 };
