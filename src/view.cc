@@ -135,7 +135,7 @@ void View::undo() {
 		redos.push_back(change);
 	}
 
-	while (undos.size() > 100) {
+	while (undos.size() > 1000) {
 		undos.erase(undos.begin());
 	}
 
@@ -176,7 +176,7 @@ void View::redo() {
 		undos.push_back(change);
 	}
 
-	while (redos.size() > 100) {
+	while (redos.size() > 1000) {
 		redos.erase(redos.begin());
 	}
 
@@ -770,7 +770,7 @@ void View::unwind() {
 	sanity();
 }
 
-void View::interpret(const std::string& cmd) {
+bool View::interpret(const std::string& cmd) {
 	auto prefix = [&](const std::string& s) {
 		return cmd.find(s) == 0;
 	};
@@ -791,7 +791,7 @@ void View::interpret(const std::string& cmd) {
 
 	if (prefix("find ") && cmd.size() > 5U) {
 		int from = selections.back().offset;
-		auto needle = cmd.substr(5);
+		auto needle = cmd.substr(5); trim(needle);
 
 		auto match = [&](const std::string& needle, int offset) {
 			for (int i = 0; i < (int)needle.size(); i++) {
@@ -801,12 +801,12 @@ void View::interpret(const std::string& cmd) {
 		};
 
 		find(from, needle, match);
-		return;
+		return true;
 	}
 
 	if (prefix("ifind ") && cmd.size() > 6U) {
 		int from = selections.back().offset;
-		auto needle = cmd.substr(6);
+		auto needle = cmd.substr(6); trim(needle);
 
 		auto match = [&](const std::string& needle, int offset) {
 			for (int i = 0; i < (int)needle.size(); i++) {
@@ -816,7 +816,7 @@ void View::interpret(const std::string& cmd) {
 		};
 
 		find(from, needle, match);
-		return;
+		return true;
 	}
 
 	if (prefix("go ")) {
@@ -827,8 +827,10 @@ void View::interpret(const std::string& cmd) {
 			selections.push_back({(int)text.line_offset(lineno-1), 0});
 		}
 		sanity();
-		return;
+		return true;
 	}
+
+	return false;
 }
 
 std::vector<std::string> View::autocomplete() {
@@ -920,7 +922,6 @@ bool View::open(std::string path) {
 
 	delete syntax;
 	auto fpath = std::filesystem::path(path);
-	notef("%s => %s", path, fpath.extension().string());
 
 	if ((std::set<std::string>{".cc", ".cpp", ".c", ".h"}).count(fpath.extension().string())) {
 		syntax = new CPP();

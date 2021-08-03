@@ -1,24 +1,9 @@
 #pragma once
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <cstdlib>
-#include <cmath>
-#include <cstring>
 #include <string>
 #include <memory>
-#include <algorithm>
-#include <functional>
 #include <stdexcept>
-#include <iostream>
-#include <sstream>
-#include <filesystem>
-
-#if defined(_WIN32)
-typedef uint32_t uint;
-#endif
-
-#define ZERO(s) memset(&s, 0, sizeof(s))
+#include <algorithm>
 
 // Convert all std::strings to const char* using constexpr if (C++17)
 template<typename T>
@@ -56,47 +41,23 @@ std::string fmt(std::string fmt, Args&& ... args) {
 
 #define fmtc(...) fmt(__VA_ARGS__).c_str()
 
-class Logger {
-    bool first = true;
-    bool last = true;
-public:
-    Logger() = default;
-    Logger(const char* prefix) {
-        first = false;
-        std::cerr << prefix;
-    }
-    Logger(const char* prefix, const char* file, int line, const char* func) : Logger(prefix) {
-        std::cerr << ' ' << std::filesystem::path(file).filename().string() << ':' << line << ' ' << func << "()";
-        first = false;
-    }
-    Logger(Logger && dc) noexcept : first{false} {
-        dc.last = false;
-    }
-    ~Logger() {
-        if (last) std::cerr << '\n';
-    }
-    template <typename T>
-    friend Logger operator<<(Logger db, const T& x) {
-        if (db.first) db.first = false; else std::cerr << ' ';
-        std::cerr << x;
-        return db;
-    }
-};
+static inline void ltrim(std::string &s) {
+    s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](auto ch) { return !std::isspace(ch); }));
+}
 
-class NullLogger {
-public:
-    NullLogger() = default;
-    template <typename T>
-    friend NullLogger operator<<(NullLogger db, const T& x) {
-        return db;
-    }
-};
+static inline void rtrim(std::string &s) {
+    s.erase(std::find_if(s.rbegin(), s.rend(), [](auto ch) { return !std::isspace(ch); }).base(), s.end());
+}
 
-#ifndef NDEBUG
-#define note() Logger("NOTE", __FILE__, __LINE__, __func__)
-#define debug() Logger("DEBUG", __FILE__, __LINE__, __func__)
-#else
-#define note() Logger()
-#define debug() NullLogger()
-#endif
+static inline void trim(std::string &s) {
+    ltrim(s);
+    rtrim(s);
+}
 
+static inline bool ends_with(const std::string& str, const std::string& suffix) {
+    return str.size() >= suffix.size() && 0 == str.compare(str.size()-suffix.size(), suffix.size(), suffix);
+}
+
+static inline bool starts_with(const std::string& str, const std::string& prefix) {
+    return str.size() >= prefix.size() && 0 == str.compare(0, prefix.size(), prefix);
+}

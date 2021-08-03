@@ -7,6 +7,7 @@ struct ViewRegion;
 #include <vector>
 #include <list>
 #include <string>
+#include <cmath>
 #include "doc.h"
 #include "syntax.h"
 
@@ -123,5 +124,5 @@ struct View {
 	bool indent();
 	bool outdent();
 	std::vector<std::string> autocomplete();
-	void interpret(const std::string& cmd);
+	bool interpret(const std::string& cmd);
 };

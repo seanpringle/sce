@@ -1,5 +1,4 @@
 
-#include "common.h"
 #include "doc.h"
 #include "gtest/gtest.h"
 
@@ -15,6 +14,7 @@ namespace {
 		EXPECT_EQ(doc.last.index, 6U);
 		EXPECT_EQ(doc.last.line, 1U);
 		EXPECT_EQ(doc.last.cell, 2U);
+		EXPECT_TRUE(doc.sanity());
 	}
 
 	TEST(doc, insert) {
@@ -26,6 +26,7 @@ namespace {
 		EXPECT_EQ(doc.last.cell, 2U);
 		EXPECT_EQ(doc.size(), 8U);
 		EXPECT_EQ(doc.lines.size(), 2U);
+		EXPECT_TRUE(doc.sanity());
 	}
 
 	TEST(doc, erase) {
@@ -42,5 +43,6 @@ namespace {
 		EXPECT_EQ(doc.last.index, 4U);
 		EXPECT_EQ(doc.last.line, 0U);
 		EXPECT_EQ(doc.last.cell, 4U);
+		EXPECT_TRUE(doc.sanity());
 	}
 }

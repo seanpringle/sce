@@ -119,6 +119,8 @@ struct ViewTitle {
 std::vector<ViewTitle> viewTitles;
 
 int main(int argc, const char* argv[]) {
+	notef("hello world");
+
 	for (auto arg: config.args(argc, argv)) {
 		auto path = std::filesystem::path(arg);
 		if (std::filesystem::is_regular_file(path)) {
@@ -626,7 +628,7 @@ int main(int argc, const char* argv[]) {
 					if (InputTextWithHint(fmtc("#command-input-%s", commandPrefix ? commandPrefix: "any"),
 						"command...", commandInput, sizeof(commandInput), ImGuiInputTextFlags_EnterReturnsTrue|ImGuiInputTextFlags_AutoSelectAll)
 					){
-						project.view()->interpret(commandInput);
+						project.interpret(commandInput) || project.view()->interpret(commandInput);
 						CloseCurrentPopup();
 					}
 

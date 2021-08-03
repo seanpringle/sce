@@ -21,16 +21,16 @@ struct Doc {
 		uint cell = 0;
 	};
 
-	void sanity() {
+	bool sanity() {
 		uint sum = 0;
 		for (uint i = 0; i < lines.size()-1; i++) {
-			ensure(lines[i].size() && lines[i].back() == '\n');
+			if (lines[i].back() != '\n') return false;
 			sum += lines[i].size();
 		}
 		if (lines.size()) {
 			sum += lines.back().size();
 		}
-		ensure(sum == count);
+		return sum == count;
 	};
 
 	void clear() {
@@ -269,20 +269,17 @@ struct Doc {
 		if (!lines.size()) {
 			lines.push_back({v});
 			count++;
-			//sanity();
 			return begin();
 		}
 		if (it == end() && v != '\n') {
 			lines.back().push_back(v);
 			count++;
-			//sanity();
 			return iterator(this, it.ii);
 		}
 		if (it == end() && v == '\n') {
 			lines.back().push_back(v);
 			count++;
 			lines.push_back({});
-			//sanity();
 			return iterator(this, it.ii);
 		}
 
@@ -304,7 +301,6 @@ struct Doc {
 			auto lit = lines.begin()+cur.line;
 			lines.insert(lit+1, eol);
 		}
-		sanity();
 		return iterator(this, it.ii);
 	};
 
@@ -343,7 +339,6 @@ struct Doc {
 				lines.erase(lines.begin()+cur.line+1);
 			}
 		}
-		sanity();
 		return iterator(this, it.ii);
 	};
 

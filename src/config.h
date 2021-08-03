@@ -1,6 +1,7 @@
 #include "common.h"
 #include <chrono>
 #include <set>
+#include <vector>
 
 struct Config {
 	struct {

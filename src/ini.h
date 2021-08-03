@@ -7,28 +7,6 @@
 #include "catenate.h"
 
 class IniReader {
-private:
-
-    static inline void ltrim(std::string &s) {
-        s.erase(s.begin(), std::find_if(s.begin(), s.end(), [](auto ch) { return !std::isspace(ch); }));
-    }
-
-    static inline void rtrim(std::string &s) {
-        s.erase(std::find_if(s.rbegin(), s.rend(), [](auto ch) { return !std::isspace(ch); }).base(), s.end());
-    }
-
-    static inline void trim(std::string &s) {
-        ltrim(s);
-        rtrim(s);
-    }
-
-    static inline bool ends_with(const std::string& str, const std::string& suffix) {
-        return str.size() >= suffix.size() && 0 == str.compare(str.size()-suffix.size(), suffix.size(), suffix);
-    }
-
-    static inline bool starts_with(const std::string& str, const std::string& prefix) {
-        return str.size() >= prefix.size() && 0 == str.compare(0, prefix.size(), prefix);
-    }
 
     std::map<std::string,std::map<std::string,std::string>> sections;
 

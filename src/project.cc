@@ -1,5 +1,6 @@
 #include "common.h"
 #include "project.h"
+#include <fstream>
 
 Project::~Project() {
 	sanity();
@@ -56,4 +57,52 @@ void Project::close() {
 		views.erase(std::find(views.begin(), views.end(), v));
 		sanity();
 	}
+}
+
+bool Project::interpret(const std::string& cmd) {
+	auto prefix = [&](const std::string& s) {
+		return cmd.find(s) == 0;
+	};
+
+	if (prefix("path ") && cmd.size() > 5U) {
+		auto path = cmd.substr(5); trim(path);
+		paths.push_back(path);
+		return true;
+	}
+
+	if (prefix("save ") && cmd.size() > 5U) {
+		auto path = cmd.substr(5); trim(path);
+		save(path);
+		return true;
+	}
+
+	if (prefix("load ") && cmd.size() > 5U) {
+		auto path = cmd.substr(5); trim(path);
+		load(path);
+		return true;
+	}
+
+	return false;
+}
+
+bool Project::load(const std::string& path) {
+	auto in = std::ifstream(path);
+	if (!in) return false;
+	for (std::string line; std::getline(in, line); ) {
+		notef("%s", line);
+		open(line);
+	}
+	in.close();
+	return true;
+}
+
+bool Project::save(const std::string& path) {
+	auto out = std::ofstream(path);
+	if (!out) return false;
+	for (auto view: views) {
+		notef("%s", view->path);
+		out << view->path << '\n';
+	}
+	out.close();
+	return true;
 }

@@ -15,4 +15,7 @@ struct Project {
 	void sanity();
 	View* view();
 	void close();
+	bool interpret(const std::string& cmd);
+	bool load(const std::string& path);
+	bool save(const std::string& path);
 };
