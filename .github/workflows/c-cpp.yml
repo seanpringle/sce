@@ -10,8 +10,10 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-    - name: checkout
+    - name: checkout repository and submodules
       uses: actions/checkout@v2
+      with:
+        submodules: recursive
     - name: deps
       run: sudo apt install build-essential gcc-9 g++-9 cmake libsdl2-dev libglew-dev libfreetype-dev
     - name: gcc
