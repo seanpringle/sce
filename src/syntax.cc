@@ -624,7 +624,6 @@ Syntax::Token INI::next(const Doc& text, int cursor, Syntax::Token token) {
 	switch (token) {
 		case Token::None: {
 
-
 			if (cursor > 0 && get(text, cursor-1) == '[' && (cursor == 1 || get(text, cursor-2) == '\n')) {
 				return Token::Namespace;
 			}
@@ -632,6 +631,11 @@ Syntax::Token INI::next(const Doc& text, int cursor, Syntax::Token token) {
 			if (iswalpha(get(text, cursor)) && (!cursor || get(text, cursor-1) == '\n')) {
 				return Token::Type;
 			}
+
+			if (get(text, cursor) == ';') {
+				return Token::Comment;
+			}
+
 			break;
 		}
 
@@ -643,6 +647,12 @@ Syntax::Token INI::next(const Doc& text, int cursor, Syntax::Token token) {
 
 		case Token::Type: {
 			if (isspace(get(text, cursor)))
+				return next(text, cursor, Token::None);
+			break;
+		}
+
+		case Token::Comment: {
+			if (get(text, cursor) == '\n')
 				return next(text, cursor, Token::None);
 			break;
 		}

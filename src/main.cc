@@ -223,6 +223,10 @@ int main(int argc, const char* argv[])
 
 	ImVec4 clear_color = ImVec4(0,0,0,1);
 
+	bool command = false;
+	const char* commandPrefix = nullptr;
+	char commandInput[100];
+
 	bool find = false;
 	char findInput[100];
 	std::memset(findInput, 0, sizeof(findInput));
@@ -463,12 +467,20 @@ int main(int argc, const char* argv[])
 			Begin("#bg", nullptr, flags);
 				PushFont(fontProp);
 
+				if (find || line) {
+					OpenPopup("#command");
+				}
+
 				if (find) {
-					OpenPopup("#find");
+					commandPrefix = "find ";
+					command = true;
+					find = false;
 				}
 
 				if (line) {
-					OpenPopup("#line");
+					commandPrefix = "go ";
+					command = true;
+					line = false;
 				}
 
 				if (tags) {
@@ -601,32 +613,30 @@ int main(int argc, const char* argv[])
 					selected = std::max(0, std::min(size-1, selected));
 				};
 
-				auto inputPopup = [&](auto name, bool& toggle, char* input, uint size, auto cb) {
-					nextPopup();
+				nextPopup();
 
-					if (BeginPopup(fmtc("#%s", name))) {
-						if (toggle) {
-							SetKeyboardFocusHere();
-							toggle = false;
-						}
-						if (InputText(fmtc("%s#%s-input", name, name), input, size, ImGuiInputTextFlags_EnterReturnsTrue|ImGuiInputTextFlags_AutoSelectAll)) {
-							CloseCurrentPopup();
-							cb();
-						}
-						if (IsKeyPressed(KeyMap[KEY_ESCAPE])) {
-							CloseCurrentPopup();
-						}
-						EndPopup();
+				if (BeginPopup("#command")) {
+					if (command) {
+						snprintf(commandInput, sizeof(commandInput), "%s", commandPrefix);
+						SetKeyboardFocusHere();
+						command = false;
 					}
-				};
 
-				inputPopup("find", find, findInput, sizeof(findInput), [&]() {
-					project.view()->interpret(fmt("find %s", findInput));
-				});
+					SetNextItemWidth(-FLT_MIN);
 
-				inputPopup("line", line, lineInput, sizeof(lineInput), [&]() {
-					project.view()->interpret(fmt("go %s", lineInput));
-				});
+					if (InputTextWithHint(fmtc("#command-input-%s", commandPrefix ? commandPrefix: "any"),
+						"command...", commandInput, sizeof(commandInput), ImGuiInputTextFlags_EnterReturnsTrue|ImGuiInputTextFlags_AutoSelectAll)
+					){
+						project.view()->interpret(commandInput);
+						CloseCurrentPopup();
+					}
+
+					if (IsKeyPressed(KeyMap[KEY_ESCAPE])) {
+						CloseCurrentPopup();
+					}
+
+					EndPopup();
+				}
 
 				nextPopup(config.window.height/3*2);
 
