@@ -252,6 +252,7 @@ struct Doc {
 	};
 
 	iterator insert(iterator it, int v) {
+		// move the cached cursor to safe spot
 		if (last.index >= it.ii) {
 			cursor(std::max(0, (int)it.ii-1));
 		}
@@ -301,6 +302,7 @@ struct Doc {
 	};
 
 	iterator erase(iterator it) {
+		// move the cached cursor to safe spot
 		if (last.index >= it.ii) {
 			cursor(std::max(0, (int)it.ii-1));
 		}

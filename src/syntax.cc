@@ -34,7 +34,7 @@ std::vector<std::string> PlainText::matches(const Doc& text, int cursor) {
 	return {};
 }
 
-Syntax::Token PlainText::next(const Doc& text, int cursor, CPP::Token token) {
+Syntax::Token PlainText::next(const Doc& text, int cursor, Syntax::Token token) {
 	return Token::None;
 }
 
@@ -334,7 +334,7 @@ bool CPP::matchFunction(const Doc& text, int cursor) {
 	return true;
 }
 
-Syntax::Token CPP::next(const Doc& text, int cursor, CPP::Token token) {
+Syntax::Token CPP::next(const Doc& text, int cursor, Syntax::Token token) {
 
 	auto rget = [&](int offset = 0) {
 		return get(text, cursor+offset);
@@ -545,7 +545,7 @@ bool OpenSCAD::matchModule(const Doc& text, int cursor) {
 	return c() == '{';
 }
 
-Syntax::Token OpenSCAD::next(const Doc& text, int cursor, CPP::Token token) {
+Syntax::Token OpenSCAD::next(const Doc& text, int cursor, Syntax::Token token) {
 	switch (token) {
 
 		case Token::None: {
@@ -620,6 +620,32 @@ std::vector<std::string> INI::matches(const Doc& text, int cursor) {
 	return {};
 }
 
-Syntax::Token INI::next(const Doc& text, int cursor, CPP::Token token) {
-	return Token::None;
+Syntax::Token INI::next(const Doc& text, int cursor, Syntax::Token token) {
+	switch (token) {
+		case Token::None: {
+
+
+			if (cursor > 0 && get(text, cursor-1) == '[' && (cursor == 1 || get(text, cursor-2) == '\n')) {
+				return Token::Namespace;
+			}
+
+			if (iswalpha(get(text, cursor)) && (!cursor || get(text, cursor-1) == '\n')) {
+				return Token::Type;
+			}
+			break;
+		}
+
+		case Token::Namespace: {
+			if (get(text, cursor) == ']')
+				return next(text, cursor, Token::None);
+			break;
+		}
+
+		case Token::Type: {
+			if (isspace(get(text, cursor)))
+				return next(text, cursor, Token::None);
+			break;
+		}
+	}
+	return token;
 }
