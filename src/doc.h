@@ -252,6 +252,9 @@ struct Doc {
 	};
 
 	iterator insert(iterator it, int v) {
+		if (it == begin()) {
+			last = {0,0,0};
+		}
 		if (!lines.size()) {
 			lines.push_back({v});
 			count++;
@@ -298,6 +301,9 @@ struct Doc {
 	};
 
 	iterator erase(iterator it) {
+		if (it == begin()) {
+			last = {0,0,0};
+		}
 		if (it == end()) {
 			return it;
 		}

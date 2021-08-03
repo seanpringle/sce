@@ -22,7 +22,7 @@ std::vector<std::string> Config::args(int argc, const char** argv) {
 	mouse.wheelSpeedStep = 30ms;
 
 	font.prop.face = tilde(ini.getString("window", "font.prop"));
-	font.prop.size = ini.getDouble("window", "font.px", 18.0);
+	font.prop.size = ini.getDouble("window", "font.pt", 13.0);
 
 	font.mono.face = tilde(ini.getString("window", "font.mono"));
 	font.mono.size = font.prop.size;
@@ -38,7 +38,7 @@ std::vector<std::string> Config::args(int argc, const char** argv) {
 	popup.width = ini.getDouble("popup", "width", 0.25);
 
 	layout2.left = ini.getWords("layout2", "left");
-	layout2.split = ini.getDouble("layout2", "width", 0.0);
+	layout2.split = ini.getDouble("layout2", "width", 0.5);
 
 	std::vector<std::string> paths;
 

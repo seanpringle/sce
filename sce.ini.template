@@ -1,0 +1,54 @@
+; Template for $HOME/.sce.ini
+
+[window]
+font.prop = /usr/share/fonts/truetype/dejavu/DejaVuSans.ttf
+font.mono = /usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf
+font.pt = 13
+
+; Open file list on the left
+[sidebar]
+
+; Uses window.prop font
+; Scaling applied to window.font base size
+font = 1.0
+
+; Width proportional to window width
+width = 0.1
+
+; Popup windows (quick open, symbol view, find, goto)
+[popup]
+
+; Uses window.prop font
+; Scaling applied to window.font base size
+font = 1.0
+
+; Width proportional to window width (centered)
+width = 0.25
+
+; Scaling applied to window.font base size
+font = 1.0
+
+; Width proportional to window width
+width = 0.1
+
+; Editing panels on the right
+[edit]
+
+; Uses window.mono font
+; Scaling applied to window.font base size
+font = 1.0
+
+; Indent mode and size detected for exising files
+; Otherwise tabs default to "hard" or "soft"
+tabs = hard
+tabs.size = 4
+
+; Two-group layout with vertical split mapped to [F2]
+; Revert to single group with [F1]
+[layout2]
+
+; File extensions to place on left
+left = h md txt ini
+
+; Width of left panel. Right is remainder
+width = 0.5

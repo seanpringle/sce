@@ -176,6 +176,16 @@ int main(int argc, const char* argv[])
 	ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
 	ImGui_ImplOpenGL3_Init(glsl_version);
 
+	float ddpi = 0.0f;
+	float hdpi = 0.0f;
+	float vdpi = 0.0f;
+	SDL_GetDisplayDPI(0, &ddpi, &hdpi, &vdpi);
+	notef("DPI: diagonal %0.2f horizontal %0.2f vertical %0.2f", ddpi, hdpi, vdpi);
+
+	auto fontpx = [&](float pt) {
+		return (int)std::ceil(pt/72*vdpi);
+	};
+
 	auto& fonts = ImGui::GetIO().Fonts;
 	fonts->Clear();
 
@@ -187,23 +197,23 @@ int main(int argc, const char* argv[])
 	bool haveFontMono = config.font.mono.face.size() && std::filesystem::exists(config.font.mono.face);
 
 	ImFont* fontProp = haveFontProp
-		? fonts->AddFontFromFileTTF(config.font.prop.face.c_str(), config.font.prop.size, nullptr, uniPlane0)
+		? fonts->AddFontFromFileTTF(config.font.prop.face.c_str(), fontpx(config.font.prop.size), nullptr, uniPlane0)
 		: fontDef;
 
 	ImFont* fontMono = haveFontMono
-		? fonts->AddFontFromFileTTF(config.font.mono.face.c_str(), config.font.mono.size, nullptr, uniPlane0)
+		? fonts->AddFontFromFileTTF(config.font.mono.face.c_str(), fontpx(config.font.mono.size), nullptr, uniPlane0)
 		: fontDef;
 
 	ImFont* fontView = haveFontMono && (config.view.font > 1.0f || config.view.font < 1.0f)
-		? fonts->AddFontFromFileTTF(config.font.mono.face.c_str(), config.font.mono.size * config.view.font, nullptr, uniPlane0)
+		? fonts->AddFontFromFileTTF(config.font.mono.face.c_str(), fontpx(config.font.mono.size * config.view.font), nullptr, uniPlane0)
 		: fontMono;
 
 	ImFont* fontSidebar = haveFontProp && (config.sidebar.font > 1.0f || config.sidebar.font < 1.0f)
-		? fonts->AddFontFromFileTTF(config.font.prop.face.c_str(), config.font.prop.size * config.sidebar.font, nullptr, uniPlane0)
+		? fonts->AddFontFromFileTTF(config.font.prop.face.c_str(), fontpx(config.font.prop.size * config.sidebar.font), nullptr, uniPlane0)
 		: fontProp;
 
 	ImFont* fontPopup = haveFontProp && (config.popup.font > 1.0f || config.popup.font < 1.0f)
-		? fonts->AddFontFromFileTTF(config.font.prop.face.c_str(), config.font.prop.size * config.popup.font, nullptr, uniPlane0)
+		? fonts->AddFontFromFileTTF(config.font.prop.face.c_str(), fontpx(config.font.prop.size * config.popup.font), nullptr, uniPlane0)
 		: fontProp;
 
 	fonts->Build();
