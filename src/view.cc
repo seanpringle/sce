@@ -920,6 +920,7 @@ bool View::open(std::string path) {
 
 	delete syntax;
 	auto fpath = std::filesystem::path(path);
+	notef("%s => %s", path, fpath.extension().string());
 
 	if ((std::set<std::string>{".cc", ".cpp", ".c", ".h"}).count(fpath.extension().string())) {
 		syntax = new CPP();
@@ -927,6 +928,10 @@ bool View::open(std::string path) {
 	else
 	if ((std::set<std::string>{".scad"}).count(fpath.extension().string())) {
 		syntax = new OpenSCAD();
+	}
+	else
+	if ((std::set<std::string>{".ini"}).count(fpath.extension().string())) {
+		syntax = new INI();
 	}
 	else {
 		syntax = new PlainText();

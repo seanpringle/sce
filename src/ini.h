@@ -39,10 +39,18 @@ public:
     IniReader(const char* path) {
         auto in = std::ifstream(path);
         if (!in.is_open()) return;
+        auto content = std::string(
+            (std::istreambuf_iterator<char>(in)),
+            (std::istreambuf_iterator<char>())
+        );
+        in.close();
+        parse(content);
+    }
 
+    void parse(std::string text) {
         std::string section;
 
-        for (std::string line; std::getline(in, line);) {
+        for (auto line: discatenate(text, "\n")) {
             trim(line);
 
             if (starts_with(line, "[")) {
@@ -99,7 +107,6 @@ public:
                 sections[section][left] = right;
             }
         }
-        in.close();
     }
 
     bool has(const std::string& section, const std::string& key) {

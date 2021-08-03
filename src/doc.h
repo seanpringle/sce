@@ -252,8 +252,8 @@ struct Doc {
 	};
 
 	iterator insert(iterator it, int v) {
-		if (it == begin()) {
-			last = {0,0,0};
+		if (last.index >= it.ii) {
+			cursor(std::max(0, (int)it.ii-1));
 		}
 		if (!lines.size()) {
 			lines.push_back({v});
@@ -301,8 +301,8 @@ struct Doc {
 	};
 
 	iterator erase(iterator it) {
-		if (it == begin()) {
-			last = {0,0,0};
+		if (last.index >= it.ii) {
+			cursor(std::max(0, (int)it.ii-1));
 		}
 		if (it == end()) {
 			return it;

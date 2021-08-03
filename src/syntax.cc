@@ -602,3 +602,24 @@ Syntax::Token OpenSCAD::next(const Doc& text, int cursor, CPP::Token token) {
 	}
 	return token;
 }
+
+std::vector<ViewRegion> INI::tags(const Doc& text) {
+	std::vector<ViewRegion> tags;
+	for (uint i = 0; i < text.size(); i++) {
+		auto c = get(text, i);
+		if (c == '[' && (!i || get(text, i-1) == '\n')) {
+			uint a = ++i;
+			while (i < text.size() && get(text, i) != ']') i++;
+			tags.push_back({(int)a, (int)(i-a)});
+		}
+	}
+	return tags;
+}
+
+std::vector<std::string> INI::matches(const Doc& text, int cursor) {
+	return {};
+}
+
+Syntax::Token INI::next(const Doc& text, int cursor, CPP::Token token) {
+	return Token::None;
+}

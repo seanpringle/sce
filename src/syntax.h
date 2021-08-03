@@ -178,3 +178,9 @@ struct OpenSCAD : Syntax {
 	bool comment(const Doc& text, int offset);
 	bool matchModule(const Doc& text, int cursor);
 };
+
+struct INI : Syntax {
+	std::vector<ViewRegion> tags(const Doc& text);
+	std::vector<std::string> matches(const Doc& text, int cursor);
+	Token next(const Doc& text, int cursor, Token token);
+};
