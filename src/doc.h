@@ -133,6 +133,14 @@ struct Doc {
 		insert(end(), v);
 	}
 
+	void push_back(std::string s) {
+		for (auto c: s) push_back(c);
+	}
+
+	operator std::string() const {
+		return std::string({begin(), end()});
+	}
+
 	class iterator {
 	public:
 		uint ii;

@@ -25,12 +25,6 @@ font = 1.0
 ; Width proportional to window width (centered)
 width = 0.25
 
-; Scaling applied to window.font base size
-font = 1.0
-
-; Width proportional to window width
-width = 0.1
-
 ; Editing panels on the right
 [edit]
 
@@ -51,4 +45,4 @@ tabs.size = 4
 left = h md txt ini
 
 ; Width of left panel. Right is remainder
-width = 0.5
+width = 0.4

@@ -118,8 +118,7 @@ struct ViewTitle {
 
 std::vector<ViewTitle> viewTitles;
 
-int main(int argc, const char* argv[])
-{
+int main(int argc, const char* argv[]) {
 	for (auto arg: config.args(argc, argv)) {
 		auto path = std::filesystem::path(arg);
 		if (std::filesystem::is_regular_file(path)) {

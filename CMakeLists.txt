@@ -14,6 +14,21 @@ find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(Freetype REQUIRED)
 
+# gtest
+
+set(CMAKE_CXX_STANDARD 11)
+set(GTEST googletest/googletest)
+
+add_library(gtest OBJECT EXCLUDE_FROM_ALL ${GTEST}/src/gtest-all.cc ${GTEST}/src/gtest_main.cc)
+target_include_directories(gtest PRIVATE ${GTEST} ${GTEST}/include)
+target_compile_options(gtest PRIVATE -isystem ${GTEST}/include)
+
+set(CMAKE_CXX_STANDARD 17)
+
+add_executable(sce-test EXCLUDE_FROM_ALL src/test.cc)
+target_include_directories(sce-test PRIVATE ${GTEST}/include)
+target_link_libraries(sce-test m pthread gtest)
+
 # imgui
 
 set(CMAKE_CXX_STANDARD 11)
