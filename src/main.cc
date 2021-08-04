@@ -10,6 +10,7 @@
 #include "project.h"
 #include "view.h"
 #include "keys.h"
+#include "catenate.h"
 #include <filesystem>
 #include <experimental/filesystem>
 
@@ -41,6 +42,14 @@ int KeyMap[100] = {
 	[KEY_F1] = SDL_SCANCODE_F1,
 	[KEY_F2] = SDL_SCANCODE_F2,
 	[KEY_F3] = SDL_SCANCODE_F3,
+	[KEY_F4] = SDL_SCANCODE_F4,
+	[KEY_F5] = SDL_SCANCODE_F5,
+	[KEY_F6] = SDL_SCANCODE_F6,
+	[KEY_F7] = SDL_SCANCODE_F7,
+	[KEY_F8] = SDL_SCANCODE_F8,
+	[KEY_F9] = SDL_SCANCODE_F9,
+	[KEY_F10] = SDL_SCANCODE_F10,
+	[KEY_F11] = SDL_SCANCODE_F11,
 	[KEY_F12] = SDL_SCANCODE_F12,
 	[KEY_G] = SDL_SCANCODE_G,
 	[KEY_H] = SDL_SCANCODE_H,
@@ -71,7 +80,7 @@ int main(int argc, const char* argv[]) {
 			project.open(arg);
 		}
 		if (std::filesystem::is_directory(path)) {
-			project.paths.push_back(arg);
+			project.pathAdd(arg);
 		}
 	}
 
@@ -80,7 +89,7 @@ int main(int argc, const char* argv[]) {
 	}
 
 	if (!project.paths.size()) {
-		project.paths.push_back(".");
+		project.pathAdd(".");
 	}
 
 	ensuref(0 == SDL_Init(SDL_INIT_VIDEO|SDL_INIT_EVENTS), "%s", SDL_GetError());
@@ -197,6 +206,9 @@ int main(int argc, const char* argv[]) {
 	std::vector<std::string> compStrings;
 	std::memset(compInput, 0, sizeof(compInput));
 
+	bool setup = false;
+	char setupProjectAddPath[100];
+
 	auto now = []() {
 		return std::chrono::system_clock::now();
 	};
@@ -231,6 +243,10 @@ int main(int argc, const char* argv[]) {
 
 			if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_CLOSE && event.window.windowID == SDL_GetWindowID(window)) {
 				done = true;
+			}
+
+			if (event.type == SDL_MOUSEBUTTONDOWN || event.type == SDL_MOUSEBUTTONUP || event.type == SDL_MOUSEWHEEL || event.type == SDL_MOUSEMOTION) {
+				immediate = true;
 			}
 
 			SDL_PumpEvents();
@@ -273,6 +289,8 @@ int main(int argc, const char* argv[]) {
 				tags = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_R]);
 				open = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_P]);
 				comp = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_TAB]);
+
+				setup = IsKeyPressed(KeyMap[KEY_F6]);
 
 				if (IsKeyPressed(KeyMap[KEY_F12])) {
 					done = true;
@@ -368,6 +386,10 @@ int main(int argc, const char* argv[]) {
 					line = false;
 				}
 
+				if (setup) {
+					OpenPopup("#setup");
+				}
+
 				if (tags) {
 					OpenPopup("#tags");
 				}
@@ -417,7 +439,7 @@ int main(int argc, const char* argv[]) {
 							GetColorU32(project.view() == view ? ImGuiCol_TitleBgActive: ImGuiCol_FrameBg)
 						);
 
-						Text("%s", view->path.c_str());
+						Text("%s", std::filesystem::relative(view->path).c_str());
 					}
 
 					TableNextRow();
@@ -431,7 +453,7 @@ int main(int argc, const char* argv[]) {
 							uint size = sizeof(viewTitles[i].text);
 
 							const char* modified = view->modified ? "*": "";
-							std::snprintf(title, size, "%s%s", view->path.c_str(), modified);
+							std::snprintf(title, size, "%s%s", std::filesystem::relative(view->path).c_str(), modified);
 
 							PushStyleColor(ImGuiCol_Text, view->modified ? ImColorSRGB(0xffff00ff) : GetColorU32(ImGuiCol_Text));
 
@@ -480,13 +502,18 @@ int main(int argc, const char* argv[]) {
 					SetNextWindowSize(ImVec2(w,h));
 				};
 
-				auto filterOptions = [&](const std::vector<std::string>& haystacks, const std::string& needle) {
+				auto filterOptions = [&](const std::vector<std::string>& haystacks, const std::string& needles) {
 					std::vector<int> matches;
 					for (int i = 0, l = (int)haystacks.size(); i < l; i++) {
 						auto& haystack = haystacks[i];
-						if (needle.size() > haystack.size()) continue;
-						if (haystack.find(needle) == std::string::npos) continue;
-						matches.push_back(i);
+						bool match = true;
+						for (auto needle: discatenate(needles," ")) {
+							trim(needle);
+							if (!needle.size()) continue;
+							if (needle.size() > haystack.size()) { match = false; break; }
+							if (haystack.find(needle) == std::string::npos) { match = false; break; }
+						}
+						if (match) matches.push_back(i);
 					}
 					return matches;
 				};
@@ -657,12 +684,9 @@ int main(int argc, const char* argv[]) {
 							using namespace std::experimental::filesystem;
 
 							for (const directory_entry& entry: recursive_directory_iterator(path)) {
-								auto path = entry.path().string();
-								if (path.size() > 1 && path.substr(0,2) == "./") {
-									path = path.substr(2);
-								}
+								auto path = std::filesystem::relative(entry.path().string()).string();
 								if (!is_regular_file(entry)) continue;
-								if (path[0] == '.') continue;
+								if (path == ".git" || path.find(".git/") == 0) continue;
 								if (path == "build" || path.find("build/") == 0) continue;
 								openPaths.push_back(path);
 							}
@@ -708,6 +732,71 @@ int main(int argc, const char* argv[]) {
 					}
 					EndPopup();
 				}
+
+				nextPopup(config.window.height/3*2);
+
+				if (BeginPopup("#setup")) {
+					if (setup) {
+						setup = false;
+						setupProjectAddPath[0] = 0;
+					}
+
+					if (BeginTabBar("#setup-tabs")) {
+
+						if (BeginTabItem("Project##setup-tab-project")) {
+
+							BeginTable("#paths", 2);
+
+							TableSetupColumn("Search Paths", ImGuiTableColumnFlags_WidthStretch);
+							TableSetupColumn("");
+
+							TableHeadersRow();
+
+							int remove = -1;
+							auto width = GetWindowContentRegionWidth();
+
+							for (int i = 0; i < (int)project.paths.size(); i++) {
+								auto path = project.paths[i];
+
+								TableNextRow();
+
+								TableNextColumn();
+								Print(path.c_str());
+
+								TableNextColumn();
+								if (Button("remove", ImVec2(width*0.25,0))) remove = i;
+							}
+
+							TableNextRow();
+
+							TableNextColumn();
+							SetNextItemWidth(GetWindowContentRegionWidth());
+							InputText("##add-path-input", setupProjectAddPath, sizeof(setupProjectAddPath));
+
+							TableNextColumn();
+							if (Button("add##add-path-button", ImVec2(width*0.25,0)) && setupProjectAddPath[0]) {
+								project.pathAdd(setupProjectAddPath);
+							}
+
+							EndTable();
+
+							if (remove >= 0) {
+								project.pathDrop(project.paths[remove]);
+							}
+
+							EndTabItem();
+						}
+
+						EndTabBar();
+					}
+
+					if (IsKeyPressed(KeyMap[KEY_ESCAPE])) {
+						CloseCurrentPopup();
+					}
+
+					EndPopup();
+				}
+
 				PopFont();
 				PopFont();
 			End();

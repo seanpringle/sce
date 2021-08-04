@@ -92,6 +92,20 @@ void Project::close() {
 	}
 }
 
+void Project::pathAdd(const std::string& path) {
+	auto tpath = std::filesystem::path(path);
+	auto apath = std::filesystem::canonical(tpath);
+	if (std::find(paths.begin(), paths.end(), apath.string()) == paths.end()) {
+		paths.push_back(apath.string());
+	}
+}
+
+void Project::pathDrop(const std::string& path) {
+	auto tpath = std::filesystem::path(path);
+	auto apath = std::filesystem::canonical(tpath);
+	paths.erase(std::remove(paths.begin(), paths.end(), apath.string()));
+}
+
 bool Project::interpret(const std::string& cmd) {
 	auto prefix = [&](const std::string& s) {
 		return cmd.find(s) == 0;
@@ -99,7 +113,7 @@ bool Project::interpret(const std::string& cmd) {
 
 	if (prefix("path ") && cmd.size() > 5U) {
 		auto path = cmd.substr(5); trim(path);
-		paths.push_back(path);
+		pathAdd(path);
 		return true;
 	}
 
@@ -119,8 +133,15 @@ bool Project::interpret(const std::string& cmd) {
 }
 
 bool Project::load(const std::string path) {
-	auto in = std::ifstream(path);
+	const std::string lpath = path.empty() ? ppath: path;
+	if (lpath.empty()) return false;
+
+	auto in = std::ifstream(lpath);
 	if (!in) return false;
+
+	auto apath = std::filesystem::path(lpath);
+	auto rpath = std::filesystem::relative(apath);
+	ppath = rpath.string();
 
 	std::string line;
 	int nviews = 0, ngroups = 0, npaths = 0;
@@ -131,9 +152,7 @@ bool Project::load(const std::string path) {
 	for (int i = 0; i < nviews; i++) {
 		ensure(std::getline(in, line));
 		notef("%s", line);
-		auto apath = std::filesystem::path(line);
-		auto rpath = std::filesystem::relative(apath);
-		open(rpath.string());
+		open(line);
 	}
 
 	ensure(std::getline(in, line));
@@ -154,9 +173,7 @@ bool Project::load(const std::string path) {
 		ensure(1 == std::sscanf(line.c_str(), "%d", &gsize));
 		for (int i = 0; i < gsize; i++) {
 			ensure(std::getline(in, line));
-			auto apath = std::filesystem::path(line);
-			auto rpath = std::filesystem::relative(apath);
-			int id = find(rpath.string());
+			int id = find(line);
 			if (id >= 0) group.push_back(views[id]);
 		}
 	}
@@ -166,9 +183,7 @@ bool Project::load(const std::string path) {
 
 	for (int i = 0; i < npaths; i++) {
 		ensure(std::getline(in, line)); trim(line);
-		auto apath = std::filesystem::path(line);
-		auto rpath = std::filesystem::relative(apath);
-		paths.push_back(rpath.string());
+		pathAdd(line);
 	}
 
 	in.close();
@@ -185,6 +200,10 @@ bool Project::save(const std::string path) {
 
 	auto out = std::ofstream(spath);
 	if (!out) return false;
+
+	auto tpath = std::filesystem::path(spath);
+	auto apath = std::filesystem::canonical(tpath);
+	ppath = apath.string();
 
 	out << fmt("%llu views", views.size()) << '\n';
 	for (auto view: views) {
@@ -276,18 +295,25 @@ void Project::cycle() {
 
 	bool found = false;
 	auto gactive = group(view());
+
 	for (int i = gactive+1; !found && i < (int)groups.size(); i++) {
 		if (groups[i].size()) {
-			gactive = find(groups[i].front());
+			gactive = i;
 			found = true;
 		}
 	}
+
 	for (int i = 0; !found && i < gactive; i++) {
 		if (groups[i].size()) {
-			gactive = find(groups[i].front());
+			gactive = i;
 			found = true;
 		}
 	}
+
+	if (found) {
+		active = find(groups[gactive].front());
+	}
+
 	bubble();
 }
 

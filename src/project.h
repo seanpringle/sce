@@ -18,6 +18,10 @@ struct Project {
 	void sanity();
 	View* view();
 	void close();
+
+	void pathAdd(const std::string& path);
+	void pathDrop(const std::string& path);
+
 	bool interpret(const std::string& cmd);
 	bool load(const std::string path);
 	bool save(const std::string path = "");
