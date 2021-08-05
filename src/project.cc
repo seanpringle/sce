@@ -37,7 +37,8 @@ void Project::sanity() {
 }
 
 int Project::find(const std::string& path) {
-	auto it = std::find_if(views.begin(), views.end(), [&](auto view) { return view->path == path; });
+	auto vpath = std::filesystem::weakly_canonical(path).string();
+	auto it = std::find_if(views.begin(), views.end(), [&](auto view) { return view->path == vpath; });
 	return it == views.end() ? -1: it-views.begin();
 }
 
@@ -51,11 +52,6 @@ View* Project::view() {
 }
 
 View* Project::open(const std::string& path) {
-	if (std::filesystem::path(path).extension().string() == ".sce-project") {
-		load(path);
-		return view();
-	}
-
 	int gactive = group(view());
 	int factive = find(path);
 
@@ -94,7 +90,7 @@ void Project::close() {
 
 void Project::pathAdd(const std::string& path) {
 	auto tpath = std::filesystem::path(path);
-	auto apath = std::filesystem::canonical(tpath);
+	auto apath = std::filesystem::weakly_canonical(tpath);
 	if (std::find(paths.begin(), paths.end(), apath.string()) == paths.end()) {
 		paths.push_back(apath.string());
 	}
@@ -102,7 +98,7 @@ void Project::pathAdd(const std::string& path) {
 
 void Project::pathDrop(const std::string& path) {
 	auto tpath = std::filesystem::path(path);
-	auto apath = std::filesystem::canonical(tpath);
+	auto apath = std::filesystem::weakly_canonical(tpath);
 	paths.erase(std::remove(paths.begin(), paths.end(), apath.string()));
 }
 
@@ -136,12 +132,12 @@ bool Project::load(const std::string path) {
 	const std::string lpath = path.empty() ? ppath: path;
 	if (lpath.empty()) return false;
 
-	auto in = std::ifstream(lpath);
-	if (!in) return false;
-
 	auto apath = std::filesystem::path(lpath);
 	auto rpath = std::filesystem::relative(apath);
 	ppath = rpath.string();
+
+	auto in = std::ifstream(lpath);
+	if (!in) return false;
 
 	std::string line;
 	int nviews = 0, ngroups = 0, npaths = 0;
@@ -198,17 +194,17 @@ bool Project::save(const std::string path) {
 	const std::string spath = path.empty() ? ppath: path;
 	if (spath.empty()) return false;
 
+	auto tpath = std::filesystem::path(spath);
+	auto apath = std::filesystem::weakly_canonical(tpath);
+	ppath = apath.string();
+
 	auto out = std::ofstream(spath);
 	if (!out) return false;
-
-	auto tpath = std::filesystem::path(spath);
-	auto apath = std::filesystem::canonical(tpath);
-	ppath = apath.string();
 
 	out << fmt("%llu views", views.size()) << '\n';
 	for (auto view: views) {
 		auto vpath = std::filesystem::path(view->path);
-		auto apath = std::filesystem::canonical(vpath);
+		auto apath = std::filesystem::weakly_canonical(vpath);
 		out << apath.string() << '\n';
 	}
 	out << fmt("%d active", active) << '\n';
@@ -218,14 +214,14 @@ bool Project::save(const std::string path) {
 		out << fmt("%llu views", group.size()) << '\n';
 		for (auto view: group) {
 			auto vpath = std::filesystem::path(view->path);
-			auto apath = std::filesystem::canonical(vpath);
+			auto apath = std::filesystem::weakly_canonical(vpath);
 			out << apath.string() << '\n';
 		}
 	}
 	out << fmt("%llu paths", paths.size()) << '\n';
 	for (auto searchPath: paths) {
 		auto spath = std::filesystem::path(searchPath);
-		auto apath = std::filesystem::canonical(spath);
+		auto apath = std::filesystem::weakly_canonical(spath);
 		out << apath.string() << '\n';
 	}
 	out.close();

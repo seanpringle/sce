@@ -76,12 +76,23 @@ int main(int argc, const char* argv[]) {
 
 	for (auto arg: config.args(argc, argv)) {
 		auto path = std::filesystem::path(arg);
+
+		if (path.extension().string() == ".sce-project" && project.ppath.empty()) {
+			project.load(path);
+			continue;
+		}
+
 		if (std::filesystem::is_regular_file(path)) {
 			project.open(arg);
+			continue;
 		}
+
 		if (std::filesystem::is_directory(path)) {
 			project.pathAdd(arg);
+			continue;
 		}
+
+		notef("what is this? %s", path);
 	}
 
 	if (project.ppath.empty() && project.views.empty()) {
@@ -208,6 +219,7 @@ int main(int argc, const char* argv[]) {
 
 	bool setup = false;
 	char setupProjectAddPath[100];
+	char setupProjectSavePath[100];
 
 	auto now = []() {
 		return std::chrono::system_clock::now();
@@ -367,7 +379,12 @@ int main(int argc, const char* argv[]) {
 				| ImGuiWindowFlags_NoScrollWithMouse
 			;
 
+			auto bg = ImColorSRGB(0x272727ff);
+
+			PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(2,2));
+
 			Begin("#bg", nullptr, flags);
+				PopStyleVar(1); // WindowPadding
 				PushFont(fontProp);
 
 				if (find || line) {
@@ -426,7 +443,8 @@ int main(int argc, const char* argv[]) {
 					TableNextRow();
 
 					TableNextColumn();
-					TableSetBgColor(ImGuiTableBgTarget_CellBg, GetColorU32(ImGuiCol_FrameBg));
+					TableSetBgColor(ImGuiTableBgTarget_CellBg, bg);
+					SetCursorPosX(GetCursorPosX()+4);
 					TextUnformatted(std::filesystem::path(project.ppath).filename().c_str());
 
 					for (uint i = 0; i < project.groups.size(); i++) {
@@ -445,6 +463,8 @@ int main(int argc, const char* argv[]) {
 					TableNextRow();
 
 					TableNextColumn();
+					TableSetBgColor(ImGuiTableBgTarget_CellBg, bg);
+					PushStyleColor(ImGuiCol_FrameBg, bg);
 					PushFont(fontSidebar);
 					if (BeginListBox("#open", ImVec2(-1,-1))) {
 						for (uint i = 0; i < project.views.size(); i++) {
@@ -466,10 +486,12 @@ int main(int argc, const char* argv[]) {
 						EndListBox();
 					}
 					PopFont();
+					PopStyleColor(1);
 
 					PushFont(fontView);
 					for (auto& group: project.groups) {
 						TableNextColumn();
+						TableSetBgColor(ImGuiTableBgTarget_CellBg, ImColorSRGB(0x222222ff));
 						if (!group.size()) continue;
 						auto view = group.front();
 
@@ -739,21 +761,43 @@ int main(int argc, const char* argv[]) {
 					if (setup) {
 						setup = false;
 						setupProjectAddPath[0] = 0;
+						auto path = std::filesystem::weakly_canonical(project.ppath);
+						snprintf(setupProjectSavePath, sizeof(setupProjectSavePath), "%s", path.string().c_str());
 					}
 
 					if (BeginTabBar("#setup-tabs")) {
 
 						if (BeginTabItem("Project##setup-tab-project")) {
+							auto width = GetWindowContentRegionWidth();
+
+							BeginTable("#project", 2);
+
+							TableSetupColumn("Project Config", ImGuiTableColumnFlags_WidthStretch);
+							TableSetupColumn("");
+
+							TableHeadersRow();
+
+							TableNextRow();
+
+							TableNextColumn();
+							SetNextItemWidth(GetWindowContentRegionWidth());
+							InputText("##save-path-input", setupProjectSavePath, sizeof(setupProjectSavePath));
+
+							TableNextColumn();
+							if (Button("save##save-path-button", ImVec2(width*0.25,0)) && setupProjectSavePath[0]) {
+								project.save(setupProjectSavePath);
+							}
+
+							EndTable();
 
 							BeginTable("#paths", 2);
 
-							TableSetupColumn("Search Paths", ImGuiTableColumnFlags_WidthStretch);
+							TableSetupColumn("Project Search Paths", ImGuiTableColumnFlags_WidthStretch);
 							TableSetupColumn("");
 
 							TableHeadersRow();
 
 							int remove = -1;
-							auto width = GetWindowContentRegionWidth();
 
 							for (int i = 0; i < (int)project.paths.size(); i++) {
 								auto path = project.paths[i];

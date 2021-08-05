@@ -914,14 +914,14 @@ void View::input() {
 }
 
 bool View::open(std::string path) {
+	auto fpath = std::filesystem::weakly_canonical(path);
+
 	// figure out why wifstream doesn't work
-	auto in = std::ifstream(path);
+	auto in = std::ifstream(fpath.string());
 	if (!in) return false;
 
-	this->path = path;
-
+	this->path = fpath.string();
 	delete syntax;
-	auto fpath = std::filesystem::path(path);
 
 	if ((std::set<std::string>{".cc", ".cpp", ".c", ".h"}).count(fpath.extension().string())) {
 		syntax = new CPP();
@@ -1162,7 +1162,10 @@ void View::draw() {
 	}
 
 	auto max = ImVec2(origin.x+region.x, origin.y+region.y);
-	ImGui::GetWindowDrawList()->AddRectFilled(origin, max, ImGui::GetColorU32(ImGuiCol_FrameBg));
+
+	ImGui::GetWindowDrawList()->AddRectFilled(origin, max,
+		ImGui::GetColorU32(theme.highlight[Syntax::Token::None][Theme::State::Plain].bg)
+	);
 
 	for (auto& chunk: out) {
 		if (!chunk.text.size()) continue;
