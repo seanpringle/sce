@@ -840,6 +840,34 @@ bool View::interpret(const std::string& cmd) {
 		return true;
 	}
 
+	if (prefix("syntax ")) {
+		auto name = cmd.substr(7);
+
+		if (name == "cpp") {
+			delete syntax;
+			syntax = new CPP();
+			return true;
+		}
+
+		if (name == "ini") {
+			delete syntax;
+			syntax = new INI();
+			return true;
+		}
+
+		if (name == "openscad") {
+			delete syntax;
+			syntax = new OpenSCAD();
+			return true;
+		}
+
+		if (name == "plaintext") {
+			delete syntax;
+			syntax = new PlainText();
+			return true;
+		}
+	}
+
 	return false;
 }
 
