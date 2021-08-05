@@ -1,6 +1,10 @@
 #include "common.h"
 #include "view.h"
 #include "syntax.h"
+#include "syntax/cpp.h"
+#include "syntax/ini.h"
+#include "syntax/openscad.h"
+#include "syntax/plaintext.h"
 #include "theme.h"
 #include "config.h"
 #include "keys.h"
@@ -27,7 +31,7 @@ View::~View() {
 void View::sanity() {
 	if (!text.size()) text = {'\n'};
 
-	index();
+	top = std::max(0, std::min(top, (int)text.lines.size()-1));
 
 	// bounds
 	for (auto& selection: selections) {
@@ -87,10 +91,6 @@ bool View::sol(int offset) {
 
 bool View::eol(int offset) {
 	return offset >= (int)text.size() || get(offset) == '\n';
-}
-
-void View::index() {
-	top = std::max(0, std::min(top, (int)text.lines.size()-1));
 }
 
 void View::nav() {
@@ -830,6 +830,16 @@ bool View::interpret(const std::string& cmd) {
 		return true;
 	}
 
+	if (cmd == "softtabs") {
+		convertTabsSoft();
+		return true;
+	}
+
+	if (cmd == "hardtabs") {
+		convertTabsHard();
+		return true;
+	}
+
 	return false;
 }
 
@@ -923,15 +933,17 @@ bool View::open(std::string path) {
 	this->path = fpath.string();
 	delete syntax;
 
-	if ((std::set<std::string>{".cc", ".cpp", ".c", ".h"}).count(fpath.extension().string())) {
+	auto ext = fpath.extension().string();
+
+	if ((std::set<std::string>{".cc", ".cpp", ".c", ".h"}).count(ext)) {
 		syntax = new CPP();
 	}
 	else
-	if ((std::set<std::string>{".scad"}).count(fpath.extension().string())) {
+	if ((std::set<std::string>{".scad"}).count(ext)) {
 		syntax = new OpenSCAD();
 	}
 	else
-	if ((std::set<std::string>{".ini"}).count(fpath.extension().string())) {
+	if ((std::set<std::string>{".ini"}).count(ext)) {
 		syntax = new INI();
 	}
 	else {
@@ -979,6 +991,46 @@ bool View::open(std::string path) {
 	undos.clear();
 	redos.clear();
 	return true;
+}
+
+void View::convertTabsSoft() {
+	for (int i = 0; i < (int)text.size(); i++) {
+		if (get(i) == '\t') {
+			ViewRegion region = {i,0};
+			delAt(region);
+			for (int j = 0; j < tabs.width; j++) {
+				insertAt(region, ' ', false);
+			}
+		}
+	}
+	modified = true;
+	sanity();
+}
+
+void View::convertTabsHard() {
+	auto indent = [&](int i) {
+		for (int j = 0; i+j < (int)text.size() && j < tabs.width; j++) {
+			if (get(i+j) != ' ') return false;
+		}
+		return true;
+	};
+
+	for (int i = 0; i < (int)text.size(); i++) {
+		if (!i || get(i) == '\n') {
+			i++;
+			while (i < (int)text.size() && indent(i)) {
+				ViewRegion region = {i,0};
+				for (int j = 0; j < tabs.width; j++) {
+					delAt(region);
+				}
+				insertAt(region, '\t', false);
+				i++;
+			}
+			i--;
+		}
+	}
+	modified = true;
+	sanity();
 }
 
 void View::save() {
@@ -1036,12 +1088,14 @@ void View::draw() {
 		uint fg = 0xffffffff;
 		uint bg = 0x00000000;
 		std::vector<int> text;
+		bool hint = false;
 	};
 
 	std::vector<Output> out;
 
 	auto token = Syntax::Token::None;
 	auto state = Theme::State::Plain;
+	bool hint = false;
 
 	int lineCol = std::ceil(std::log10((int)text.lines.size()+1));
 	std::string lineFmt = fmt("%%0%dd ", lineCol);
@@ -1067,19 +1121,21 @@ void View::draw() {
 			leftRemaining--;
 			return;
 		}
+
 		if (col < w) {
 			if (!out.back().text.size()) {
 				out.back().fg = fg;
 				out.back().bg = bg;
 			}
 
-			if (out.back().fg != fg || out.back().bg != bg) {
-				out.push_back({col,row,fg,bg,{}});
+			if (out.back().fg != fg || out.back().bg != bg || out.back().hint || hint) {
+				out.push_back({col,row,fg,bg,{},hint});
 			}
 
 			out.back().text.push_back(c);
 		}
 		col++;
+		hint = false;
 	};
 
 	auto format = [&](auto f) {
@@ -1111,10 +1167,10 @@ void View::draw() {
 			fg = 0x666666ff;
 			bg = 0;
 			auto line = fmt(lineFmt.c_str(), lineNo++);
-			out.push_back({col,row,fg,bg,{line.begin(),line.end()}});
+			out.push_back({col,row,fg,bg,{line.begin(),line.end()},false});
 			col = lineCol+1;
 			format(theme.highlight[token][state]);
-			out.push_back({col,row,fg,bg,{}});
+			out.push_back({col,row,fg,bg,{},false});
 			leftRemaining = leftOffset;
 		}
 
@@ -1140,6 +1196,7 @@ void View::draw() {
 		}
 
 		int c = cursor < (int)text.size() ? text[cursor]: '\n';
+		hint = syntax->hint(text, cursor, selections);
 		cursor++;
 
 		if (c == '\n') {
@@ -1151,7 +1208,7 @@ void View::draw() {
 		}
 
 		if (col < w && c == '\t') {
-			format(theme.highlight[Syntax::Token::Comment][selecting ? Theme::State::Selected: Theme::State::Plain]);
+			format(theme.highlight[Syntax::Token::Indent][selecting ? Theme::State::Selected: Theme::State::Plain]);
 			int spaces = std::min(w-col, tabs.width);
 			for (int i = 0; i < spaces; i++) emit(i ? 0x20: 0xc2b7);
 			format(theme.highlight[token][state]);
@@ -1188,8 +1245,10 @@ void View::draw() {
 			ensuref(c >= 32, "bad character %d", c);
 			if (c>>8 == 0xc2) c &= 0xff;
 			ImGui::GetFont()->RenderChar(ImGui::GetWindowDrawList(), -1.0f, pos, ImGui::ImColorSRGB(chunk.fg), c);
+			if (chunk.hint) ImGui::GetFont()->RenderChar(ImGui::GetWindowDrawList(), -1.0f, pos, ImGui::ImColorSRGB(chunk.fg), '_');
 		}
 	}
 
 	ImGui::SetCursorPos((ImVec2){origin.x+(w*cell.x), origin.y+(h*cell.y)});
 }
+

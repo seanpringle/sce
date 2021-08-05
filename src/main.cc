@@ -13,6 +13,8 @@
 #include "catenate.h"
 #include <filesystem>
 #include <experimental/filesystem>
+#include <chrono>
+#include <algorithm>
 
 using namespace std::literals::chrono_literals;
 
@@ -88,7 +90,7 @@ int main(int argc, const char* argv[]) {
 		}
 
 		if (std::filesystem::is_directory(path)) {
-			project.pathAdd(arg);
+			project.searchPathAdd(arg);
 			continue;
 		}
 
@@ -99,8 +101,8 @@ int main(int argc, const char* argv[]) {
 		project.load(fmt("%s/.sce-project", HOME));
 	}
 
-	if (!project.paths.size()) {
-		project.pathAdd(".");
+	if (!project.searchPaths.size()) {
+		project.searchPathAdd(".");
 	}
 
 	ensuref(0 == SDL_Init(SDL_INIT_VIDEO|SDL_INIT_EVENTS), "%s", SDL_GetError());
@@ -218,7 +220,8 @@ int main(int argc, const char* argv[]) {
 	std::memset(compInput, 0, sizeof(compInput));
 
 	bool setup = false;
-	char setupProjectAddPath[100];
+	char setupProjectAddSearchPath[100];
+	char setupProjectAddIgnorePath[100];
 	char setupProjectSavePath[100];
 
 	auto now = []() {
@@ -702,15 +705,23 @@ int main(int argc, const char* argv[]) {
 						openPaths.clear();
 						openInput[0] = 0;
 
-						for (auto path: project.paths) {
-							using namespace std::experimental::filesystem;
+						using namespace std::experimental::filesystem;
+
+						for (auto path: project.searchPaths) {
+							auto searchPath = std::filesystem::weakly_canonical(path);
 
 							for (const directory_entry& entry: recursive_directory_iterator(path)) {
-								auto path = std::filesystem::relative(entry.path().string()).string();
 								if (!is_regular_file(entry)) continue;
-								if (path == ".git" || path.find(".git/") == 0) continue;
-								if (path == "build" || path.find("build/") == 0) continue;
-								openPaths.push_back(path);
+								auto entryPath = std::filesystem::weakly_canonical(entry.path().string());
+
+								bool ignore = false;
+								for (auto path: project.ignorePaths) {
+									auto ignorePath = std::filesystem::weakly_canonical(path);
+									ignore = ignore || starts_with(entryPath.string(), ignorePath.string());
+								}
+								if (!ignore) {
+									openPaths.push_back(std::filesystem::relative(entryPath).string());
+								}
 							}
 						}
 
@@ -760,22 +771,22 @@ int main(int argc, const char* argv[]) {
 				if (BeginPopup("#setup")) {
 					if (setup) {
 						setup = false;
-						setupProjectAddPath[0] = 0;
+						setupProjectAddSearchPath[0] = 0;
+						setupProjectAddIgnorePath[0] = 0;
 						auto path = std::filesystem::weakly_canonical(project.ppath);
 						snprintf(setupProjectSavePath, sizeof(setupProjectSavePath), "%s", path.string().c_str());
 					}
 
 					if (BeginTabBar("#setup-tabs")) {
+						int id = 0;
 
 						if (BeginTabItem("Project##setup-tab-project")) {
 							auto width = GetWindowContentRegionWidth();
 
 							BeginTable("#project", 2);
 
-							TableSetupColumn("Project Config", ImGuiTableColumnFlags_WidthStretch);
+							TableSetupColumn("Config", ImGuiTableColumnFlags_WidthStretch);
 							TableSetupColumn("");
-
-							TableHeadersRow();
 
 							TableNextRow();
 
@@ -790,42 +801,84 @@ int main(int argc, const char* argv[]) {
 
 							EndTable();
 
-							BeginTable("#paths", 2);
+							NewLine();
+							BeginTable("#searchPaths", 2);
 
-							TableSetupColumn("Project Search Paths", ImGuiTableColumnFlags_WidthStretch);
+							TableSetupColumn("Search Paths", ImGuiTableColumnFlags_WidthStretch);
 							TableSetupColumn("");
 
 							TableHeadersRow();
 
-							int remove = -1;
+							std::string removeSearchPath;
 
-							for (int i = 0; i < (int)project.paths.size(); i++) {
-								auto path = project.paths[i];
-
+							for (auto path: project.searchPaths) {
 								TableNextRow();
 
 								TableNextColumn();
 								Print(path.c_str());
 
 								TableNextColumn();
-								if (Button("remove", ImVec2(width*0.25,0))) remove = i;
+								if (Button(fmtc("remove##removeSearchPath%d", id++), ImVec2(width*0.25,0))) {
+									removeSearchPath = path;
+								}
 							}
 
 							TableNextRow();
 
 							TableNextColumn();
 							SetNextItemWidth(GetWindowContentRegionWidth());
-							InputText("##add-path-input", setupProjectAddPath, sizeof(setupProjectAddPath));
+							InputText("##add-path-input", setupProjectAddSearchPath, sizeof(setupProjectAddSearchPath));
 
 							TableNextColumn();
-							if (Button("add##add-path-button", ImVec2(width*0.25,0)) && setupProjectAddPath[0]) {
-								project.pathAdd(setupProjectAddPath);
+							if (Button("add##add-path-button", ImVec2(width*0.25,0)) && setupProjectAddSearchPath[0]) {
+								project.searchPathAdd(setupProjectAddSearchPath);
+								setupProjectAddSearchPath[0] = 0;
 							}
 
 							EndTable();
 
-							if (remove >= 0) {
-								project.pathDrop(project.paths[remove]);
+							NewLine();
+							BeginTable("#ignorePaths", 2);
+
+							TableSetupColumn("Ignore Paths", ImGuiTableColumnFlags_WidthStretch);
+							TableSetupColumn("");
+
+							TableHeadersRow();
+
+							std::string removeIgnorePath;
+
+							for (auto path: project.ignorePaths) {
+								TableNextRow();
+
+								TableNextColumn();
+								Print(path.c_str());
+
+								TableNextColumn();
+								if (Button(fmtc("remove##removeIgnorePath%d", id++), ImVec2(width*0.25,0))) {
+									removeIgnorePath = path;
+								}
+							}
+
+							TableNextRow();
+
+							TableNextColumn();
+							SetNextItemWidth(GetWindowContentRegionWidth());
+							InputText("##add-path-input", setupProjectAddIgnorePath, sizeof(setupProjectAddIgnorePath));
+
+							TableNextColumn();
+							if (Button("add##add-path-button", ImVec2(width*0.25,0)) && setupProjectAddIgnorePath[0]) {
+								project.ignorePathAdd(setupProjectAddIgnorePath);
+								setupProjectAddIgnorePath[0] = 0;
+							}
+
+							EndTable();
+
+							if (!removeSearchPath.empty()) {
+								project.searchPathDrop(removeSearchPath);
+							}
+
+							if (!removeIgnorePath.empty()) {
+								project.ignorePathDrop(removeIgnorePath);
 							}
 
 							EndTabItem();

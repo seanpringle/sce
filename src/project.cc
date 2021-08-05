@@ -88,18 +88,28 @@ void Project::close() {
 	}
 }
 
-void Project::pathAdd(const std::string& path) {
+void Project::searchPathAdd(const std::string& path) {
 	auto tpath = std::filesystem::path(path);
 	auto apath = std::filesystem::weakly_canonical(tpath);
-	if (std::find(paths.begin(), paths.end(), apath.string()) == paths.end()) {
-		paths.push_back(apath.string());
-	}
+	searchPaths.insert(apath.string());
 }
 
-void Project::pathDrop(const std::string& path) {
+void Project::searchPathDrop(const std::string& path) {
 	auto tpath = std::filesystem::path(path);
 	auto apath = std::filesystem::weakly_canonical(tpath);
-	paths.erase(std::remove(paths.begin(), paths.end(), apath.string()));
+	searchPaths.erase(apath.string());
+}
+
+void Project::ignorePathAdd(const std::string& path) {
+	auto tpath = std::filesystem::path(path);
+	auto apath = std::filesystem::weakly_canonical(tpath);
+	ignorePaths.insert(apath.string());
+}
+
+void Project::ignorePathDrop(const std::string& path) {
+	auto tpath = std::filesystem::path(path);
+	auto apath = std::filesystem::weakly_canonical(tpath);
+	ignorePaths.erase(apath.string());
 }
 
 bool Project::interpret(const std::string& cmd) {
@@ -109,7 +119,7 @@ bool Project::interpret(const std::string& cmd) {
 
 	if (prefix("path ") && cmd.size() > 5U) {
 		auto path = cmd.substr(5); trim(path);
-		pathAdd(path);
+		searchPathAdd(path);
 		return true;
 	}
 
@@ -179,7 +189,16 @@ bool Project::load(const std::string path) {
 
 	for (int i = 0; i < npaths; i++) {
 		ensure(std::getline(in, line)); trim(line);
-		pathAdd(line);
+		searchPathAdd(line);
+	}
+
+	if (std::getline(in, line)) {
+		ensure(1 == std::sscanf(line.c_str(), "%d", &npaths));
+
+		for (int i = 0; i < npaths; i++) {
+			ensure(std::getline(in, line)); trim(line);
+			ignorePathAdd(line);
+		}
 	}
 
 	in.close();
@@ -218,9 +237,15 @@ bool Project::save(const std::string path) {
 			out << apath.string() << '\n';
 		}
 	}
-	out << fmt("%llu paths", paths.size()) << '\n';
-	for (auto searchPath: paths) {
+	out << fmt("%llu searchPaths", searchPaths.size()) << '\n';
+	for (auto searchPath: searchPaths) {
 		auto spath = std::filesystem::path(searchPath);
+		auto apath = std::filesystem::weakly_canonical(spath);
+		out << apath.string() << '\n';
+	}
+	out << fmt("%llu ignorePaths", ignorePaths.size()) << '\n';
+	for (auto ignorePath: ignorePaths) {
+		auto spath = std::filesystem::path(ignorePath);
 		auto apath = std::filesystem::weakly_canonical(spath);
 		out << apath.string() << '\n';
 	}
@@ -348,4 +373,3 @@ void Project::moveNext() {
 	}
 	bubble();
 }
-

@@ -18,6 +18,11 @@ Theme::Theme() {
 	highlight[Syntax::Token::None][State::Plain] = { .fg = text, .bg = 0x00000000 };
 	highlight[Syntax::Token::None][State::Selected] = { .fg = 0x000000ff, .bg = 0xddddddff };
 
+	highlight[Syntax::Token::Indent][State::Plain] = highlight[Syntax::Token::None][State::Plain];
+	highlight[Syntax::Token::Indent][State::Selected] = highlight[Syntax::Token::None][State::Selected];
+
+	highlight[Syntax::Token::Indent][State::Plain].fg = 0x555555ff;
+
 	highlight[Syntax::Token::Comment][State::Plain] = highlight[Syntax::Token::None][State::Plain];
 	highlight[Syntax::Token::Comment][State::Selected] = highlight[Syntax::Token::None][State::Selected];
 

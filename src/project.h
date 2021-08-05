@@ -6,7 +6,8 @@ struct Project {
 	int active = 0;
 	std::vector<View*> views;
 	std::string ppath;
-	std::vector<std::string> paths;
+	std::set<std::string> searchPaths;
+	std::set<std::string> ignorePaths;
 	std::vector<std::vector<View*>> groups;
 	int layout = 0;
 
@@ -19,8 +20,10 @@ struct Project {
 	View* view();
 	void close();
 
-	void pathAdd(const std::string& path);
-	void pathDrop(const std::string& path);
+	void searchPathAdd(const std::string& path);
+	void searchPathDrop(const std::string& path);
+	void ignorePathAdd(const std::string& path);
+	void ignorePathDrop(const std::string& path);
 
 	bool interpret(const std::string& cmd);
 	bool load(const std::string path);

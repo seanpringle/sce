@@ -8,6 +8,7 @@ struct ViewRegion;
 #include <list>
 #include <string>
 #include <cmath>
+#include <chrono>
 #include "doc.h"
 #include "syntax.h"
 
@@ -116,7 +117,6 @@ struct View {
 	int get(int offset);
 	bool sol(int offset);
 	bool eol(int offset);
-	void index();
 	void move(int xx, int yy, int ww, int hh);
 	void input();
 	void single();
@@ -125,4 +125,6 @@ struct View {
 	bool outdent();
 	std::vector<std::string> autocomplete();
 	bool interpret(const std::string& cmd);
+	void convertTabsSoft();
+	void convertTabsHard();
 };
