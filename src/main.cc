@@ -37,6 +37,7 @@ int KeyMap[100] = {
 	[KEY_UP] = SDL_SCANCODE_UP,
 	[KEY_DOWN] = SDL_SCANCODE_DOWN,
 	[KEY_SPACE] = SDL_SCANCODE_SPACE,
+	[KEY_TICK] = SDL_SCANCODE_APOSTROPHE,
 	[KEY_B] = SDL_SCANCODE_B,
 	[KEY_C] = SDL_SCANCODE_C,
 	[KEY_D] = SDL_SCANCODE_D,
@@ -68,6 +69,16 @@ int KeyMap[100] = {
 };
 
 namespace {
+	struct ViewTitle {
+		char text[100] = {0};
+	};
+
+	std::vector<ViewTitle> viewTitles;
+
+	bool command = false;
+	bool find = false;
+	bool line = false;
+
 	std::string displayPath(std::string& ipath) {
 		using namespace std::filesystem;
 		auto cpath = weakly_canonical(ipath);
@@ -80,48 +91,26 @@ namespace {
 		return weakly_canonical(ipath).string();
 	};
 
-	struct ViewTitle {
-		char text[100] = {0};
-	};
+	#include "popup.cc"
+	#include "popup/filter.cc"
 
-	std::vector<ViewTitle> viewTitles;
+	#include "popup/command.cc"
+	CommandPopup commandPopup;
 
-	bool command = false;
-	const char* commandPrefix = nullptr;
-	char commandInput[100];
+	#include "popup/setup.cc"
+	SetupPopup setupPopup;
 
-	bool find = false;
-	char findInput[100];
+	#include "popup/filter/tags.cc"
+	FilterPopupTags tagsPopup;
 
-	bool line = false;
-	char lineInput[100];
+	#include "popup/filter/open.cc"
+	FilterPopupOpen openPopup;
 
-	bool tags = false;
-	char tagsInput[100];
-	int tagSelected = 0;
-	std::vector<ViewRegion> tagRegions;
-	std::vector<std::string> tagStrings;
+	#include "popup/filter/change.cc"
+	FilterPopupChange changePopup;
 
-	bool open = false;
-	char openInput[100];
-	int openSelected = 0;
-	std::vector<std::string> openPaths;
-
-	bool change = false;
-	char changeInput[100];
-	int changeSelected = 0;
-	std::vector<std::string> changePaths;
-
-	bool comp = false;
-	char compInput[100];
-	int compSelected = 0;
-	std::string compPrefix;
-	std::vector<std::string> compStrings;
-
-	bool setup = false;
-	char setupProjectAddSearchPath[100];
-	char setupProjectAddIgnorePath[100];
-	char setupProjectSavePath[100];
+	#include "popup/filter/complete.cc"
+	FilterPopupComplete completePopup;
 }
 
 int main(int argc, const char* argv[]) {
@@ -315,13 +304,14 @@ int main(int argc, const char* argv[]) {
 
 				find = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_F]);
 				line = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_G]);
-				tags = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_R]);
-				comp = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_TAB]);
+				command = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_TICK]);
 
-				open = io.KeyCtrl && !io.KeyAlt && IsKeyPressed(KeyMap[KEY_P]);
-				change = io.KeyCtrl && io.KeyAlt && IsKeyPressed(KeyMap[KEY_P]);
+				tagsPopup.activate = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_R]);
+				completePopup.activate = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_TAB]);
+				openPopup.activate = io.KeyCtrl && !io.KeyAlt && IsKeyPressed(KeyMap[KEY_P]);
+				changePopup.activate = io.KeyCtrl && io.KeyAlt && IsKeyPressed(KeyMap[KEY_P]);
 
-				setup = IsKeyPressed(KeyMap[KEY_F6]);
+				setupPopup.activate = IsKeyPressed(KeyMap[KEY_F6]);
 
 				if (IsKeyPressed(KeyMap[KEY_F12])) {
 					done = true;
@@ -395,31 +385,6 @@ int main(int argc, const char* argv[]) {
 				SetNextWindowSize(ImVec2(w,h));
 			};
 
-			auto filterOptions = [&](const std::vector<std::string>& haystacks, const std::string& needles) {
-				std::vector<int> matches;
-				for (int i = 0, l = (int)haystacks.size(); i < l; i++) {
-					auto& haystack = haystacks[i];
-					bool match = true;
-					for (auto needle: discatenate(needles," ")) {
-						trim(needle);
-						if (!needle.size()) continue;
-						if (needle.size() > haystack.size()) { match = false; break; }
-						if (haystack.find(needle) == std::string::npos) { match = false; break; }
-					}
-					if (match) matches.push_back(i);
-				}
-				return matches;
-			};
-
-			auto selectNavigate = [&](int size, int& selected) {
-				using namespace ImGui;
-				if (IsKeyPressed(KeyMap[KEY_DOWN])) selected++;
-				if (IsKeyPressed(KeyMap[KEY_UP])) selected--;
-				if (IsKeyPressed(KeyMap[KEY_PAGEDOWN])) selected += 10;
-				if (IsKeyPressed(KeyMap[KEY_PAGEUP])) selected -= 10;
-				selected = std::max(0, std::min(size-1, selected));
-			};
-
 			SetNextWindowPos(ImVec2(0,0));
 			SetNextWindowSize(ImVec2(config.window.width,config.window.height));
 
@@ -439,40 +404,46 @@ int main(int argc, const char* argv[]) {
 				PopStyleVar(1); // WindowPadding
 				PushFont(fontProp);
 
-				if (find || line) {
-					OpenPopup("#command");
+				if (command) {
+					commandPopup.prefix.clear();
+					commandPopup.activate = true;
+					find = false;
 				}
 
 				if (find) {
-					commandPrefix = "find ";
-					command = true;
+					commandPopup.prefix = "find";
+					commandPopup.activate = true;
 					find = false;
 				}
 
 				if (line) {
-					commandPrefix = "go ";
-					command = true;
+					commandPopup.prefix = "go";
+					commandPopup.activate = true;
 					line = false;
 				}
 
-				if (setup) {
+				if (commandPopup.activate) {
+					OpenPopup("#command");
+				}
+
+				if (setupPopup.activate) {
 					OpenPopup("#setup");
 				}
 
-				if (tags) {
+				if (tagsPopup.activate) {
 					OpenPopup("#tags");
 				}
 
-				if (open) {
+				if (openPopup.activate) {
 					OpenPopup("#open");
 				}
 
-				if (change) {
+				if (changePopup.activate) {
 					OpenPopup("#change");
 				}
 
-				if (comp) {
-					OpenPopup("#comp");
+				if (completePopup.activate) {
+					OpenPopup("#complete");
 				}
 
 				viewTitles.clear();
@@ -575,419 +546,27 @@ int main(int argc, const char* argv[]) {
 
 				nextPopup();
 
-				if (BeginPopup("#command")) {
-					if (command) {
-						snprintf(commandInput, sizeof(commandInput), "%s", commandPrefix);
-						SetKeyboardFocusHere();
-						command = false;
-					}
-
-					SetNextItemWidth(-FLT_MIN);
-
-					if (InputTextWithHint(fmtc("#command-input-%s", commandPrefix ? commandPrefix: "any"),
-						"command...", commandInput, sizeof(commandInput), ImGuiInputTextFlags_EnterReturnsTrue|ImGuiInputTextFlags_AutoSelectAll)
-					){
-						project.interpret(commandInput) || project.view()->interpret(commandInput);
-						CloseCurrentPopup();
-					}
-
-					if (IsKeyPressed(KeyMap[KEY_ESCAPE])) {
-						CloseCurrentPopup();
-					}
-
-					EndPopup();
-				}
+				commandPopup.run();
 
 				nextPopup(config.window.height/3*2);
 
-				if (BeginPopup("#comp")) {
-					if (comp) {
-						SetKeyboardFocusHere();
-						comp = false;
-						compStrings.clear();
-						compPrefix.clear();
-						compSelected = 0;
-						compInput[0] = 0;
-						if (project.views.size()) {
-							auto view = project.view();
-							compStrings = view->autocomplete();
-							if (compStrings.size()) {
-								compPrefix = compStrings.front();
-								compStrings.erase(compStrings.begin());
-								std::snprintf(compInput, sizeof(compInput), "%s", compPrefix.c_str());
-							}
-						}
-					}
-
-					InputText("#comp-input", compInput, sizeof(compInput));
-
-					if (BeginListBox("autocomplete#comp-matches", ImVec2(-1,-1))) {
-						auto filter = std::string(compInput);
-						std::vector<int> visible = filterOptions(compStrings, filter);
-						selectNavigate(visible.size(), compSelected);
-
-						auto compInsert = [&](std::string compString) {
-							for (int i = 0; i < (int)compString.size(); i++) {
-								if (i < (int)compPrefix.size()) continue;
-								project.view()->insert(compString[i]);
-							}
-						};
-
-						if (IsKeyPressed(KeyMap[KEY_RETURN])) {
-							if (visible.size()) {
-								compInsert(compStrings[visible[compSelected]]);
-							}
-							CloseCurrentPopup();
-						}
-
-						for (int i = 0; i < (int)visible.size(); i++) {
-							auto& compString = compStrings[visible[i]];
-							if (Selectable(compString.c_str(), i == compSelected)) {
-								compInsert(compString);
-								CloseCurrentPopup();
-							}
-							if (compSelected == i) {
-								SetScrollHereY();
-							}
-						}
-
-						EndListBox();
-					}
-
-					if (IsKeyPressed(KeyMap[KEY_ESCAPE])) {
-						CloseCurrentPopup();
-					}
-					EndPopup();
-				}
+				completePopup.run();
 
 				nextPopup(config.window.height/3*2);
 
-				if (BeginPopup("#tags")) {
-					if (tags) {
-						SetKeyboardFocusHere();
-						tags = false;
-						tagRegions.clear();
-						tagStrings.clear();
-						tagSelected = 0;
-						tagsInput[0] = 0;
-						if (project.views.size()) {
-							auto view = project.view();
-							auto it = view->text.begin();
-							tagRegions = view->syntax->tags(view->text);
-							for (auto region: tagRegions) {
-								auto tag = std::string(it+region.offset, it+region.offset+region.length);
-								tagStrings.push_back(tag);
-							}
-						}
-					}
-
-					InputText("symbol#tags-input", tagsInput, sizeof(tagsInput));
-
-					if (BeginListBox("#tags-matches", ImVec2(-1,-1))) {
-						auto filter = std::string(tagsInput);
-						std::vector<int> visible = filterOptions(tagStrings, filter);
-						selectNavigate(visible.size(), tagSelected);
-
-						if (IsKeyPressed(KeyMap[KEY_RETURN])) {
-							if (visible.size()) {
-								auto& tagRegion = tagRegions[visible[tagSelected]];
-								project.view()->single(tagRegion);
-							}
-							CloseCurrentPopup();
-						}
-
-						for (int i = 0; i < (int)visible.size(); i++) {
-							auto& tagRegion = tagRegions[visible[i]];
-							auto& tagString = tagStrings[visible[i]];
-
-							if (Selectable(tagString.c_str(), i == tagSelected)) {
-								project.view()->single(tagRegion);
-								CloseCurrentPopup();
-							}
-
-							if (tagSelected == i) {
-								SetScrollHereY();
-							}
-						}
-						EndListBox();
-					}
-
-					if (IsKeyPressed(KeyMap[KEY_ESCAPE])) {
-						CloseCurrentPopup();
-					}
-					EndPopup();
-				}
+				tagsPopup.run();
 
 				nextPopup(config.window.height/3*2);
 
-				if (BeginPopup("#open")) {
-					if (open) {
-						SetKeyboardFocusHere();
-						open = false;
-						openPaths.clear();
-						openInput[0] = 0;
-
-						using namespace std::filesystem;
-
-						for (auto path: project.searchPaths) {
-							auto searchPath = weakly_canonical(path);
-
-							auto it = recursive_directory_iterator(searchPath,
-								directory_options::skip_permission_denied
-							);
-
-							for (const directory_entry& entry: it) {
-								if (!is_regular_file(entry)) continue;
-								auto entryPath = weakly_canonical(entry.path().string());
-
-								bool ignore = false;
-								for (auto path: project.ignorePaths) {
-									auto ignorePath = weakly_canonical(path);
-									ignore = ignore || starts_with(entryPath.string(), ignorePath.string());
-								}
-								if (!ignore) {
-									auto epath = entryPath.string();
-									openPaths.push_back(displayPath(epath));
-								}
-							}
-						}
-
-						std::sort(openPaths.begin(), openPaths.end());
-					}
-
-					InputText("open#open-input", openInput, sizeof(openInput));
-
-					if (BeginListBox("#open-matches", ImVec2(-1,-1))) {
-						auto filter = std::string(openInput);
-						std::vector<int> visible = filterOptions(openPaths, filter);
-						selectNavigate(visible.size(), openSelected);
-
-						auto openView = [&](const std::string& openPath) {
-							project.open(openPath);
-						};
-
-						if (IsKeyPressed(KeyMap[KEY_RETURN])) {
-							if (visible.size()) {
-								openView(openPaths[visible[openSelected]]);
-							}
-							CloseCurrentPopup();
-						}
-
-						for (int i = 0; i < (int)visible.size(); i++) {
-							auto& openPath = openPaths[visible[i]];
-							if (Selectable(openPath.c_str(), i == openSelected)) {
-								openView(openPath);
-								CloseCurrentPopup();
-							}
-							if (openSelected == i) {
-								SetScrollHereY();
-							}
-						}
-
-						EndListBox();
-					}
-
-					if (IsKeyPressed(KeyMap[KEY_ESCAPE])) {
-						CloseCurrentPopup();
-					}
-					EndPopup();
-				}
+				openPopup.run();
 
 				nextPopup(config.window.height/3*2);
 
-				if (BeginPopup("#change")) {
-					if (change) {
-						SetKeyboardFocusHere();
-						change = false;
-						changePaths.clear();
-						changeInput[0] = 0;
-
-						using namespace std::filesystem;
-
-						auto path = weakly_canonical(HOME);
-
-						auto it = recursive_directory_iterator(path,
-							directory_options::skip_permission_denied
-						);
-
-						for (const directory_entry& entry: it) {
-							if (!is_regular_file(entry)) continue;
-							auto ext = entry.path().extension().string();
-							auto name = entry.path().filename().string();
-							if (ext == ".sce-project" || name == ".sce-project") {
-								changePaths.push_back(canonical(entry.path().string()).string());
-							}
-						}
-
-						std::sort(changePaths.begin(), changePaths.end());
-					}
-
-					InputText("change#change-input", changeInput, sizeof(changeInput));
-
-					if (BeginListBox("#change-matches", ImVec2(-1,-1))) {
-						auto filter = std::string(changeInput);
-						std::vector<int> visible = filterOptions(changePaths, filter);
-						selectNavigate(visible.size(), changeSelected);
-
-						auto changeView = [&](const std::string& changePath) {
-							project.save();
-							project.load(changePath);
-						};
-
-						if (IsKeyPressed(KeyMap[KEY_RETURN])) {
-							if (visible.size()) {
-								changeView(changePaths[visible[changeSelected]]);
-							}
-							CloseCurrentPopup();
-						}
-
-						for (int i = 0; i < (int)visible.size(); i++) {
-							auto& changePath = changePaths[visible[i]];
-							if (Selectable(changePath.c_str(), i == changeSelected)) {
-								changeView(changePath);
-								CloseCurrentPopup();
-							}
-							if (changeSelected == i) {
-								SetScrollHereY();
-							}
-						}
-
-						EndListBox();
-					}
-
-					if (IsKeyPressed(KeyMap[KEY_ESCAPE])) {
-						CloseCurrentPopup();
-					}
-					EndPopup();
-				}
+				changePopup.run();
 
 				nextPopup(config.window.height/3*2);
 
-				if (BeginPopup("#setup")) {
-					if (setup) {
-						setup = false;
-						setupProjectAddSearchPath[0] = 0;
-						setupProjectAddIgnorePath[0] = 0;
-						auto path = std::filesystem::weakly_canonical(project.ppath);
-						snprintf(setupProjectSavePath, sizeof(setupProjectSavePath), "%s", path.string().c_str());
-					}
-
-					if (BeginTabBar("#setup-tabs")) {
-						int id = 0;
-
-						if (BeginTabItem("Project##setup-tab-project")) {
-							auto width = GetWindowContentRegionWidth();
-
-							BeginTable("#project", 2);
-
-							TableSetupColumn("Config", ImGuiTableColumnFlags_WidthStretch);
-							TableSetupColumn("");
-
-							TableNextRow();
-
-							TableNextColumn();
-							SetNextItemWidth(GetWindowContentRegionWidth());
-							InputText("##save-path-input", setupProjectSavePath, sizeof(setupProjectSavePath));
-
-							TableNextColumn();
-							if (Button("save##save-path-button", ImVec2(width*0.25,0)) && setupProjectSavePath[0]) {
-								project.save(setupProjectSavePath);
-							}
-
-							EndTable();
-
-							NewLine();
-							BeginTable("#searchPaths", 2);
-
-							TableSetupColumn("Search Paths", ImGuiTableColumnFlags_WidthStretch);
-							TableSetupColumn("");
-
-							TableHeadersRow();
-
-							std::string removeSearchPath;
-
-							for (auto path: project.searchPaths) {
-								TableNextRow();
-
-								TableNextColumn();
-								Print(path.c_str());
-
-								TableNextColumn();
-								if (Button(fmtc("remove##removeSearchPath%d", id++), ImVec2(width*0.25,0))) {
-									removeSearchPath = path;
-								}
-							}
-
-							TableNextRow();
-
-							TableNextColumn();
-							SetNextItemWidth(GetWindowContentRegionWidth());
-							InputText("##add-path-input", setupProjectAddSearchPath, sizeof(setupProjectAddSearchPath));
-
-							TableNextColumn();
-							if (Button("add##add-path-button", ImVec2(width*0.25,0)) && setupProjectAddSearchPath[0]) {
-								project.searchPathAdd(setupProjectAddSearchPath);
-								setupProjectAddSearchPath[0] = 0;
-							}
-
-							EndTable();
-
-							NewLine();
-							BeginTable("#ignorePaths", 2);
-
-							TableSetupColumn("Ignore Paths", ImGuiTableColumnFlags_WidthStretch);
-							TableSetupColumn("");
-
-							TableHeadersRow();
-
-							std::string removeIgnorePath;
-
-							for (auto path: project.ignorePaths) {
-								TableNextRow();
-
-								TableNextColumn();
-								Print(path.c_str());
-
-								TableNextColumn();
-								if (Button(fmtc("remove##removeIgnorePath%d", id++), ImVec2(width*0.25,0))) {
-									removeIgnorePath = path;
-								}
-							}
-
-							TableNextRow();
-
-							TableNextColumn();
-							SetNextItemWidth(GetWindowContentRegionWidth());
-							InputText("##add-path-input", setupProjectAddIgnorePath, sizeof(setupProjectAddIgnorePath));
-
-							TableNextColumn();
-							if (Button("add##add-path-button", ImVec2(width*0.25,0)) && setupProjectAddIgnorePath[0]) {
-								project.ignorePathAdd(setupProjectAddIgnorePath);
-								setupProjectAddIgnorePath[0] = 0;
-							}
-
-							EndTable();
-
-							if (!removeSearchPath.empty()) {
-								project.searchPathDrop(removeSearchPath);
-							}
-
-							if (!removeIgnorePath.empty()) {
-								project.ignorePathDrop(removeIgnorePath);
-							}
-
-							EndTabItem();
-						}
-
-						EndTabBar();
-					}
-
-					if (IsKeyPressed(KeyMap[KEY_ESCAPE])) {
-						CloseCurrentPopup();
-					}
-
-					EndPopup();
-				}
+				setupPopup.run();
 
 				PopFont();
 				PopFont();
