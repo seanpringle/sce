@@ -67,11 +67,62 @@ int KeyMap[100] = {
 	[KEY_Z] = SDL_SCANCODE_Z,
 };
 
-struct ViewTitle {
-	char text[100] = {0};
-};
+namespace {
+	std::string displayPath(std::string& ipath) {
+		using namespace std::filesystem;
+		auto cpath = weakly_canonical(ipath);
+		for (auto& path: project.searchPaths) {
+			auto spath = weakly_canonical(path);
+			if (starts_with(cpath.string(), spath.string())) {
+				return relative(cpath, spath).string();
+			}
+		}
+		return weakly_canonical(ipath).string();
+	};
 
-std::vector<ViewTitle> viewTitles;
+	struct ViewTitle {
+		char text[100] = {0};
+	};
+
+	std::vector<ViewTitle> viewTitles;
+
+	bool command = false;
+	const char* commandPrefix = nullptr;
+	char commandInput[100];
+
+	bool find = false;
+	char findInput[100];
+
+	bool line = false;
+	char lineInput[100];
+
+	bool tags = false;
+	char tagsInput[100];
+	int tagSelected = 0;
+	std::vector<ViewRegion> tagRegions;
+	std::vector<std::string> tagStrings;
+
+	bool open = false;
+	char openInput[100];
+	int openSelected = 0;
+	std::vector<std::string> openPaths;
+
+	bool change = false;
+	char changeInput[100];
+	int changeSelected = 0;
+	std::vector<std::string> changePaths;
+
+	bool comp = false;
+	char compInput[100];
+	int compSelected = 0;
+	std::string compPrefix;
+	std::vector<std::string> compStrings;
+
+	bool setup = false;
+	char setupProjectAddSearchPath[100];
+	char setupProjectAddIgnorePath[100];
+	char setupProjectSavePath[100];
+}
 
 int main(int argc, const char* argv[]) {
 	auto HOME = std::getenv("HOME");
@@ -187,44 +238,7 @@ int main(int argc, const char* argv[]) {
 
 	ImVec4 clear_color = ImVec4(0,0,0,1);
 
-	bool command = false;
-	const char* commandPrefix = nullptr;
-	char commandInput[100];
-
-	bool find = false;
-	char findInput[100];
-	std::memset(findInput, 0, sizeof(findInput));
-
-	bool line = false;
-	char lineInput[100];
-	std::memset(lineInput, 0, sizeof(lineInput));
-
-	bool tags = false;
-	char tagsInput[100];
-	int tagSelected = 0;
-	std::vector<ViewRegion> tagRegions;
-	std::vector<std::string> tagStrings;
-	std::memset(tagsInput, 0, sizeof(tagsInput));
-
-	bool open = false;
-	char openInput[100];
-	int openSelected = 0;
-	std::vector<std::string> openPaths;
-	std::memset(openInput, 0, sizeof(openInput));
-
-	bool comp = false;
-	char compInput[100];
-	int compSelected = 0;
-	std::string compPrefix;
-	std::vector<std::string> compStrings;
-	std::memset(compInput, 0, sizeof(compInput));
-
-	bool setup = false;
-	char setupProjectAddSearchPath[100];
-	char setupProjectAddIgnorePath[100];
-	char setupProjectSavePath[100];
-
-	auto now = []() {
+	auto now = [&]() {
 		return std::chrono::system_clock::now();
 	};
 
@@ -302,8 +316,10 @@ int main(int argc, const char* argv[]) {
 				find = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_F]);
 				line = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_G]);
 				tags = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_R]);
-				open = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_P]);
 				comp = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_TAB]);
+
+				open = io.KeyCtrl && !io.KeyAlt && IsKeyPressed(KeyMap[KEY_P]);
+				change = io.KeyCtrl && io.KeyAlt && IsKeyPressed(KeyMap[KEY_P]);
 
 				setup = IsKeyPressed(KeyMap[KEY_F6]);
 
@@ -367,8 +383,41 @@ int main(int argc, const char* argv[]) {
 				}
 			}
 
-			auto vsplit = [](float space, float split) {
+			auto vsplit = [&](float space, float split) {
 				return split < 1.0f ? space * split: split;
+			};
+
+			auto nextPopup = [&](int h = -1) {
+				using namespace ImGui;
+				h = std::min(config.window.height, h);
+				int w = std::min(config.window.width, (int)vsplit(config.window.width, config.popup.width));
+				SetNextWindowPos(ImVec2((config.window.width-w)/2,(config.window.height-h)/2));
+				SetNextWindowSize(ImVec2(w,h));
+			};
+
+			auto filterOptions = [&](const std::vector<std::string>& haystacks, const std::string& needles) {
+				std::vector<int> matches;
+				for (int i = 0, l = (int)haystacks.size(); i < l; i++) {
+					auto& haystack = haystacks[i];
+					bool match = true;
+					for (auto needle: discatenate(needles," ")) {
+						trim(needle);
+						if (!needle.size()) continue;
+						if (needle.size() > haystack.size()) { match = false; break; }
+						if (haystack.find(needle) == std::string::npos) { match = false; break; }
+					}
+					if (match) matches.push_back(i);
+				}
+				return matches;
+			};
+
+			auto selectNavigate = [&](int size, int& selected) {
+				using namespace ImGui;
+				if (IsKeyPressed(KeyMap[KEY_DOWN])) selected++;
+				if (IsKeyPressed(KeyMap[KEY_UP])) selected--;
+				if (IsKeyPressed(KeyMap[KEY_PAGEDOWN])) selected += 10;
+				if (IsKeyPressed(KeyMap[KEY_PAGEUP])) selected -= 10;
+				selected = std::max(0, std::min(size-1, selected));
 			};
 
 			SetNextWindowPos(ImVec2(0,0));
@@ -418,6 +467,10 @@ int main(int argc, const char* argv[]) {
 					OpenPopup("#open");
 				}
 
+				if (change) {
+					OpenPopup("#change");
+				}
+
 				if (comp) {
 					OpenPopup("#comp");
 				}
@@ -460,7 +513,7 @@ int main(int argc, const char* argv[]) {
 							GetColorU32(project.view() == view ? ImGuiCol_TitleBgActive: ImGuiCol_FrameBg)
 						);
 
-						Text("%s", std::filesystem::relative(view->path).c_str());
+						Text("%s", displayPath(view->path).c_str());
 					}
 
 					TableNextRow();
@@ -476,7 +529,7 @@ int main(int argc, const char* argv[]) {
 							uint size = sizeof(viewTitles[i].text);
 
 							const char* modified = view->modified ? "*": "";
-							std::snprintf(title, size, "%s%s", std::filesystem::relative(view->path).c_str(), modified);
+							std::snprintf(title, size, "%s%s", displayPath(view->path).c_str(), modified);
 
 							PushStyleColor(ImGuiCol_Text, view->modified ? ImColorSRGB(0xffff00ff) : GetColorU32(ImGuiCol_Text));
 
@@ -519,37 +572,6 @@ int main(int argc, const char* argv[]) {
 
 				PopStyleVar(1);
 				PushFont(fontPopup);
-
-				auto nextPopup = [&](int h = -1) {
-					h = std::min(config.window.height, h);
-					int w = std::min(config.window.width, (int)vsplit(config.window.width, config.popup.width));
-					SetNextWindowPos(ImVec2((config.window.width-w)/2,(config.window.height-h)/2));
-					SetNextWindowSize(ImVec2(w,h));
-				};
-
-				auto filterOptions = [&](const std::vector<std::string>& haystacks, const std::string& needles) {
-					std::vector<int> matches;
-					for (int i = 0, l = (int)haystacks.size(); i < l; i++) {
-						auto& haystack = haystacks[i];
-						bool match = true;
-						for (auto needle: discatenate(needles," ")) {
-							trim(needle);
-							if (!needle.size()) continue;
-							if (needle.size() > haystack.size()) { match = false; break; }
-							if (haystack.find(needle) == std::string::npos) { match = false; break; }
-						}
-						if (match) matches.push_back(i);
-					}
-					return matches;
-				};
-
-				auto selectNavigate = [&](int size, int& selected) {
-					if (IsKeyPressed(KeyMap[KEY_DOWN])) selected++;
-					if (IsKeyPressed(KeyMap[KEY_UP])) selected--;
-					if (IsKeyPressed(KeyMap[KEY_PAGEDOWN])) selected += 10;
-					if (IsKeyPressed(KeyMap[KEY_PAGEUP])) selected -= 10;
-					selected = std::max(0, std::min(size-1, selected));
-				};
 
 				nextPopup();
 
@@ -705,22 +727,27 @@ int main(int argc, const char* argv[]) {
 						openPaths.clear();
 						openInput[0] = 0;
 
-						using namespace std::experimental::filesystem;
+						using namespace std::filesystem;
 
 						for (auto path: project.searchPaths) {
-							auto searchPath = std::filesystem::weakly_canonical(path);
+							auto searchPath = weakly_canonical(path);
 
-							for (const directory_entry& entry: recursive_directory_iterator(path)) {
+							auto it = recursive_directory_iterator(searchPath,
+								directory_options::skip_permission_denied
+							);
+
+							for (const directory_entry& entry: it) {
 								if (!is_regular_file(entry)) continue;
-								auto entryPath = std::filesystem::weakly_canonical(entry.path().string());
+								auto entryPath = weakly_canonical(entry.path().string());
 
 								bool ignore = false;
 								for (auto path: project.ignorePaths) {
-									auto ignorePath = std::filesystem::weakly_canonical(path);
+									auto ignorePath = weakly_canonical(path);
 									ignore = ignore || starts_with(entryPath.string(), ignorePath.string());
 								}
 								if (!ignore) {
-									openPaths.push_back(std::filesystem::relative(entryPath).string());
+									auto epath = entryPath.string();
+									openPaths.push_back(displayPath(epath));
 								}
 							}
 						}
@@ -753,6 +780,74 @@ int main(int argc, const char* argv[]) {
 								CloseCurrentPopup();
 							}
 							if (openSelected == i) {
+								SetScrollHereY();
+							}
+						}
+
+						EndListBox();
+					}
+
+					if (IsKeyPressed(KeyMap[KEY_ESCAPE])) {
+						CloseCurrentPopup();
+					}
+					EndPopup();
+				}
+
+				nextPopup(config.window.height/3*2);
+
+				if (BeginPopup("#change")) {
+					if (change) {
+						SetKeyboardFocusHere();
+						change = false;
+						changePaths.clear();
+						changeInput[0] = 0;
+
+						using namespace std::filesystem;
+
+						auto path = weakly_canonical(HOME);
+
+						auto it = recursive_directory_iterator(path,
+							directory_options::skip_permission_denied
+						);
+
+						for (const directory_entry& entry: it) {
+							if (!is_regular_file(entry)) continue;
+							auto ext = entry.path().extension().string();
+							auto name = entry.path().filename().string();
+							if (ext == ".sce-project" || name == ".sce-project") {
+								changePaths.push_back(canonical(entry.path().string()).string());
+							}
+						}
+
+						std::sort(changePaths.begin(), changePaths.end());
+					}
+
+					InputText("change#change-input", changeInput, sizeof(changeInput));
+
+					if (BeginListBox("#change-matches", ImVec2(-1,-1))) {
+						auto filter = std::string(changeInput);
+						std::vector<int> visible = filterOptions(changePaths, filter);
+						selectNavigate(visible.size(), changeSelected);
+
+						auto changeView = [&](const std::string& changePath) {
+							project.save();
+							project.load(changePath);
+						};
+
+						if (IsKeyPressed(KeyMap[KEY_RETURN])) {
+							if (visible.size()) {
+								changeView(changePaths[visible[changeSelected]]);
+							}
+							CloseCurrentPopup();
+						}
+
+						for (int i = 0; i < (int)visible.size(); i++) {
+							auto& changePath = changePaths[visible[i]];
+							if (Selectable(changePath.c_str(), i == changeSelected)) {
+								changeView(changePath);
+								CloseCurrentPopup();
+							}
+							if (changeSelected == i) {
 								SetScrollHereY();
 							}
 						}

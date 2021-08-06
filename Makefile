@@ -13,6 +13,6 @@ clean:
 	rm -rf build
 	rm -f /tmp/sce.prof
 
-prof: dev
+prof: linux
 	LD_PRELOAD=/usr/lib/x86_64-linux-gnu/libprofiler.so.0 CPUPROFILE=/tmp/sce.prof build/sce
 	google-pprof --web build/sce /tmp/sce.prof

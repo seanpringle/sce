@@ -4,8 +4,6 @@
 #include <deque>
 #include <vector>
 
-// Store a text document as a deque of vectors (lines)
-
 struct Doc {
 	Doc() = default;
 	Doc(std::initializer_list<int> l) {
@@ -13,7 +11,7 @@ struct Doc {
 	}
 
 	uint count = 0;
-	std::deque<std::vector<int>> lines;
+	std::vector<std::vector<int>> lines;
 
 	struct Cursor {
 		uint index = 0;

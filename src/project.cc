@@ -149,6 +149,13 @@ bool Project::load(const std::string path) {
 	auto in = std::ifstream(lpath);
 	if (!in) return false;
 
+	while (views.size()) close();
+	searchPaths.clear();
+	ignorePaths.clear();
+	groups.clear();
+	groups.resize(1);
+	layout = 0;
+
 	std::string line;
 	int nviews = 0, ngroups = 0, npaths = 0;
 
