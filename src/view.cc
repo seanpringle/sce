@@ -3,6 +3,7 @@
 #include "syntax.h"
 #include "syntax/cpp.h"
 #include "syntax/ini.h"
+#include "syntax/cmake.h"
 #include "syntax/openscad.h"
 #include "syntax/plaintext.h"
 #include "theme.h"
@@ -855,6 +856,12 @@ bool View::interpret(const std::string& cmd) {
 			return true;
 		}
 
+		if (name == "cmake") {
+			delete syntax;
+			syntax = new CMake();
+			return true;
+		}
+
 		if (name == "openscad") {
 			delete syntax;
 			syntax = new OpenSCAD();
@@ -962,6 +969,7 @@ bool View::open(std::string path) {
 	delete syntax;
 
 	auto ext = fpath.extension().string();
+	auto name = fpath.filename().string();
 
 	if ((std::set<std::string>{".cc", ".cpp", ".c", ".h"}).count(ext)) {
 		syntax = new CPP();
@@ -973,6 +981,10 @@ bool View::open(std::string path) {
 	else
 	if ((std::set<std::string>{".ini"}).count(ext)) {
 		syntax = new INI();
+	}
+	else
+	if (name == "CMakeLists.txt") {
+		syntax = new CMake();
 	}
 	else {
 		syntax = new PlainText();
