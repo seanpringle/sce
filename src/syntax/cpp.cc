@@ -44,18 +44,20 @@ std::vector<std::string> CPP::matches(const Doc& text, int cursor) {
 	while (isname(c(-1))) --cursor;
 
 	int pstart = cursor;
-
-	//while (isname(c())) ++cursor;
-	//int plength = cursor-pstart;
-
 	int plength = home-pstart;
 
 	if (pstart < home) {
 		cursor = 0;
+
+		std::vector<int> prefix;
+		for (int i = pstart; i < home; i++) {
+			prefix.push_back(get(text, i));
+		}
+
 		while (cursor < (int)text.size()) {
 			int mstart = cursor;
 			for (int i = 0; i < plength; i++, cursor++) {
-				if (c() != get(text, pstart+i)) break;
+				if (c() != prefix[i]) break;
 			}
 			int mlength = cursor-mstart;
 			if (mlength == plength) {
@@ -72,12 +74,7 @@ std::vector<std::string> CPP::matches(const Doc& text, int cursor) {
 			cursor++;
 		}
 
-		std::string prefix;
-		for (int i = pstart; i < home; i++) {
-			prefix += get(text, i);
-		}
-
-		results.push_back(prefix);
+		results.push_back({prefix.begin(), prefix.end()});
 
 		for (auto& hit: hits) {
 			results.push_back(hit);
@@ -191,8 +188,6 @@ bool CPP::matchBlockType(const Doc& text, int cursor) {
 	if (!isname(c())) return false;
 	int start = cursor;
 
-	if (keyword(text, cursor)) return false;
-
 	// blocktype namespace::...::name {
 	if (c(-1) == ':') {
 		while (c(-1) && (isname(c(-1)) || c(-1) == ':')) --cursor;
@@ -203,16 +198,8 @@ bool CPP::matchBlockType(const Doc& text, int cursor) {
 	while (c(-1) && iswalnum(c(-1))) --cursor;
 
 	if (!iswalpha(c())) return false;
-	bool blocktype = false;
-	for (auto& name: blocktypes) {
-		if (word(text, cursor, name)) {
-			blocktype = true;
-			break;
-		}
-	}
-
 	if (comment(text, cursor)) return false;
-	if (!blocktype) return false;
+	if (!wordset(text, cursor, blocktypes)) return false;
 
 	cursor = start;
 
@@ -220,7 +207,7 @@ bool CPP::matchBlockType(const Doc& text, int cursor) {
 	while (c() && iswspace(c())) cursor++;
 	if (!(c() == '{' || c() == ':' || c() == ';')) return false;
 
-	return true;
+	return !keyword(text, start);
 }
 
 // is cursor on a function or method name
@@ -231,10 +218,9 @@ bool CPP::matchFunction(const Doc& text, int cursor) {
 
 	if (!isname(c())) return false;
 	int start = cursor;
+
 	while (isname(c())) cursor++;
 	int length = cursor-start;
-
-	if (keyword(text, start)) return false;
 
 	bool constructor = false;
 	bool function = false;
@@ -292,8 +278,20 @@ bool CPP::matchFunction(const Doc& text, int cursor) {
 		while (c() && iswspace(c())) cursor++;
 	}
 
-	if (!(c() == '{' || c() == ':' || c() == ';')) return false;
-	return true;
+	bool isFunction = c() == '{';
+	bool isDeclaration = (c() == ';' || c() == '=');
+	bool isConstructor = c() == ':';
+
+	return (isFunction || isDeclaration || isConstructor) && !keyword(text, start);
+}
+
+Syntax::Token CPP::first(const Doc& text, int cursor) {
+	bool guessMultiLineComment =
+		(get(text, cursor) == '*' && get(text, cursor+1) == '/') ||
+		(get(text, cursor) == '*' && get(text, cursor+1) == '*') ||
+		(get(text, cursor) == ' ' && get(text, cursor+1) == '*')
+	;
+	return guessMultiLineComment ? Token::CommentBlock: Token::None;
 }
 
 Syntax::Token CPP::next(const Doc& text, int cursor, Syntax::Token token) {

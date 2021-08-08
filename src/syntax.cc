@@ -23,7 +23,7 @@ bool Syntax::wordset(const Doc& text, int cursor, const std::set<std::string,std
 		pad[len++] = get(text, cursor+i);
 	}
 	pad[len] = 0;
-	return names.count(std::string_view(pad)) > 0;
+	return len > 0 && names.count(std::string_view(pad)) > 0;
 }
 
 bool Syntax::hintMatchedPair(const Doc& text, int cursor, const ViewRegion& selection, int open, int close) {
@@ -39,14 +39,19 @@ bool Syntax::hintMatchedPair(const Doc& text, int cursor, const ViewRegion& sele
 	};
 
 	int c = get(text, cursor);
-	int s = get(text, selection.offset);
 
-	if (c == open && selection.offset > cursor && s == close && isBalancedPair(cursor, selection.offset)){
-		return true;
+	if (c == open && selection.offset > cursor) {
+		int s = get(text, selection.offset);
+		if (s == close && isBalancedPair(cursor, selection.offset)) {
+			return true;
+		}
 	}
 
-	if (c == close && selection.offset < cursor && s == open && isBalancedPair(selection.offset, cursor)){
-		return true;
+	if (c == close && selection.offset < cursor) {
+		int s = get(text, selection.offset);
+		if (s == open && isBalancedPair(selection.offset, cursor)) {
+			return true;
+		}
 	}
 
 	return false;

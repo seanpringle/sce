@@ -37,6 +37,9 @@ struct Syntax {
 	// Find autocomplete strings based on cursor position
 	virtual std::vector<std::string> matches(const Doc& text, int cursor) = 0;
 
+	// Token for first cursor position dispayed on screen
+	virtual Syntax::Token first(const Doc& text, int cursor) = 0;
+
 	// Token for a cursor position, potentially based on last token
 	virtual Syntax::Token next(const Doc& text, int cursor, Token token) = 0;
 

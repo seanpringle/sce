@@ -1191,6 +1191,7 @@ void View::draw() {
 	format(theme.highlight[token][state]);
 
 	cursor = text.line_offset(top);
+	token = syntax->first(text, cursor);
 
 	// detect large selection starting off screen
 	for (auto& selection: selections) {

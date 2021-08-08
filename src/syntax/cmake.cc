@@ -12,6 +12,10 @@ std::vector<std::string> CMake::matches(const Doc& text, int cursor) {
 	return {};
 }
 
+Syntax::Token CMake::first(const Doc& text, int cursor) {
+	return Token::None;
+}
+
 Syntax::Token CMake::next(const Doc& text, int cursor, Syntax::Token token) {
 	switch (token) {
 		case Token::None: {

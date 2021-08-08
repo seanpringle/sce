@@ -64,6 +64,10 @@ bool OpenSCAD::matchModule(const Doc& text, int cursor) {
 	return c() == '{';
 }
 
+Syntax::Token OpenSCAD::first(const Doc& text, int cursor) {
+	return Token::None;
+}
+
 Syntax::Token OpenSCAD::next(const Doc& text, int cursor, Syntax::Token token) {
 	switch (token) {
 

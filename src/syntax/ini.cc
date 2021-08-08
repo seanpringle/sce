@@ -17,6 +17,10 @@ std::vector<std::string> INI::matches(const Doc& text, int cursor) {
 	return {};
 }
 
+Syntax::Token INI::first(const Doc& text, int cursor) {
+	return Token::None;
+}
+
 Syntax::Token INI::next(const Doc& text, int cursor, Syntax::Token token) {
 	switch (token) {
 		case Token::None: {
