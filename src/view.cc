@@ -841,6 +841,11 @@ bool View::interpret(const std::string& cmd) {
 		return true;
 	}
 
+	if (cmd == "trim") {
+		trimTailingWhite();
+		return true;
+	}
+
 	if (prefix("syntax ")) {
 		auto name = cmd.substr(7);
 
@@ -1073,13 +1078,32 @@ void View::convertTabsHard() {
 	sanity();
 }
 
+void View::trimTailingWhite() {
+	std::vector<Doc::Cursor> cursors;
+	for (auto& selection: selections) {
+		cursors.push_back(text.cursor(selection.offset));
+	}
+	text.cursor(0);
+	for (auto& line: text.lines) {
+		while (line.size() > 1 && isspace(line[line.size()-2])) {
+			line.erase(line.begin()+line.size()-2);
+			text.count--;
+		}
+	}
+	for (uint i = 0; i < selections.size(); i++) {
+		auto& cursor = cursors[i];
+		auto& selection = selections[i];
+		selection.offset = text.line_offset(cursor.line) + std::min(cursor.cell, (uint)text.lines[cursor.line].size()-1);
+	}
+	modified = true;
+	sanity();
+}
+
 void View::save() {
 	if (!path.size()) return;
+	trimTailingWhite();
 	auto out = std::ofstream(path);
-	for (int i = 0; i < (int)text.size(); ) {
-		std::vector<int> line;
-		while (!eol(i)) line.push_back(text[i++]);
-		while (line.size() && iswspace(line.back())) line.pop_back();
+	for (auto& line: text.lines) {
 		for (int c: line) {
 			if (c&0xff00) {
 				out << (unsigned char)((c&0xff00)>>8);
@@ -1087,8 +1111,6 @@ void View::save() {
 			}
 			out << (unsigned char)c;
 		}
-		out << '\n';
-		i++;
 	}
 	out.close();
 	modified = false;

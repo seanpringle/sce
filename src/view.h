@@ -127,4 +127,5 @@ struct View {
 	bool interpret(const std::string& cmd);
 	void convertTabsSoft();
 	void convertTabsHard();
+	void trimTailingWhite();
 };
