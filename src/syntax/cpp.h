@@ -84,6 +84,7 @@ struct CPP : Syntax {
 		"override",
 		"virtual",
 		"mutable",
+		"noexcept",
 	};
 
 	const std::set<std::string, std::less<>> blocktypes = {
@@ -106,6 +107,7 @@ struct CPP : Syntax {
 	const std::set<std::string, std::less<>> specifiers = {
 		"override",
 		"const",
+		"explicit",
 	};
 
 	bool isoperator(int c) override;

@@ -976,7 +976,7 @@ bool View::open(std::string path) {
 	auto ext = fpath.extension().string();
 	auto name = fpath.filename().string();
 
-	if ((std::set<std::string>{".cc", ".cpp", ".c", ".h"}).count(ext)) {
+	if ((std::set<std::string>{".cc", ".cpp", ".cxx", ".c", ".h", ".hpp"}).count(ext)) {
 		syntax = new CPP();
 	}
 	else

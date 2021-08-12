@@ -1,8 +1,12 @@
 #include "common.h"
 #include "project.h"
 #include "config.h"
+#include "catenate.h"
 #include <fstream>
 #include <filesystem>
+
+#include "json.hpp"
+using json = nlohmann::json;
 
 extern Config config;
 
@@ -148,6 +152,9 @@ bool Project::load(const std::string path) {
 
 	auto in = std::ifstream(lpath);
 	if (!in) return false;
+	json pstate;
+	in >> pstate;
+	in.close();
 
 	while (views.size()) close();
 	searchPaths.clear();
@@ -156,59 +163,38 @@ bool Project::load(const std::string path) {
 	groups.resize(1);
 	layout = 0;
 
-	std::string line;
-	int nviews = 0, ngroups = 0, npaths = 0;
-
-	ensure(std::getline(in, line));
-	ensure(1 == std::sscanf(line.c_str(), "%d", &nviews));
-
-	for (int i = 0; i < nviews; i++) {
-		ensure(std::getline(in, line));
-		notef("%s", line);
-		open(line);
+	for (auto vstate: pstate["views"]) {
+		auto view = open(vstate["path"]);
+		if (!view) continue;
+		view->selections.clear();
+		for (auto vsel: vstate["selections"]) {
+			view->selections.push_back({vsel[0], vsel[1]});
+		}
+		view->sanity();
 	}
 
-	ensure(std::getline(in, line));
-	ensure(1 == std::sscanf(line.c_str(), "%d", &active));
+	for (auto spath: pstate["searchPaths"]) {
+		searchPathAdd(spath);
+	}
 
-	ensure(std::getline(in, line));
-	ensure(1 == std::sscanf(line.c_str(), "%d", &layout));
-
-	ensure(std::getline(in, line));
-	ensure(1 == std::sscanf(line.c_str(), "%d", &ngroups));
+	for (auto spath: pstate["ignorePaths"]) {
+		ignorePathAdd(spath);
+	}
 
 	groups.clear();
-	groups.resize(ngroups);
 
-	for (auto& group: groups) {
-		int gsize = 0;
-		ensure(std::getline(in, line));
-		ensure(1 == std::sscanf(line.c_str(), "%d", &gsize));
-		for (int i = 0; i < gsize; i++) {
-			ensure(std::getline(in, line));
-			int id = find(line);
-			if (id >= 0) group.push_back(views[id]);
+	for (auto jstate: pstate["groups"]) {
+		groups.resize(groups.size()+1);
+		auto& group = groups.back();
+		for (auto vpath: jstate["views"]) {
+			int id = find(vpath);
+			if (id < 0) continue;
+			group.push_back(views[id]);
 		}
 	}
 
-	ensure(std::getline(in, line));
-	ensure(1 == std::sscanf(line.c_str(), "%d", &npaths));
-
-	for (int i = 0; i < npaths; i++) {
-		ensure(std::getline(in, line)); trim(line);
-		searchPathAdd(line);
-	}
-
-	if (std::getline(in, line)) {
-		ensure(1 == std::sscanf(line.c_str(), "%d", &npaths));
-
-		for (int i = 0; i < npaths; i++) {
-			ensure(std::getline(in, line)); trim(line);
-			ignorePathAdd(line);
-		}
-	}
-
-	in.close();
+	active = pstate["active"];
+	layout = pstate["layout"];
 
 	bubble();
 
@@ -227,36 +213,55 @@ bool Project::save(const std::string path) {
 	auto out = std::ofstream(spath);
 	if (!out) return false;
 
-	out << fmt("%llu views", views.size()) << '\n';
+	json pstate;
+
+	int i = 0;
 	for (auto view: views) {
 		auto vpath = std::filesystem::path(view->path);
 		auto apath = std::filesystem::weakly_canonical(vpath);
-		out << apath.string() << '\n';
+		json vstate;
+		vstate["path"] = apath;
+		int j = 0;
+		for (auto selection: view->selections) {
+			int k = j++;
+			vstate["selections"][k][0] = selection.offset;
+			vstate["selections"][k][1] = selection.length;
+		}
+		pstate["views"][i++] = vstate;
 	}
-	out << fmt("%d active", active) << '\n';
-	out << fmt("%d layout", layout) << '\n';
-	out << fmt("%llu groups", groups.size()) << '\n';
+
+	pstate["active"] = active;
+	pstate["layout"] = layout;
+
+	i = 0;
 	for (auto group: groups) {
-		out << fmt("%llu views", group.size()) << '\n';
+		json gstate;
+		int j = 0;
 		for (auto view: group) {
 			auto vpath = std::filesystem::path(view->path);
 			auto apath = std::filesystem::weakly_canonical(vpath);
-			out << apath.string() << '\n';
+			gstate["views"][j++] = apath;
 		}
+		pstate["groups"][i++] = gstate;
 	}
-	out << fmt("%llu searchPaths", searchPaths.size()) << '\n';
+
+	i = 0;
 	for (auto searchPath: searchPaths) {
 		auto spath = std::filesystem::path(searchPath);
 		auto apath = std::filesystem::weakly_canonical(spath);
-		out << apath.string() << '\n';
+		pstate["searchPaths"][i++] = apath;
 	}
-	out << fmt("%llu ignorePaths", ignorePaths.size()) << '\n';
+
+	i = 0;
 	for (auto ignorePath: ignorePaths) {
 		auto spath = std::filesystem::path(ignorePath);
 		auto apath = std::filesystem::weakly_canonical(spath);
-		out << apath.string() << '\n';
+		pstate["ignorePaths"][i++] = apath;
 	}
+
+	out << pstate.dump(4);
 	out.close();
+
 	return true;
 }
 
