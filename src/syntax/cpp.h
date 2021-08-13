@@ -85,6 +85,7 @@ struct CPP : Syntax {
 		"virtual",
 		"mutable",
 		"noexcept",
+		"explicit",
 	};
 
 	const std::set<std::string, std::less<>> blocktypes = {

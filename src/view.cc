@@ -5,6 +5,7 @@
 #include "syntax/ini.h"
 #include "syntax/cmake.h"
 #include "syntax/openscad.h"
+#include "syntax/forth.h"
 #include "syntax/plaintext.h"
 #include "theme.h"
 #include "config.h"
@@ -986,6 +987,10 @@ bool View::open(std::string path) {
 	else
 	if ((std::set<std::string>{".ini"}).count(ext)) {
 		syntax = new INI();
+	}
+	else
+	if ((std::set<std::string>{".f"}).count(ext)) {
+		syntax = new Forth();
 	}
 	else
 	if (name == "CMakeLists.txt") {
