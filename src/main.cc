@@ -38,6 +38,7 @@ int KeyMap[100] = {
 	[KEY_DOWN] = SDL_SCANCODE_DOWN,
 	[KEY_SPACE] = SDL_SCANCODE_SPACE,
 	[KEY_TICK] = SDL_SCANCODE_APOSTROPHE,
+	[KEY_A] = SDL_SCANCODE_A,
 	[KEY_B] = SDL_SCANCODE_B,
 	[KEY_C] = SDL_SCANCODE_C,
 	[KEY_D] = SDL_SCANCODE_D,
@@ -58,6 +59,7 @@ int KeyMap[100] = {
 	[KEY_H] = SDL_SCANCODE_H,
 	[KEY_K] = SDL_SCANCODE_K,
 	[KEY_L] = SDL_SCANCODE_L,
+	[KEY_N] = SDL_SCANCODE_N,
 	[KEY_P] = SDL_SCANCODE_P,
 	[KEY_R] = SDL_SCANCODE_R,
 	[KEY_S] = SDL_SCANCODE_S,
@@ -116,6 +118,8 @@ namespace {
 int main(int argc, const char* argv[]) {
 	auto HOME = std::getenv("HOME");
 
+	project.load(fmt("%s/.sce-project", HOME));
+
 	for (auto arg: config.args(argc, argv)) {
 		auto path = std::filesystem::path(arg);
 
@@ -135,10 +139,6 @@ int main(int argc, const char* argv[]) {
 		}
 
 		notef("what is this? %s", path);
-	}
-
-	if (project.ppath.empty() && project.views.empty()) {
-		project.load(fmt("%s/.sce-project", HOME));
 	}
 
 	if (!project.searchPaths.size()) {
@@ -369,6 +369,10 @@ int main(int argc, const char* argv[]) {
 
 					if (io.KeyCtrl && io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEDOWN])) {
 						project.moveNext();
+					}
+
+					if (io.KeyCtrl && IsKeyPressed(KeyMap[KEY_N])) {
+						project.fresh();
 					}
 				}
 			}

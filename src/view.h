@@ -105,6 +105,7 @@ struct View {
 	void selectDown();
 	void selectUp();
 	void selectSkip();
+	void selectAll();
 	void intoView(ViewRegion& region);
 	void boundaryRight();
 	void boundaryLeft();

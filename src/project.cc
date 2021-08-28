@@ -82,6 +82,24 @@ View* Project::open(const std::string& path) {
 	return view();
 }
 
+View* Project::fresh() {
+	int gactive = group(view());
+	auto v = new View();
+
+	groups[gactive].push_back(v);
+	views.push_back(v);
+
+	v->path = "untitled";
+
+	std::sort(views.begin(), views.end(), [](auto a, auto b) { return a->path < b->path; });
+
+	active = find(v);
+	ensure(active >= 0);
+
+	bubble();
+	return view();
+}
+
 void Project::close() {
 	auto v = view();
 	if (v) {
@@ -121,8 +139,8 @@ bool Project::interpret(const std::string& cmd) {
 		return cmd.find(s) == 0;
 	};
 
-	if (prefix("path ") && cmd.size() > 5U) {
-		auto path = cmd.substr(5); trim(path);
+	if (prefix("search ") && cmd.size() > 7U) {
+		auto path = cmd.substr(7); trim(path);
 		searchPathAdd(path);
 		return true;
 	}

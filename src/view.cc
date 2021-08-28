@@ -24,6 +24,7 @@ View::View() {
 	sanity();
 	tabs.hard = config.tabs.hard;
 	tabs.width = config.tabs.width;
+	syntax = new PlainText();
 }
 
 View::~View() {
@@ -679,6 +680,12 @@ void View::selectSkip() {
 	skip = selections.back();
 }
 
+void View::selectAll() {
+	single();
+	selections.front() = {0,(int)text.size()};
+	sanity();
+}
+
 void View::intoView(ViewRegion& selection) {
 	int lineno = text.cursor(selection.offset+selection.length).line;
 
@@ -790,6 +797,16 @@ bool View::interpret(const std::string& cmd) {
 
 		sanity();
 	};
+
+	if (prefix("path ") && cmd.size() > 5U) {
+		auto path = cmd.substr(5); trim(path);
+		if (path.find('/') == std::string::npos) {
+			path = fmt("./%s", path);
+		}
+		auto fpath = std::filesystem::weakly_canonical(path);
+		this->path = fpath.string();
+		return true;
+	}
 
 	if (prefix("find ") && cmd.size() > 5U) {
 		int from = selections.back().offset;
@@ -925,6 +942,7 @@ void View::input() {
 	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_D])) { selectNext(); return; }
 	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_K])) { selectSkip(); return; }
 	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_B])) { unwind(); return; }
+	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_A])) { selectAll(); return; }
 
 	if (Ctrl && ImGui::IsKeyReleased(KeyMap[KEY_S])) { save(); return; }
 	if (Ctrl && ImGui::IsKeyReleased(KeyMap[KEY_L])) { reload(); return; }
@@ -1038,8 +1056,6 @@ bool View::open(std::string path) {
 	}
 
 	sanity();
-	undos.clear();
-	redos.clear();
 	return true;
 }
 

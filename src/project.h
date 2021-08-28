@@ -19,6 +19,7 @@ struct Project {
 	void sanity();
 	View* view();
 	void close();
+	View* fresh();
 
 	void searchPathAdd(const std::string& path);
 	void searchPathDrop(const std::string& path);
