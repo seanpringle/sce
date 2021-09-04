@@ -16,6 +16,7 @@ void FilterPopupChange::init() {
 
 	for (const directory_entry& entry: it) {
 		if (!is_regular_file(entry)) continue;
+		if (it.depth() >= 3) it.disable_recursion_pending();
 		auto ext = entry.path().extension().string();
 		auto name = entry.path().filename().string();
 		if (ext == ".sce-project" || name == ".sce-project") {
