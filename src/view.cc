@@ -5,6 +5,7 @@
 #include "syntax/ini.h"
 #include "syntax/cmake.h"
 #include "syntax/openscad.h"
+#include "syntax/bash.h"
 #include "syntax/forth.h"
 #include "syntax/plaintext.h"
 #include "theme.h"
@@ -891,6 +892,12 @@ bool View::interpret(const std::string& cmd) {
 			return true;
 		}
 
+		if (name == "bash") {
+			delete syntax;
+			syntax = new Bash();
+			return true;
+		}
+
 		if (name == "plaintext") {
 			delete syntax;
 			syntax = new PlainText();
@@ -1001,6 +1008,10 @@ bool View::open(std::string path) {
 	else
 	if ((std::set<std::string>{".scad"}).count(ext)) {
 		syntax = new OpenSCAD();
+	}
+	else
+	if ((std::set<std::string>{".sh"}).count(ext)) {
+		syntax = new Bash();
 	}
 	else
 	if ((std::set<std::string>{".ini"}).count(ext)) {

@@ -61,5 +61,6 @@ bool Syntax::hintMatchedPair(const Doc& text, int cursor, const ViewRegion& sele
 #include "syntax/ini.cc"
 #include "syntax/cmake.cc"
 #include "syntax/openscad.cc"
+#include "syntax/bash.cc"
 #include "syntax/forth.cc"
 #include "syntax/plaintext.cc"
