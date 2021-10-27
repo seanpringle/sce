@@ -134,6 +134,10 @@ bool CPP::typelike(const Doc& text, int cursor) {
 		return prev() == '&' || prev() == '*';
 	};
 
+	auto tpl = [&]() {
+		return prev() == '<' || prev() == '>';
+	};
+
 	auto skip = [&](auto fn) {
 		while (prev() && fn()) --cursor;
 	};
@@ -145,10 +149,16 @@ bool CPP::typelike(const Doc& text, int cursor) {
 	if (refptr()) --cursor;
 	skip(white);
 
-	// templated type. should probably be recursive
 	if (prev() == '>') {
-		--cursor;
-		while (name() || white() || refptr()) cursor--;
+		int depth = 0;
+		int length = 0;
+		while (length < 150 && (tpl() || name() || white() || refptr())) {
+			if (prev() == '>') depth++;
+			if (prev() == '<') depth--;
+			if (!depth) break;
+			cursor--;
+			length++;
+		}
 		if (prev() != '<') return false;
 		--cursor;
 	}
