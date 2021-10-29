@@ -1337,7 +1337,7 @@ void View::draw() {
 			ImVec2 pos = (ImVec2){min.x+(i*cell.x),min.y};
 			if (pos.x+cell.x > origin.x+region.x) break;
 			if (pos.y+cell.y > origin.y+region.y) break;
-			ensuref(c >= 32, "bad character %d", c);
+			if (c < 32) c = 0xfffd;
 			if (c>>8 == 0xc2) c &= 0xff;
 			ImGui::GetFont()->RenderChar(ImGui::GetWindowDrawList(), -1.0f, pos, ImGui::ImColorSRGB(chunk.fg), c);
 			if (chunk.hint) ImGui::GetFont()->RenderChar(ImGui::GetWindowDrawList(), -1.0f, pos, ImGui::ImColorSRGB(chunk.fg), '_');
