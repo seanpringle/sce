@@ -1006,40 +1006,6 @@ bool View::open(std::string path) {
 	this->path = fpath.string();
 	delete syntax;
 
-	auto ext = fpath.extension().string();
-	auto name = fpath.filename().string();
-
-	if ((std::set<std::string>{".cc", ".cpp", ".cxx", ".c", ".h", ".hpp"}).count(ext)) {
-		syntax = new CPP();
-	}
-	else
-	if ((std::set<std::string>{".scad"}).count(ext)) {
-		syntax = new OpenSCAD();
-	}
-	else
-	if ((std::set<std::string>{".sh"}).count(ext)) {
-		syntax = new Bash();
-	}
-	else
-	if ((std::set<std::string>{".ini"}).count(ext)) {
-		syntax = new INI();
-	}
-	else
-	if ((std::set<std::string>{".f"}).count(ext)) {
-		syntax = new Forth();
-	}
-	else
-	if (name == "CMakeLists.txt") {
-		syntax = new CMake();
-	}
-	else
-	if (name == "Makefile") {
-		syntax = new Make();
-	}
-	else {
-		syntax = new PlainText();
-	}
-
 	text.clear();
 	selections.clear();
 	batches = 0;
@@ -1075,6 +1041,46 @@ bool View::open(std::string path) {
 
 	if (soft || hard) {
 		tabs.hard = hard > soft;
+	}
+
+	auto ext = fpath.extension().string();
+	auto name = fpath.filename().string();
+
+	std::string line = {text.begin(), text.begin() + toEol(0)};
+
+	auto shebang = [&](std::string sub) {
+		return line.find(sub) != std::string::npos;
+	};
+
+	if ((std::set<std::string>{".cc", ".cpp", ".cxx", ".c", ".h", ".hpp", ".fs", ".vs"}).count(ext)) {
+		syntax = new CPP();
+	}
+	else
+	if ((std::set<std::string>{".scad"}).count(ext)) {
+		syntax = new OpenSCAD();
+	}
+	else
+	if ((std::set<std::string>{".sh"}).count(ext)) {
+		syntax = new Bash();
+	}
+	else
+	if ((std::set<std::string>{".ini"}).count(ext)) {
+		syntax = new INI();
+	}
+	else
+	if ((std::set<std::string>{".f"}).count(ext)) {
+		syntax = new Forth();
+	}
+	else
+	if (name == "CMakeLists.txt") {
+		syntax = new CMake();
+	}
+	else
+	if (name == "Makefile") {
+		syntax = new Make();
+	}
+	else {
+		syntax = new PlainText();
 	}
 
 	sanity();
