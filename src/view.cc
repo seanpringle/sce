@@ -3,6 +3,7 @@
 #include "syntax.h"
 #include "syntax/cpp.h"
 #include "syntax/ini.h"
+#include "syntax/make.h"
 #include "syntax/cmake.h"
 #include "syntax/openscad.h"
 #include "syntax/bash.h"
@@ -880,6 +881,12 @@ bool View::interpret(const std::string& cmd) {
 			return true;
 		}
 
+		if (name == "make") {
+			delete syntax;
+			syntax = new Make();
+			return true;
+		}
+
 		if (name == "cmake") {
 			delete syntax;
 			syntax = new CMake();
@@ -1024,6 +1031,10 @@ bool View::open(std::string path) {
 	else
 	if (name == "CMakeLists.txt") {
 		syntax = new CMake();
+	}
+	else
+	if (name == "Makefile") {
+		syntax = new Make();
 	}
 	else {
 		syntax = new PlainText();
