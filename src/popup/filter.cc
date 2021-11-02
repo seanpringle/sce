@@ -33,11 +33,27 @@ void FilterPopup::setup() {
 	visible.clear();
 	selected = 0;
 	input[0] = 0;
-	init();
+	ready = false;
+	focus = false;
+	immediate = true;
+	crew.job([&]() {
+		init();
+		ready = true;
+	});
 }
 
 void FilterPopup::render() {
 	using namespace ImGui;
+	if (!ready) return;
+
+	immediate = false;
+
+	if (!focus) {
+		SetKeyboardFocusHere();
+		focus = true;
+		immediate = true;
+	}
+
 	InputText(fmtc("%s#%s-input", name, name), input, sizeof(input));
 
 	if (BeginListBox(fmtc("#%s-matches", name), ImVec2(-1,-1))) {

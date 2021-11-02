@@ -13,6 +13,7 @@ find_package(SDL2 REQUIRED)
 find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(Freetype REQUIRED)
+find_package(Threads REQUIRED)
 
 # gtest
 
@@ -41,4 +42,4 @@ set(CMAKE_CXX_STANDARD 17)
 
 add_executable(sce src/main.cc src/config.cc src/theme.cc src/syntax.cc src/project.cc src/view.cc)
 include_directories(sce ${SDL2_INCLUDE_DIRS} ${FREETYPE_INCLUDE_DIRS})
-target_link_libraries(sce imgui ${SDL2_LIBRARIES} ${FREETYPE_LIBRARIES} OpenGL::GL GLEW::GLEW stdc++fs)
+target_link_libraries(sce imgui ${SDL2_LIBRARIES} ${FREETYPE_LIBRARIES} OpenGL::GL GLEW::GLEW stdc++fs Threads::Threads)

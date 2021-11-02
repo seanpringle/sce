@@ -1,6 +1,8 @@
 #pragma once
 
 struct FilterPopup : Popup {
+	bool ready = false;
+	bool focus = false;
 	char input[100];
 	std::vector<std::string> options;
 	std::vector<int> visible;

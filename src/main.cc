@@ -11,10 +11,13 @@
 #include "view.h"
 #include "keys.h"
 #include "catenate.h"
+#include "channel.h"
+#include "workers.h"
 #include <filesystem>
 #include <chrono>
 #include <algorithm>
 #include <regex>
+#include <thread>
 
 using namespace std::literals::chrono_literals;
 
@@ -113,6 +116,9 @@ namespace {
 
 	#include "popup/filter/complete.cc"
 	FilterPopupComplete completePopup;
+
+	#include "popup/filter/refs.cc"
+	FilterPopupRefs refsPopup;
 }
 
 int main(int argc, const char* argv[]) {
@@ -279,6 +285,7 @@ int main(int argc, const char* argv[]) {
 
 		if (immediate) {
 			immediate = false;
+			std::this_thread::sleep_for(1ms);
 			if (SDL_PollEvent(&event)) processEvent();
 		}
 		else {
@@ -302,12 +309,13 @@ int main(int argc, const char* argv[]) {
 				if (io.KeyCtrl && !io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEUP])) project.prev();
 				if (io.KeyCtrl && !io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEDOWN])) project.next();
 
-				find = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_F]);
-				line = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_G]);
-				command = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_TICK]);
+				find = io.KeyCtrl && !io.KeyShift && IsKeyPressed(KeyMap[KEY_F]);
+				line = io.KeyCtrl && !io.KeyShift && IsKeyPressed(KeyMap[KEY_G]);
+				command = io.KeyCtrl && !io.KeyShift && IsKeyPressed(KeyMap[KEY_TICK]);
 
-				tagsPopup.activate = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_R]);
-				completePopup.activate = io.KeyCtrl && IsKeyPressed(KeyMap[KEY_TAB]);
+				tagsPopup.activate = io.KeyCtrl && !io.KeyShift && IsKeyPressed(KeyMap[KEY_R]);
+				refsPopup.activate = io.KeyCtrl && io.KeyShift && IsKeyPressed(KeyMap[KEY_F]);
+				completePopup.activate = io.KeyCtrl && !io.KeyShift && IsKeyPressed(KeyMap[KEY_TAB]);
 				openPopup.activate = io.KeyCtrl && !io.KeyAlt && IsKeyPressed(KeyMap[KEY_P]);
 				changePopup.activate = io.KeyCtrl && io.KeyAlt && IsKeyPressed(KeyMap[KEY_P]);
 
@@ -450,6 +458,11 @@ int main(int argc, const char* argv[]) {
 					OpenPopup("#complete");
 				}
 
+				if (refsPopup.activate) {
+					refsPopup.needle = project.view()->selected();
+					OpenPopup("#refs");
+				}
+
 				viewTitles.clear();
 				viewTitles.resize(project.views.size());
 
@@ -550,27 +563,31 @@ int main(int argc, const char* argv[]) {
 
 				nextPopup();
 
-				commandPopup.run();
+				immediate = commandPopup.run() || immediate;
 
 				nextPopup(config.window.height/3*2);
 
-				completePopup.run();
+				immediate = completePopup.run() || immediate;
 
 				nextPopup(config.window.height/3*2);
 
-				tagsPopup.run();
+				immediate = tagsPopup.run() || immediate;
 
 				nextPopup(config.window.height/3*2);
 
-				openPopup.run();
+				immediate = refsPopup.run() || immediate;
 
 				nextPopup(config.window.height/3*2);
 
-				changePopup.run();
+				immediate = openPopup.run() || immediate;
 
 				nextPopup(config.window.height/3*2);
 
-				setupPopup.run();
+				immediate = changePopup.run() || immediate;
+
+				nextPopup(config.window.height/3*2);
+
+				immediate = setupPopup.run() || immediate;
 
 				PopFont();
 				PopFont();

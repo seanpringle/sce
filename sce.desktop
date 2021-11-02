@@ -1,0 +1,13 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=SCE
+GenericName=Text Editor
+Comment=Source code editor.
+Exec=/usr/local/bin/sce %F
+Terminal=false
+MimeType=text/plain;
+Icon=
+Categories=TextEditor;Development;
+StartupNotify=true
+Actions=new-window;new-file;

@@ -98,6 +98,14 @@ bool View::eol(int offset) {
 	return offset >= (int)text.size() || get(offset) == '\n';
 }
 
+std::string View::extract(const ViewRegion& region) {
+	std::string str;
+	for (int i = region.offset; i < region.offset+region.length && get(i); i++) {
+		str += get(i);
+	}
+	return str;
+}
+
 void View::nav() {
 	Change change;
 	change.batch = batches++;
@@ -688,7 +696,7 @@ void View::selectAll() {
 	sanity();
 }
 
-void View::intoView(ViewRegion& selection) {
+void View::intoView(const ViewRegion& selection) {
 	int lineno = text.cursor(selection.offset+selection.length).line;
 
 	while (lineno+10 > top+h) {
@@ -1013,13 +1021,33 @@ bool View::open(std::string path) {
 	undos.clear();
 	redos.clear();
 
-	int c = 0;
+	auto bytes = std::filesystem::file_size(fpath);
+	std::string raw(bytes, '\0');
+	in.read(raw.data(), bytes);
 
-	while ((c = in.get()) && c != EOF) {
-		if (c == 0xc2) {
-			text.push_back((c << 8)|in.get());
+	int at = 0;
+
+	auto more = [&]() {
+		return at < bytes;
+	};
+
+	auto next = [&]() {
+		return more() ? (int)raw[at++]: EOF;
+	};
+
+	while (more()) {
+		int c = next();
+
+		if (c == 0xc2 && !more()) {
+			notef("invalid utf8 sequence at offset %d", at-1);
 			continue;
 		}
+
+		if (c == 0xc2) {
+			text.push_back((c << 8)|next());
+			continue;
+		}
+
 		text.push_back(c);
 	}
 
@@ -1146,6 +1174,25 @@ void View::trimTailingWhite() {
 	}
 	modified = true;
 	sanity();
+}
+
+std::vector<ViewRegion> View::search(const std::string& needle) {
+	std::vector<ViewRegion> hits;
+	for (int i = 0, l = text.size(), n = needle.size(); i < l; i++) {
+		int j = 0;
+		bool hit = get(i) == needle[0];
+		for (; hit && j < l && j < n; j++) {
+			hit = hit && (needle[j] == get(i+j));
+		}
+		if (hit && j == n) {
+			hits.push_back({i,n});
+		}
+	}
+	return hits;
+}
+
+std::string View::selected() {
+	return extract(selections.front());
 }
 
 void View::save() {

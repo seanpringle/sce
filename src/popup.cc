@@ -1,6 +1,6 @@
 #include "popup.h"
 
-void Popup::run() {
+bool Popup::run() {
 	using namespace ImGui;
 	if (BeginPopup(fmtc("#%s", name))) {
 		if (activate) {
@@ -15,5 +15,8 @@ void Popup::run() {
 		}
 
 		EndPopup();
+		return immediate;
 	}
+
+	return false;
 }

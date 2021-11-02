@@ -46,4 +46,15 @@ struct Project {
 	void next();
 	void movePrev();
 	void moveNext();
+
+	std::vector<std::string> files();
+
+	struct Match {
+		std::string path;
+		std::string line;
+		ViewRegion region;
+		uint lineno;
+	};
+
+	std::vector<Match> search(std::string needle);
 };

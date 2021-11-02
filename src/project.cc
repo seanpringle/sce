@@ -2,8 +2,11 @@
 #include "project.h"
 #include "config.h"
 #include "catenate.h"
+#include "channel.h"
+#include "workers.h"
 #include <fstream>
 #include <filesystem>
+#include <regex>
 
 #include "json.hpp"
 using json = nlohmann::json;
@@ -422,4 +425,72 @@ void Project::moveNext() {
 		dst.insert(dst.begin(), view());
 	}
 	bubble();
+}
+
+std::vector<std::string> Project::files() {
+	using namespace std::filesystem;
+	std::vector<std::string> results;
+
+	std::vector<std::regex> patterns;
+
+	for (auto& pattern: ignorePatterns) {
+		try {
+			patterns.push_back(std::regex(pattern));
+		}
+		catch (const std::regex_error& e) {
+			notef("%s", e.what());
+		}
+	}
+
+	for (auto path: searchPaths) {
+		auto searchPath = weakly_canonical(path);
+
+		auto it = recursive_directory_iterator(searchPath,
+			directory_options::skip_permission_denied
+		);
+
+		for (const directory_entry& entry: it) {
+			if (!is_regular_file(entry)) continue;
+			auto entryPath = weakly_canonical(entry.path().string());
+
+			bool ignore = false;
+			for (auto path: ignorePaths) {
+				auto ignorePath = weakly_canonical(path);
+				ignore = ignore || starts_with(entryPath.string(), ignorePath.string());
+			}
+			for (auto re: patterns) {
+				ignore = ignore || std::regex_search(entryPath.string(), re);
+			}
+			if (!ignore) {
+				results.push_back(std::filesystem::canonical(entryPath.string()));
+			}
+		}
+	}
+
+	return results;
+}
+
+std::vector<Project::Match> Project::search(std::string needle) {
+	workers<8> crew;
+	channel<Match,-1> matches;
+
+	for (auto path: files()) {
+		crew.job([&,path]() {
+			View view;
+			view.open(path);
+			for (auto& region: view.search(needle)) {
+				int offset = region.offset - view.toSol(region.offset);
+				int length = view.toEol(offset);
+				matches.send({
+					.path = view.path,
+					.line = view.extract({offset,length}),
+					.region = region,
+					.lineno = view.text.cursor(offset).line,
+				});
+			}
+		});
+	}
+
+	crew.wait();
+	return matches.recv_all();
 }

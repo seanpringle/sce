@@ -106,7 +106,7 @@ struct View {
 	void selectUp();
 	void selectSkip();
 	void selectAll();
-	void intoView(ViewRegion& region);
+	void intoView(const ViewRegion& region);
 	void boundaryRight();
 	void boundaryLeft();
 	void addCursorDown();
@@ -118,6 +118,7 @@ struct View {
 	int get(int offset);
 	bool sol(int offset);
 	bool eol(int offset);
+	std::string extract(const ViewRegion& region);
 	void move(int xx, int yy, int ww, int hh);
 	void input();
 	void single();
@@ -129,4 +130,6 @@ struct View {
 	void convertTabsSoft();
 	void convertTabsHard();
 	void trimTailingWhite();
+	std::vector<ViewRegion> search(const std::string& needle);
+	std::string selected();
 };
