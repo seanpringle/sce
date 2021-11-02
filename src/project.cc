@@ -134,6 +134,14 @@ void Project::ignorePathDrop(const std::string& path) {
 	ignorePaths.erase(apath.string());
 }
 
+void Project::ignorePatternAdd(const std::string& pattern) {
+	ignorePatterns.insert(pattern);
+}
+
+void Project::ignorePatternDrop(const std::string& pattern) {
+	ignorePatterns.erase(pattern);
+}
+
 bool Project::interpret(const std::string& cmd) {
 	auto prefix = [&](const std::string& s) {
 		return cmd.find(s) == 0;
@@ -177,6 +185,7 @@ bool Project::load(const std::string path) {
 	while (views.size()) close();
 	searchPaths.clear();
 	ignorePaths.clear();
+	ignorePatterns.clear();
 	groups.clear();
 	groups.resize(1);
 	layout = 0;
@@ -197,6 +206,12 @@ bool Project::load(const std::string path) {
 
 	for (auto spath: pstate["ignorePaths"]) {
 		ignorePathAdd(spath);
+	}
+
+	if (pstate.contains("ignorePatterns")) {
+		for (auto pattern: pstate["ignorePatterns"]) {
+			ignorePatternAdd(pattern);
+		}
 	}
 
 	groups.clear();
@@ -275,6 +290,11 @@ bool Project::save(const std::string path) {
 		auto spath = std::filesystem::path(ignorePath);
 		auto apath = std::filesystem::weakly_canonical(spath);
 		pstate["ignorePaths"][i++] = apath;
+	}
+
+	i = 0;
+	for (auto ignorePattern: ignorePatterns) {
+		pstate["ignorePatterns"][i++] = ignorePattern;
 	}
 
 	out << pstate.dump(4);

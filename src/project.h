@@ -8,6 +8,7 @@ struct Project {
 	std::string ppath;
 	std::set<std::string> searchPaths;
 	std::set<std::string> ignorePaths;
+	std::set<std::string> ignorePatterns;
 	std::vector<std::vector<View*>> groups;
 	int layout = 0;
 
@@ -25,6 +26,8 @@ struct Project {
 	void searchPathDrop(const std::string& path);
 	void ignorePathAdd(const std::string& path);
 	void ignorePathDrop(const std::string& path);
+	void ignorePatternAdd(const std::string& pattern);
+	void ignorePatternDrop(const std::string& pattern);
 
 	bool interpret(const std::string& cmd);
 	bool load(const std::string path);

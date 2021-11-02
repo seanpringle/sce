@@ -14,6 +14,7 @@
 #include <filesystem>
 #include <chrono>
 #include <algorithm>
+#include <regex>
 
 using namespace std::literals::chrono_literals;
 

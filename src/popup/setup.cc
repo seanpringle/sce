@@ -110,12 +110,52 @@ void SetupPopup::render() {
 
 			EndTable();
 
+			NewLine();
+			BeginTable("#ignorePatterns", 2);
+
+			TableSetupColumn("Ignore Patterns", ImGuiTableColumnFlags_WidthStretch);
+			TableSetupColumn("");
+
+			TableHeadersRow();
+
+			std::string removeIgnorePattern;
+
+			for (auto path: project.ignorePatterns) {
+				TableNextRow();
+
+				TableNextColumn();
+				Print(path.c_str());
+
+				TableNextColumn();
+				if (Button(fmtc("remove##removeIgnorePattern%d", id++), ImVec2(width*0.25,0))) {
+					removeIgnorePattern = path;
+				}
+			}
+
+			TableNextRow();
+
+			TableNextColumn();
+			SetNextItemWidth(GetWindowContentRegionWidth());
+			InputText("##add-path-input", setupProjectAddIgnorePattern, sizeof(setupProjectAddIgnorePattern));
+
+			TableNextColumn();
+			if (Button("add##add-path-button", ImVec2(width*0.25,0)) && setupProjectAddIgnorePattern[0]) {
+				project.ignorePatternAdd(setupProjectAddIgnorePattern);
+				setupProjectAddIgnorePattern[0] = 0;
+			}
+
+			EndTable();
+
 			if (!removeSearchPath.empty()) {
 				project.searchPathDrop(removeSearchPath);
 			}
 
 			if (!removeIgnorePath.empty()) {
 				project.ignorePathDrop(removeIgnorePath);
+			}
+
+			if (!removeIgnorePattern.empty()) {
+				project.ignorePatternDrop(removeIgnorePattern);
 			}
 
 			EndTabItem();
