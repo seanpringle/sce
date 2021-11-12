@@ -1,7 +1,9 @@
 #pragma once
 
 struct FilterPopup : Popup {
+	std::mutex sync;
 	bool ready = false;
+	bool loading = false;
 	bool focus = false;
 	char input[100];
 	std::vector<std::string> options;

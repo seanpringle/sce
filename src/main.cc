@@ -325,62 +325,65 @@ int main(int argc, const char* argv[]) {
 					done = true;
 				}
 
-				if (IsKeyPressed(KeyMap[KEY_F1])) {
-					project.layout1();
-				}
+				if (!IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup)) {
 
-				if (IsKeyPressed(KeyMap[KEY_F2])) {
-					project.layout2();
-				}
-
-				if (project.view()) {
-					if (io.KeyCtrl && IsKeyPressed(KeyMap[KEY_W])) {
-						if (!project.view()->modified) {
-							project.close();
-						}
+					if (IsKeyPressed(KeyMap[KEY_F1])) {
+						project.layout1();
 					}
 
-					if (IsKeyPressed(KeyMap[KEY_F3])) {
-						auto path = std::filesystem::path(project.view()->path);
-						auto ext = path.extension().string();
-
-						auto open = [&](auto rep) {
-							auto rpath = path.replace_extension(rep).string();
-							return project.open(rpath);
-						};
-
-						if (ext == ".c") {
-							open(".h");
-						}
-						if (ext == ".cc" || ext == ".cpp") {
-							open(".hpp") ||
-							open(".h");
-						}
-						if (ext == ".h") {
-							open(".c") ||
-							open(".cc") ||
-							open(".cpp");
-						}
-						if (ext == ".hpp") {
-							open(".cpp") ||
-							open(".cc");
-						}
+					if (IsKeyPressed(KeyMap[KEY_F2])) {
+						project.layout2();
 					}
 
-					if (io.KeyCtrl && IsKeyPressed(KeyMap[KEY_SPACE])) {
-						project.cycle();
-					}
+					if (project.view()) {
+						if (io.KeyCtrl && IsKeyPressed(KeyMap[KEY_W])) {
+							if (!project.view()->modified) {
+								project.close();
+							}
+						}
 
-					if (io.KeyCtrl && io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEUP])) {
-						project.movePrev();
-					}
+						if (IsKeyPressed(KeyMap[KEY_F3])) {
+							auto path = std::filesystem::path(project.view()->path);
+							auto ext = path.extension().string();
 
-					if (io.KeyCtrl && io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEDOWN])) {
-						project.moveNext();
-					}
+							auto open = [&](auto rep) {
+								auto rpath = path.replace_extension(rep).string();
+								return project.open(rpath);
+							};
 
-					if (io.KeyCtrl && IsKeyPressed(KeyMap[KEY_N])) {
-						project.fresh();
+							if (ext == ".c") {
+								open(".h");
+							}
+							if (ext == ".cc" || ext == ".cpp") {
+								open(".hpp") ||
+								open(".h");
+							}
+							if (ext == ".h") {
+								open(".c") ||
+								open(".cc") ||
+								open(".cpp");
+							}
+							if (ext == ".hpp") {
+								open(".cpp") ||
+								open(".cc");
+							}
+						}
+
+						if (io.KeyCtrl && IsKeyPressed(KeyMap[KEY_SPACE])) {
+							project.cycle();
+						}
+
+						if (io.KeyCtrl && io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEUP])) {
+							project.movePrev();
+						}
+
+						if (io.KeyCtrl && io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEDOWN])) {
+							project.moveNext();
+						}
+
+						if (io.KeyCtrl && IsKeyPressed(KeyMap[KEY_N])) {
+							project.fresh();
+						}
 					}
 				}
 			}

@@ -7,16 +7,16 @@ FilterPopupTags::FilterPopupTags() {
 void FilterPopupTags::init() {
 	regions.clear();
 	if (project.views.size()) {
-		auto view = project.view();
-		auto it = view->text.begin();
-		regions = view->syntax->tags(view->text);
+		view = project.view();
+		View tmp;
+		tmp.open(view->path);
+		regions = tmp.syntax->tags(tmp.text);
 		for (auto region: regions) {
-			auto tag = std::string(it+region.offset, it+region.offset+region.length);
-			options.push_back(tag);
+			options.push_back(tmp.extract(region));
 		}
 	}
 }
 
 void FilterPopupTags::chosen(int option) {
-	project.view()->single(regions[option]);
+	view->single(regions[option]);
 }

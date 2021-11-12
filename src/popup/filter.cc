@@ -27,24 +27,37 @@ void FilterPopup::selectNavigate() {
 }
 
 void FilterPopup::setup() {
-	using namespace ImGui;
-	SetKeyboardFocusHere();
-	options.clear();
-	visible.clear();
-	selected = 0;
-	input[0] = 0;
-	ready = false;
-	focus = false;
-	immediate = true;
-	crew.job([&]() {
-		init();
-		ready = true;
-	});
+	sync.lock();
+	if (!loading) {
+		loading = true;
+		options.clear();
+		visible.clear();
+		selected = 0;
+		input[0] = 0;
+		ready = false;
+		focus = false;
+		immediate = true;
+		crew.job([&]() {
+			init();
+			sync.lock();
+			ready = true;
+			loading = false;
+			sync.unlock();
+		});
+	}
+	sync.unlock();
 }
 
 void FilterPopup::render() {
 	using namespace ImGui;
-	if (!ready) return;
+
+	sync.lock();
+	if (!ready) {
+		Print("Loading...");
+		sync.unlock();
+		return;
+	}
+	sync.unlock();
 
 	immediate = false;
 
