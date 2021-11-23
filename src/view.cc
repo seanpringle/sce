@@ -3,6 +3,7 @@
 #include "syntax.h"
 #include "syntax/cpp.h"
 #include "syntax/ini.h"
+#include "syntax/xml.h"
 #include "syntax/make.h"
 #include "syntax/cmake.h"
 #include "syntax/openscad.h"
@@ -889,6 +890,12 @@ bool View::interpret(const std::string& cmd) {
 			return true;
 		}
 
+		if (name == "xml") {
+			delete syntax;
+			syntax = new XML();
+			return true;
+		}
+
 		if (name == "make") {
 			delete syntax;
 			syntax = new Make();
@@ -1094,6 +1101,10 @@ bool View::open(std::string path) {
 	else
 	if ((std::set<std::string>{".ini"}).count(ext)) {
 		syntax = new INI();
+	}
+	else
+	if ((std::set<std::string>{".xml", ".html"}).count(ext)) {
+		syntax = new XML();
 	}
 	else
 	if ((std::set<std::string>{".f"}).count(ext)) {
