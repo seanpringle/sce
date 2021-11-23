@@ -133,7 +133,11 @@ void View::undo() {
 			// find the spot and remove the region
 			auto it = text.begin()+change.offset;
 			std::vector<int> s = {it,it+change.length};
-			ensuref(s == change.text, "[%s] != [%s]", s, change.text);
+			if (s != change.text) {
+				notef("undo: [%s] != [%s]", s, change.text);
+				undos.clear();
+				break;
+			}
 			text.erase(it, it+change.length);
 		}
 
@@ -183,7 +187,11 @@ void View::redo() {
 			// find the spot and remove the region
 			auto it = text.begin()+change.offset;
 			std::vector<int> s = {it,it+change.length};
-			ensure(s == change.text);
+			if (s != change.text) {
+				notef("redo: [%s] != [%s]", s, change.text);
+				redos.clear();
+				break;
+			}
 			text.erase(it, it+change.length);
 		}
 
@@ -927,6 +935,16 @@ bool View::interpret(const std::string& cmd) {
 		}
 	}
 
+	if (cmd == "lower") {
+		convertLower();
+		return true;
+	}
+
+	if (cmd == "upper") {
+		convertUpper();
+		return true;
+	}
+
 	return false;
 }
 
@@ -998,7 +1016,7 @@ void View::input() {
 	if (mouseOver && (io.MouseWheel > 0.0f || io.MouseWheel < 0.0f)) {
 		auto now = std::chrono::system_clock::now();
 		auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now-lastWheel);
-		int steps = ms < config.mouse.wheelSpeedStep ? 5: 1;
+		int steps = (ms < config.mouse.wheelSpeedStep ? 5: 1) * std::abs(io.MouseWheel);
 		if (io.MouseWheel > 0) { for (int i = 0; i < steps; i++) up(); }
 		if (io.MouseWheel < 0) { for (int i = 0; i < steps; i++) down(); }
 		lastWheel = now;
@@ -1162,6 +1180,38 @@ void View::convertTabsHard() {
 			i--;
 		}
 	}
+	modified = true;
+	sanity();
+}
+
+void View::convertUpper() {
+	auto state = selections;
+	for (auto& selection: state) {
+		for (int i = 0, l = selection.length; i < l; i++) {
+			ViewRegion region = {selection.offset+i,0};
+			int c = get(region.offset);
+			if (isupper(c)) continue;
+			delAt(region);
+			insertAt(region, upper(c), false);
+		}
+	}
+	selections = state;
+	modified = true;
+	sanity();
+}
+
+void View::convertLower() {
+	auto state = selections;
+	for (auto& selection: state) {
+		for (int i = 0, l = selection.length; i < l; i++) {
+			ViewRegion region = {selection.offset+i,0};
+			int c = get(region.offset);
+			if (islower(c)) continue;
+			delAt(region);
+			insertAt(region, lower(c), false);
+		}
+	}
+	selections = state;
 	modified = true;
 	sanity();
 }

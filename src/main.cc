@@ -1,9 +1,8 @@
 
 #include "../imgui/imgui.h"
 #include "../imgui/imgui_impl_sdl.h"
-#include "../imgui/imgui_impl_opengl3.h"
+#include "../imgui/imgui_impl_sdlrenderer.h"
 #include <SDL.h>
-#include <GL/glew.h>
 
 #include "theme.h"
 #include "config.h"
@@ -153,26 +152,15 @@ int main(int argc, const char* argv[]) {
 
 	ensuref(0 == SDL_Init(SDL_INIT_VIDEO|SDL_INIT_EVENTS), "%s", SDL_GetError());
 
-	const char* glsl_version = "#version 330";
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 3);
-	SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 3);
-
-	auto window_flags = (SDL_WindowFlags)(SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI);
-
 	SDL_Window* window = SDL_CreateWindow("SCE",
 		SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED,
 		config.window.width, config.window.height,
-		window_flags
+		SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI
 	);
 
-	SDL_GLContext gl_context = SDL_GL_CreateContext(window);
-	SDL_GL_MakeCurrent(window, gl_context);
-
-	if (config.window.vsync) {
-		SDL_GL_SetSwapInterval(1);
-	}
-
-	ensuref(GLEW_OK == glewInit(), "glew fail");
+	uint32_t flags = SDL_RENDERER_ACCELERATED;
+	if (config.window.vsync) flags |= SDL_RENDERER_PRESENTVSYNC;
+	SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, flags);
 
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
@@ -183,8 +171,8 @@ int main(int argc, const char* argv[]) {
 
 	ImGui::StyleColorsClassic();
 
-	ImGui_ImplSDL2_InitForOpenGL(window, gl_context);
-	ImGui_ImplOpenGL3_Init(glsl_version);
+	ImGui_ImplSDL2_InitForSDLRenderer(window);
+	ImGui_ImplSDLRenderer_Init(renderer);
 
 	float ddpi = 0.0f;
 	float hdpi = 0.0f;
@@ -228,8 +216,8 @@ int main(int argc, const char* argv[]) {
 
 	fonts->Build();
 
-	ImGui_ImplOpenGL3_DestroyFontsTexture();
-	ImGui_ImplOpenGL3_CreateFontsTexture();
+	ImGui_ImplSDLRenderer_DestroyFontsTexture();
+	ImGui_ImplSDLRenderer_CreateFontsTexture();
 
 	ImVec4 clear_color = ImVec4(0,0,0,1);
 
@@ -295,7 +283,7 @@ int main(int argc, const char* argv[]) {
 
 		SDL_GetWindowSize(window, &config.window.width, &config.window.height);
 
-		ImGui_ImplOpenGL3_NewFrame();
+		ImGui_ImplSDLRenderer_NewFrame();
 		ImGui_ImplSDL2_NewFrame(window);
 		ImGui::NewFrame();
 
@@ -598,11 +586,11 @@ int main(int argc, const char* argv[]) {
 		}
 
 		ImGui::Render();
-		glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
-		glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
-		glClear(GL_COLOR_BUFFER_BIT);
-		ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-		SDL_GL_SwapWindow(window);
+		//glViewport(0, 0, (int)io.DisplaySize.x, (int)io.DisplaySize.y);
+		//glClearColor(clear_color.x * clear_color.w, clear_color.y * clear_color.w, clear_color.z * clear_color.w, clear_color.w);
+		//glClear(GL_COLOR_BUFFER_BIT);
+		ImGui_ImplSDLRenderer_RenderDrawData(ImGui::GetDrawData());
+		SDL_RenderPresent(renderer);
 	}
 
 	if (project.ppath.empty()) {
@@ -611,11 +599,11 @@ int main(int argc, const char* argv[]) {
 
 	project.save();
 
-	ImGui_ImplOpenGL3_Shutdown();
+	ImGui_ImplSDLRenderer_Shutdown();
 	ImGui_ImplSDL2_Shutdown();
 	ImGui::DestroyContext();
 
-	SDL_GL_DeleteContext(gl_context);
+	SDL_DestroyRenderer(renderer);
 	SDL_DestroyWindow(window);
 	SDL_Quit();
 

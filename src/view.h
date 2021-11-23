@@ -129,6 +129,8 @@ struct View {
 	bool interpret(const std::string& cmd);
 	void convertTabsSoft();
 	void convertTabsHard();
+	void convertLower();
+	void convertUpper();
 	void trimTailingWhite();
 	std::vector<ViewRegion> search(const std::string& needle);
 	std::string selected();

@@ -8,7 +8,7 @@
 #include "imgui_tables.cpp"
 #include "imgui_freetype.cpp"
 #include "imgui_impl_sdl.cpp"
-#include "imgui_impl_opengl3.cpp"
+#include "imgui_impl_sdlrenderer.cpp"
 
 #include <string>
 
