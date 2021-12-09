@@ -11,6 +11,7 @@ struct Project {
 	std::set<std::string> ignorePatterns;
 	std::vector<std::vector<View*>> groups;
 	int layout = 0;
+	bool autosave = true;
 
 	Project();
 	~Project();

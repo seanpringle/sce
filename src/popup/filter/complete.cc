@@ -7,10 +7,7 @@ FilterPopupComplete::FilterPopupComplete() {
 void FilterPopupComplete::init() {
 	prefix.clear();
 	if (project.views.size()) {
-		auto view = project.view();
-		View tmp;
-		tmp.open(view->path);
-		tmp.selections = view->selections;
+		View tmp = *project.view();
 		options = tmp.autocomplete();
 		if (options.size()) {
 			prefix = options.front();

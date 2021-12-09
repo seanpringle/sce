@@ -245,6 +245,7 @@ int main(int argc, const char* argv[]) {
 
 			if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
 				lostFocus = now();
+				if (project.autosave) project.save();
 			}
 
 			immediate = ImGui_ImplSDL2_ProcessEvent(&event);

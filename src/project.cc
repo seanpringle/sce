@@ -193,6 +193,10 @@ bool Project::load(const std::string path) {
 	groups.resize(1);
 	layout = 0;
 
+	if (pstate.contains("autosave")) {
+		autosave = pstate["autosave"];
+	}
+
 	for (auto vstate: pstate["views"]) {
 		auto view = open(vstate["path"]);
 		if (!view) continue;
@@ -250,9 +254,11 @@ bool Project::save(const std::string path) {
 	if (!out) return false;
 
 	json pstate;
+	pstate["autosave"] = autosave;
 
 	int i = 0;
 	for (auto view: views) {
+		view->save();
 		auto vpath = std::filesystem::path(view->path);
 		auto apath = std::filesystem::weakly_canonical(vpath);
 		json vstate;
@@ -444,6 +450,7 @@ std::vector<std::string> Project::files() {
 
 	for (auto path: searchPaths) {
 		auto searchPath = weakly_canonical(path);
+		if (!exists(searchPath)) continue;
 
 		auto it = recursive_directory_iterator(searchPath,
 			directory_options::skip_permission_denied
@@ -474,23 +481,33 @@ std::vector<Project::Match> Project::search(std::string needle) {
 	workers<8> crew;
 	channel<Match,-1> matches;
 
-	for (auto path: files()) {
-		crew.job([&,path]() {
-			View view;
-			view.open(path);
-			for (auto& region: view.search(needle)) {
-				int offset = region.offset - view.toSol(region.offset);
-				int length = view.toEol(offset);
+	std::vector<View*> state;
+
+	for (auto view: views) {
+		state.push_back(new View);
+		*state.back() = *view;
+	}
+
+	for (auto view: state) {
+		crew.job([&,view]() {
+			for (auto& region: view->search(needle)) {
+				int offset = region.offset - view->toSol(region.offset);
+				int length = view->toEol(offset);
 				matches.send({
-					.path = view.path,
-					.line = view.extract({offset,length}),
+					.path = view->path,
+					.line = view->extract({offset,length}),
 					.region = region,
-					.lineno = view.text.cursor(offset).line,
+					.lineno = view->text.cursor(offset).line,
 				});
 			}
 		});
 	}
 
 	crew.wait();
+
+	for (auto view: state) {
+		delete view;
+	}
+
 	return matches.recv_all();
 }

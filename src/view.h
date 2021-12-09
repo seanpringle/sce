@@ -66,7 +66,11 @@ struct View {
 
 	View();
 	~View();
+	View(const View& other);
+	View& operator=(const View& other);
 	bool open(std::string path);
+	bool open(View* other);
+	void autosyntax();
 	void save();
 	void reload();
 	void nav();

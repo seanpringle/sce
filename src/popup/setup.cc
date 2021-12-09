@@ -146,6 +146,8 @@ void SetupPopup::render() {
 
 			EndTable();
 
+			Checkbox("Automatic save when window loses focus?", &project.autosave);
+
 			if (!removeSearchPath.empty()) {
 				project.searchPathDrop(removeSearchPath);
 			}

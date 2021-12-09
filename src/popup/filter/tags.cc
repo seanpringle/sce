@@ -8,8 +8,7 @@ void FilterPopupTags::init() {
 	regions.clear();
 	if (project.views.size()) {
 		view = project.view();
-		View tmp;
-		tmp.open(view->path);
+		View tmp = *view;
 		regions = tmp.syntax->tags(tmp.text);
 		for (auto region: regions) {
 			options.push_back(tmp.extract(region));

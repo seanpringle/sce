@@ -9,6 +9,17 @@ struct Doc {
 	Doc(std::initializer_list<int> l) {
 		for (auto v: l) push_back(v);
 	}
+	Doc(const Doc& other) {
+		operator=(other);
+	}
+
+	Doc& operator=(const Doc& other) {
+		clear();
+		count = other.count;
+		lines = other.lines;
+		last = other.last;
+		return *this;
+	}
 
 	uint count = 0;
 	std::vector<std::vector<int>> lines;
