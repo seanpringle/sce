@@ -27,6 +27,7 @@ struct Syntax {
 		Namespace,
 		Operator,
 		Indent,
+		Variable,
 	};
 
 	virtual ~Syntax() {};

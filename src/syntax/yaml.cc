@@ -28,7 +28,7 @@ Syntax::Token YAML::next(const Doc& text, int cursor, Syntax::Token token) {
 		case Token::None: {
 
 			if (isField(text, cursor)) {
-				return Token::Namespace;
+				return Token::Variable;
 			}
 
 			if (get(text, cursor) == '#') {
@@ -38,7 +38,7 @@ Syntax::Token YAML::next(const Doc& text, int cursor, Syntax::Token token) {
 			break;
 		}
 
-		case Token::Namespace: {
+		case Token::Variable: {
 			if (get(text, cursor) == ':')
 				return next(text, cursor, Token::None);
 			break;

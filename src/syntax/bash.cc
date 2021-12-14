@@ -53,6 +53,12 @@ Syntax::Token Bash::next(const Doc& text, int cursor, Syntax::Token token) {
 				if (get(text, cursor+len) == '(') return Token::Call;
 			}
 
+			if (isname(get(text, cursor))) {
+				int len = 0;
+				while (isname(get(text, cursor+len))) len++;
+				if (get(text, cursor+len) == '=') return Token::Variable;
+			}
+
 			break;
 		}
 
@@ -73,6 +79,11 @@ Syntax::Token Bash::next(const Doc& text, int cursor, Syntax::Token token) {
 
 		case Token::Call: {
 			if (isboundary(get(text, cursor))) return next(text, cursor, Token::None);
+			break;
+		}
+
+		case Token::Variable: {
+			if (get(text, cursor) == '=') return next(text, cursor, Token::None);
 			break;
 		}
 

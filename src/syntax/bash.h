@@ -12,6 +12,7 @@ struct Bash : Syntax {
 	const std::set<std::string, std::less<>> keywords = {
 		"for",
 		"do",
+		"done",
 		"if",
 		"fi",
 		"then",

@@ -9,6 +9,7 @@ Theme::Theme() {
 	uint type = 0x66c8ffff;
 	uint call = 0x66c8ffff;
 	uint func = 0x40cc40ff;
+	uint var = 0xdd9966ff;
 	uint op = 0xffdd88ff;
 	uint ns = 0x40c2bbff;
 	uint constant = 0xb695c0ff;
@@ -88,6 +89,11 @@ Theme::Theme() {
 	highlight[Syntax::Token::Function][State::Selected] = highlight[Syntax::Token::None][State::Selected];
 
 	highlight[Syntax::Token::Function][State::Plain].fg = func;
+
+	highlight[Syntax::Token::Variable][State::Plain] = highlight[Syntax::Token::None][State::Plain];
+	highlight[Syntax::Token::Variable][State::Selected] = highlight[Syntax::Token::None][State::Selected];
+
+	highlight[Syntax::Token::Variable][State::Plain].fg = var;
 
 	highlight[Syntax::Token::Operator][State::Plain] = highlight[Syntax::Token::None][State::Plain];
 	highlight[Syntax::Token::Operator][State::Selected] = highlight[Syntax::Token::None][State::Selected];

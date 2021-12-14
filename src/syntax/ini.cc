@@ -30,7 +30,7 @@ Syntax::Token INI::next(const Doc& text, int cursor, Syntax::Token token) {
 			}
 
 			if (iswalpha(get(text, cursor)) && (!cursor || get(text, cursor-1) == '\n')) {
-				return Token::Type;
+				return Token::Variable;
 			}
 
 			if (get(text, cursor) == ';') {
@@ -46,7 +46,7 @@ Syntax::Token INI::next(const Doc& text, int cursor, Syntax::Token token) {
 			break;
 		}
 
-		case Token::Type: {
+		case Token::Variable: {
 			if (isspace(get(text, cursor)))
 				return next(text, cursor, Token::None);
 			break;

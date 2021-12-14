@@ -362,6 +362,8 @@ Syntax::Token CPP::next(const Doc& text, int cursor, Syntax::Token token) {
 				if (rget(len) == '(') return Token::Call;
 				if (rget(len) == '<') return Token::Type;
 				if (rget(len) == ':' && rget(len+1) == ':') return Token::Namespace;
+				while (rget(len) && isspace(rget(len))) len++;
+				if (rget(len) == '=' && rget(len+1) != '=') return Token::Variable;
 			}
 
 			if (isoperator(rget())) {
@@ -438,6 +440,11 @@ Syntax::Token CPP::next(const Doc& text, int cursor, Syntax::Token token) {
 		}
 
 		case Token::Function: {
+			if (!isname(rget())) return next(text, cursor, Token::None);
+			break;
+		}
+
+		case Token::Variable: {
 			if (!isname(rget())) return next(text, cursor, Token::None);
 			break;
 		}
