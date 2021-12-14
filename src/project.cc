@@ -258,7 +258,7 @@ bool Project::save(const std::string path) {
 
 	int i = 0;
 	for (auto view: views) {
-		view->save();
+		if (view->modified) view->save();
 		auto vpath = std::filesystem::path(view->path);
 		auto apath = std::filesystem::weakly_canonical(vpath);
 		json vstate;

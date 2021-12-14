@@ -3,6 +3,7 @@
 #include "syntax.h"
 #include "syntax/cpp.h"
 #include "syntax/ini.h"
+#include "syntax/yaml.h"
 #include "syntax/xml.h"
 #include "syntax/make.h"
 #include "syntax/cmake.h"
@@ -916,6 +917,12 @@ bool View::interpret(const std::string& cmd) {
 			return true;
 		}
 
+		if (name == "yaml") {
+			delete syntax;
+			syntax = new YAML();
+			return true;
+		}
+
 		if (name == "xml") {
 			delete syntax;
 			syntax = new XML();
@@ -1053,6 +1060,7 @@ void View::autosyntax() {
 
 	auto fpath = std::filesystem::weakly_canonical(path);
 	auto ext = fpath.extension().string();
+	auto stem = fpath.stem().string();
 	auto name = fpath.filename().string();
 
 	std::string line = {text.begin(), text.begin() + toEol(0)};
@@ -1077,6 +1085,10 @@ void View::autosyntax() {
 		syntax = new INI();
 	}
 	else
+	if ((std::set<std::string>{".yaml",".yml"}).count(ext)) {
+		syntax = new YAML();
+	}
+	else
 	if ((std::set<std::string>{".xml", ".html"}).count(ext)) {
 		syntax = new XML();
 	}
@@ -1089,7 +1101,7 @@ void View::autosyntax() {
 		syntax = new CMake();
 	}
 	else
-	if (name == "Makefile") {
+	if (stem == "Makefile") {
 		syntax = new Make();
 	}
 	else {
