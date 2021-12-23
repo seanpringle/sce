@@ -575,6 +575,7 @@ void View::left() {
 }
 
 void View::home() {
+	shrink();
 	for (auto& selection: selections) {
 		while (!sol(selection.offset)) selection.offset--;
 	}
@@ -582,6 +583,7 @@ void View::home() {
 }
 
 void View::end() {
+	shrink();
 	for (auto& selection: selections) {
 		while (!eol(selection.offset)) selection.offset++;
 	}
@@ -778,6 +780,12 @@ void View::single(ViewRegion& selection) {
 	single();
 	selections = {selection};
 	sanity();
+}
+
+void View::shrink() {
+	for (auto& selection: selections) {
+		selection.length = 0;
+	}
 }
 
 void View::addCursorDown() {

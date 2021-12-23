@@ -127,6 +127,7 @@ struct View {
 	void input();
 	void single();
 	void single(ViewRegion& selection);
+	void shrink();
 	bool indent();
 	bool outdent();
 	std::vector<std::string> autocomplete();

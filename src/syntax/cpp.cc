@@ -296,12 +296,24 @@ bool CPP::matchFunction(const Doc& text, int cursor) {
 }
 
 Syntax::Token CPP::first(const Doc& text, int cursor) {
-	bool guessMultiLineComment =
-		(get(text, cursor) == '*' && get(text, cursor+1) == '/') ||
-		(get(text, cursor) == '*' && get(text, cursor+1) == '*') ||
-		(get(text, cursor) == ' ' && get(text, cursor+1) == '*')
-	;
-	return guessMultiLineComment ? Token::CommentBlock: Token::None;
+
+	for (int i = cursor; i > 0 && i > cursor-1000; --i) {
+		auto a = get(text, i-1);
+		auto b = get(text, i);
+		if (a == '*' && b == '/') break;
+		if (a == '/' && b == '*') return Token::CommentBlock;
+		if (a == '*' && b == '*') return Token::CommentBlock;
+	}
+
+	for (int i = cursor; i < ((int)text.size())-1 && i < cursor+1000; i++) {
+		auto a = get(text, i);
+		auto b = get(text, i+1);
+		if (a == '/' && b == '*') break;
+		if (a == '*' && b == '/') return Token::CommentBlock;
+		if (a == '*' && b == '*') return Token::CommentBlock;
+	}
+
+	return Token::None;
 }
 
 Syntax::Token CPP::next(const Doc& text, int cursor, Syntax::Token token) {
