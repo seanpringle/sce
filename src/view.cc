@@ -10,6 +10,7 @@
 #include "syntax/openscad.h"
 #include "syntax/bash.h"
 #include "syntax/forth.h"
+#include "syntax/rela.h"
 #include "syntax/plaintext.h"
 #include "theme.h"
 #include "config.h"
@@ -961,6 +962,18 @@ bool View::interpret(const std::string& cmd) {
 			return true;
 		}
 
+		if (name == "forth") {
+			delete syntax;
+			syntax = new Forth();
+			return true;
+		}
+
+		if (name == "rela") {
+			delete syntax;
+			syntax = new Rela();
+			return true;
+		}
+
 		if (name == "plaintext") {
 			delete syntax;
 			syntax = new PlainText();
@@ -1103,6 +1116,10 @@ void View::autosyntax() {
 	else
 	if ((std::set<std::string>{".f"}).count(ext)) {
 		syntax = new Forth();
+	}
+	else
+	if ((std::set<std::string>{".rela"}).count(ext)) {
+		syntax = new Rela();
 	}
 	else
 	if (name == "CMakeLists.txt") {

@@ -278,6 +278,7 @@ struct Doc {
 		if (!lines.size()) {
 			lines.push_back({v});
 			count++;
+			if (v == '\n') lines.push_back({});
 			return begin();
 		}
 		if (it == end() && v != '\n') {

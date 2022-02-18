@@ -84,7 +84,7 @@ std::vector<std::string> CPP::matches(const Doc& text, int cursor) {
 }
 
 bool CPP::isoperator(int c) {
-	return strchr("+-*/%=<>&|^!?:", c);
+	return strchr("+-*%/=<>&|^!?:", c);
 }
 
 bool CPP::word(const Doc& text, int cursor, const std::string& name) {
@@ -302,7 +302,7 @@ Syntax::Token CPP::first(const Doc& text, int cursor) {
 		auto b = get(text, i);
 		if (a == '*' && b == '/') break;
 		if (a == '/' && b == '*') return Token::CommentBlock;
-		if (a == '*' && b == '*') return Token::CommentBlock;
+		if (a == '*' && b == '*' && get(text, i-2) == '\n') return Token::CommentBlock;
 	}
 
 	for (int i = cursor; i < ((int)text.size())-1 && i < cursor+1000; i++) {
@@ -310,7 +310,7 @@ Syntax::Token CPP::first(const Doc& text, int cursor) {
 		auto b = get(text, i+1);
 		if (a == '/' && b == '*') break;
 		if (a == '*' && b == '/') return Token::CommentBlock;
-		if (a == '*' && b == '*') return Token::CommentBlock;
+		if (a == '*' && b == '*' && get(text, i-1) == '\n') return Token::CommentBlock;
 	}
 
 	return Token::None;

@@ -10,7 +10,7 @@ bool Syntax::isboundary(int c) {
 }
 
 bool Syntax::isoperator(int c) {
-	return strchr("+-*/%=<>", c);
+	return strchr("+-*%/=<>", c);
 }
 
 int Syntax::get(const Doc& text, int cursor) {
@@ -66,4 +66,5 @@ bool Syntax::hintMatchedPair(const Doc& text, int cursor, const ViewRegion& sele
 #include "syntax/openscad.cc"
 #include "syntax/bash.cc"
 #include "syntax/forth.cc"
+#include "syntax/rela.cc"
 #include "syntax/plaintext.cc"

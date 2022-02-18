@@ -9,7 +9,7 @@ bool Forth::isboundary(int c) {
 }
 
 bool Forth::isoperator(int c) {
-	return strchr("+-*/%=<>@!&|^~", c);
+	return strchr("+-*%/=<>@!&|^~", c);
 }
 
 std::vector<ViewRegion> Forth::tags(const Doc& text) {
