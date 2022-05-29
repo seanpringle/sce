@@ -1,6 +1,7 @@
 #pragma once
 
 #include "view.h"
+#include <map>
 
 struct Project {
 	int active = 0;
@@ -39,9 +40,6 @@ struct Project {
 	int group(View* view);
 	void bubble();
 
-	void layout1();
-	void layout2();
-
 	void cycle();
 	void prev();
 	void next();
@@ -58,4 +56,17 @@ struct Project {
 	};
 
 	std::vector<Match> search(std::string needle);
+
+	std::map<std::string,std::vector<std::string>> related = {
+		{".c", {".h"}},
+		{".cc", {".h", ".hpp"}},
+		{".cpp", {".h", ".hpp"}},
+		{".h", {".c", ".cc", ".cpp"}},
+		{".hpp", {".cpp", ".cc"}},
+	};
+
+	void layout1();
+	void layout2();
+	void relatedOpen();
+	void relatedRaise();
 };

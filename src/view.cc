@@ -1090,7 +1090,7 @@ void View::autosyntax() {
 		return line.find(sub) != std::string::npos;
 	};
 
-	if ((std::set<std::string>{".cc", ".cpp", ".cxx", ".c", ".h", ".hpp", ".fs", ".vs"}).count(ext)) {
+	if ((std::set<std::string>{".cc", ".cpp", ".cxx", ".c", ".h", ".hpp", ".fs", ".vs", ".ct"}).count(ext)) {
 		syntax = new CPP();
 	}
 	else
@@ -1114,11 +1114,11 @@ void View::autosyntax() {
 		syntax = new XML();
 	}
 	else
-	if ((std::set<std::string>{".f"}).count(ext)) {
+	if ((std::set<std::string>{".f", ".4th"}).count(ext)) {
 		syntax = new Forth();
 	}
 	else
-	if ((std::set<std::string>{".rela"}).count(ext)) {
+	if ((std::set<std::string>{".rela", ".lua"}).count(ext)) {
 		syntax = new Rela();
 	}
 	else
@@ -1215,6 +1215,7 @@ void View::convertTabsSoft() {
 			}
 		}
 	}
+	tabs.hard = false;
 	modified = true;
 	sanity();
 }
@@ -1241,6 +1242,7 @@ void View::convertTabsHard() {
 			i--;
 		}
 	}
+	tabs.hard = true;
 	modified = true;
 	sanity();
 }

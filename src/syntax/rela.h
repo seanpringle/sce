@@ -17,7 +17,15 @@ struct Rela : Syntax {
 		"end",
 		"while",
 		"return",
+		"in",
+		"do",
+		"then",
+		"local",
+		"pairs",
+		"ipairs",
 	};
+
+	bool isoperator(int c) override;
 
 	bool keyword(const Doc& text, int offset);
 	bool comment(const Doc& text, int offset);

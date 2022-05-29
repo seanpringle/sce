@@ -41,6 +41,10 @@ Syntax::Token Forth::next(const Doc& text, int cursor, Syntax::Token token) {
 				return Token::Function;
 			}
 
+			if (get(text, cursor) == '"') {
+				return Token::StringStart;
+			}
+
 			if (isoperator(get(text, cursor))) {
 				return Token::Operator;
 			}
@@ -74,6 +78,16 @@ Syntax::Token Forth::next(const Doc& text, int cursor, Syntax::Token token) {
 			if (!isoperator(get(text, cursor))) {
 				return next(text, cursor, Token::None);
 			}
+			break;
+		}
+
+		case Token::StringStart: {
+			if (get(text, cursor) == '"' && (get(text, cursor-1) != '\\' || get(text, cursor-2) == '\\')) return Token::StringFinish;
+			break;
+		}
+
+		case Token::StringFinish: {
+			return next(text, cursor, Token::None);
 			break;
 		}
 

@@ -25,6 +25,10 @@ bool Rela::comment(const Doc& text, int cursor) {
 	return false;
 }
 
+bool Rela::isoperator(int c) {
+	return strchr("+-*%/=<>&|^!?:", c);
+}
+
 // is cursor on a module name
 bool Rela::matchFunction(const Doc& text, int cursor) {
 	auto c = [&](int offset = 0) {
@@ -75,6 +79,10 @@ Syntax::Token Rela::next(const Doc& text, int cursor, Syntax::Token token) {
 				return Token::Comment;
 			}
 
+			if (get(text, cursor) == '-' && get(text, cursor+1) == '-') {
+				return Token::Comment;
+			}
+
 			if (get(text, cursor) == '"') {
 				return Token::StringStart;
 			}
@@ -91,6 +99,12 @@ Syntax::Token Rela::next(const Doc& text, int cursor, Syntax::Token token) {
 				int len = 0;
 				while (isname(get(text, cursor+len))) len++;
 				if (get(text, cursor+len) == '(') return Token::Call;
+				while (get(text, cursor+len) && isspace(get(text, cursor+len))) len++;
+				if (get(text, cursor+len) == '=' && get(text, cursor+len+1) != '=') return Token::Variable;
+			}
+
+			if (isoperator(get(text, cursor))) {
+				return Token::Operator;
 			}
 
 			break;
@@ -128,6 +142,16 @@ Syntax::Token Rela::next(const Doc& text, int cursor, Syntax::Token token) {
 
 		case Token::Function: {
 			if (!isname(get(text, cursor))) return next(text, cursor, Token::None);
+			break;
+		}
+
+		case Token::Variable: {
+			if (!isname(get(text, cursor))) return next(text, cursor, Token::None);
+			break;
+		}
+
+		case Token::Operator: {
+			if (!isoperator(get(text, cursor))) return next(text, cursor, Token::None);
 			break;
 		}
 

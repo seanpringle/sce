@@ -169,7 +169,7 @@ void ImGui_ImplSDLRenderer_RenderDrawData(ImDrawData* draw_data)
 
                 const float* xy = (const float*)((const char*)vtx_buffer + IM_OFFSETOF(ImDrawVert, pos));
                 const float* uv = (const float*)((const char*)vtx_buffer + IM_OFFSETOF(ImDrawVert, uv));
-                const int* color = (const int*)((const char*)vtx_buffer + IM_OFFSETOF(ImDrawVert, col));
+                SDL_Color* color = (SDL_Color*)((const char*)vtx_buffer + IM_OFFSETOF(ImDrawVert, col));
 
                 // Bind texture, Draw
 				SDL_Texture* tex = (SDL_Texture*)pcmd->GetTexID();

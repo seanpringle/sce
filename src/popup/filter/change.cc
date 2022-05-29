@@ -7,26 +7,29 @@ FilterPopupChange::FilterPopupChange() {
 void FilterPopupChange::init() {
 	using namespace std::filesystem;
 
+	auto walk = [&](auto path) {
+		auto it = directory_iterator(path,
+			directory_options::skip_permission_denied
+		);
+
+		for (const directory_entry& entry: it) {
+			try {
+				if (!is_regular_file(entry)) continue;
+			} catch (std::filesystem::filesystem_error e) {
+				continue;
+			}
+			auto ext = entry.path().extension().string();
+			auto name = entry.path().filename().string();
+			if (ext == ".sce-project" || name == ".sce-project") {
+				options.push_back(canonical(entry.path().string()).string());
+			}
+		}
+	};
+
 	auto HOME = std::getenv("HOME");
-	auto path = weakly_canonical(HOME);
 
-	auto it = recursive_directory_iterator(path,
-		directory_options::skip_permission_denied
-	);
-
-	for (const directory_entry& entry: it) {
-		try {
-			if (!is_regular_file(entry)) continue;
-		} catch (std::filesystem::filesystem_error e) {
-			continue;
-		}
-		if (it.depth() >= 3) it.disable_recursion_pending();
-		auto ext = entry.path().extension().string();
-		auto name = entry.path().filename().string();
-		if (ext == ".sce-project" || name == ".sce-project") {
-			options.push_back(canonical(entry.path().string()).string());
-		}
-	}
+	walk(weakly_canonical(HOME));
+	walk(weakly_canonical(fmt("%s/src", HOME)));
 
 	std::sort(options.begin(), options.end());
 }

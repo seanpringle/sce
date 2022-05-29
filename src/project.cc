@@ -346,30 +346,6 @@ void Project::bubble() {
 	}
 }
 
-void Project::layout1() {
-	groups.clear();
-	groups.resize(1);
-	layout = 1;
-	for (auto view: views) {
-		groups[0].push_back(view);
-	}
-	bubble();
-}
-
-void Project::layout2() {
-	groups.clear();
-	groups.resize(2);
-	layout = 2;
-	for (auto view: views) {
-		auto path = std::filesystem::path(view->path);
-		auto ext = path.extension().string();
-		if (ext.front() == '.') ext = ext.substr(1);
-		int g = config.layout2.left.count(ext) ? 0:1;
-		groups[g].push_back(view);
-	}
-	bubble();
-}
-
 void Project::cycle() {
 	if (groups.size() < 2U) return;
 
@@ -510,4 +486,66 @@ std::vector<Project::Match> Project::search(std::string needle) {
 	}
 
 	return matches.recv_all();
+}
+
+void Project::layout1() {
+	groups.clear();
+	groups.resize(1);
+	layout = 1;
+	for (auto view: views) {
+		groups[0].push_back(view);
+	}
+	bubble();
+}
+
+void Project::layout2() {
+	groups.clear();
+	groups.resize(2);
+	layout = 2;
+	for (auto view: views) {
+		auto path = std::filesystem::path(view->path);
+		auto ext = path.extension().string();
+		if (ext.front() == '.') ext = ext.substr(1);
+		int g = config.layout2.left.count(ext) ? 0:1;
+		groups[g].push_back(view);
+	}
+
+	auto current = active;
+	relatedRaise();
+
+	active = current;
+	bubble();
+}
+
+void Project::relatedRaise() {
+	auto path = std::filesystem::path(view()->path);
+	auto ext = path.extension().string();
+
+	auto other = [&](auto rep) {
+		auto rpath = path.replace_extension(rep).string();
+		auto found = find(rpath);
+		if (found >= 0) {
+			active = found;
+			return true;
+		}
+		return false;
+	};
+
+	if (related.count(ext)) for (auto& oext: related[ext]) if (other(oext)) break;
+
+	bubble();
+}
+
+void Project::relatedOpen() {
+	auto path = std::filesystem::path(view()->path);
+	auto ext = path.extension().string();
+
+	auto other = [&](auto rep) {
+		auto rpath = path.replace_extension(rep).string();
+		return open(rpath);
+	};
+
+	if (related.count(ext)) for (auto& oext: related[ext]) if (other(oext)) break;
+
+	bubble();
 }

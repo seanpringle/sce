@@ -19,9 +19,14 @@ struct Forth : Syntax {
 		"then",
 		"begin",
 		"while",
-		"repeat",
+		"until",
+		"again",
+		"for",
+		"next",
+		"loop",
 		":",
 		";",
+		"as",
 	};
 
 	const std::set<std::string, std::less<>> corewords = {

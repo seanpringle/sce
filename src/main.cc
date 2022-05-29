@@ -332,30 +332,7 @@ int main(int argc, const char* argv[]) {
 						}
 
 						if (IsKeyPressed(KeyMap[KEY_F3])) {
-							auto path = std::filesystem::path(project.view()->path);
-							auto ext = path.extension().string();
-
-							auto open = [&](auto rep) {
-								auto rpath = path.replace_extension(rep).string();
-								return project.open(rpath);
-							};
-
-							if (ext == ".c") {
-								open(".h");
-							}
-							if (ext == ".cc" || ext == ".cpp") {
-								open(".hpp") ||
-								open(".h");
-							}
-							if (ext == ".h") {
-								open(".c") ||
-								open(".cc") ||
-								open(".cpp");
-							}
-							if (ext == ".hpp") {
-								open(".cpp") ||
-								open(".cc");
-							}
+							project.relatedOpen();
 						}
 
 						if (io.KeyCtrl && IsKeyPressed(KeyMap[KEY_SPACE])) {
