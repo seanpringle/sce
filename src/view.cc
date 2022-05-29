@@ -286,8 +286,9 @@ void View::insertAt(ViewRegion& selection, int c, bool autoindent) {
 		change.text = {c};
 		change.selections = selections;
 		undos.push_back(change);
-		redos.clear();
 	}
+
+	redos.clear();
 
 	int inserted = 1;
 	it = text.insert(it, c)+1;
@@ -372,8 +373,9 @@ void View::back(int c) {
 				change.text = {it-1, it};
 				change.selections = selections;
 				undos.push_back(change);
-				redos.clear();
 			}
+
+			redos.clear();
 
 			text.erase(it-1, it);
 			for (int j = 0; j < (int)selections.size(); j++) {
@@ -410,8 +412,9 @@ void View::delAt(ViewRegion& selection) {
 		change.text = {it, it+1};
 		change.selections = selections;
 		undos.push_back(change);
-		redos.clear();
 	}
+
+	redos.clear();
 
 	text.erase(it, it+1);
 	for (int j = 0; j < (int)selections.size(); j++) {
