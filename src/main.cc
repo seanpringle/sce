@@ -162,6 +162,8 @@ int main(int argc, const char* argv[]) {
 	if (config.window.vsync) flags |= SDL_RENDERER_PRESENTVSYNC;
 	SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, flags);
 
+	bool fullscreen = false;
+
 	IMGUI_CHECKVERSION();
 	ImGui::CreateContext();
 
@@ -310,8 +312,10 @@ int main(int argc, const char* argv[]) {
 
 				setupPopup.activate = IsKeyPressed(KeyMap[KEY_F6]);
 
-				if (IsKeyPressed(KeyMap[KEY_F12])) {
-					done = true;
+				if (IsKeyPressed(KeyMap[KEY_F11])) {
+					fullscreen = !fullscreen;
+					SDL_SetWindowFullscreen(window, fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP: 0);
+					immediate = true;
 				}
 
 				if (!IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup)) {
