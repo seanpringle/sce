@@ -11,6 +11,7 @@
 #include "syntax/bash.h"
 #include "syntax/forth.h"
 #include "syntax/rela.h"
+#include "syntax/haxe.h"
 #include "syntax/plaintext.h"
 #include "theme.h"
 #include "config.h"
@@ -977,6 +978,12 @@ bool View::interpret(const std::string& cmd) {
 			return true;
 		}
 
+		if (name == "haxe") {
+			delete syntax;
+			syntax = new Haxe();
+			return true;
+		}
+
 		if (name == "plaintext") {
 			delete syntax;
 			syntax = new PlainText();
@@ -1123,6 +1130,10 @@ void View::autosyntax() {
 	else
 	if ((std::set<std::string>{".rela", ".lua"}).count(ext)) {
 		syntax = new Rela();
+	}
+	else
+	if ((std::set<std::string>{".hx"}).count(ext)) {
+		syntax = new Haxe();
 	}
 	else
 	if (name == "CMakeLists.txt") {

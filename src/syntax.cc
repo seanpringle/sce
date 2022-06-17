@@ -67,4 +67,5 @@ bool Syntax::hintMatchedPair(const Doc& text, int cursor, const ViewRegion& sele
 #include "syntax/bash.cc"
 #include "syntax/forth.cc"
 #include "syntax/rela.cc"
+#include "syntax/haxe.cc"
 #include "syntax/plaintext.cc"
