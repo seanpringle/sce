@@ -900,13 +900,16 @@ bool View::interpret(const std::string& cmd) {
 		return true;
 	}
 
-	if (cmd == "softtabs") {
-		convertTabsSoft();
-		return true;
-	}
+	if (prefix("tabs ")) {
+		if (cmd.find("hard ") != std::string::npos) convertTabsHard();
 
-	if (cmd == "hardtabs") {
-		convertTabsHard();
+		if (cmd.size() > 10) {
+			auto size = cmd.substr(10);
+			int width = std::atoi(size.c_str());
+			if (width >= 2 && width <= 8) tabs.width = width;
+		}
+
+		if (cmd.find("soft ") != std::string::npos) convertTabsSoft();
 		return true;
 	}
 
@@ -1194,27 +1197,12 @@ bool View::open(std::string path) {
 		text.push_back(c);
 	}
 
-	int soft = 0;
-	int hard = 0;
-
-	for (int i = 0; i < (int)text.size(); i++) {
-		if (sol(i) && get(i) == '\t') {
-			hard++;
-		}
-		if (sol(i) && get(i) == ' ') {
-			bool match = true;
-			for (int j = 1; match && j < tabs.width; j++) {
-				match = match && get(i+j) == ' ';
-			}
-			if (match) soft++;
-		}
-	}
-
-	if (soft || hard) {
-		tabs.hard = hard > soft;
-	}
-
 	autosyntax();
+
+	auto tabcfg = syntax->tabs(text);
+	tabs.hard = tabcfg.first;
+	tabs.width = tabcfg.second;
+
 	sanity();
 	return true;
 }

@@ -56,4 +56,6 @@ struct Syntax {
 
 	// (..(..)..)
 	bool hintMatchedPair(const Doc& text, int cursor, const ViewRegion& selection, int open, int close);
+
+	virtual std::pair<bool,int> tabs(const Doc& text);
 };

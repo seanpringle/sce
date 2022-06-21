@@ -57,6 +57,36 @@ bool Syntax::hintMatchedPair(const Doc& text, int cursor, const ViewRegion& sele
 	return false;
 }
 
+std::pair<bool,int> Syntax::tabs(const Doc& text) {
+
+	auto get = [&](int cursor) {
+		return cursor >= 0 && cursor < (int)text.size() ? text[cursor]: 0;
+	};
+
+	auto sol = [&](int cursor) {
+		return cursor <= 0 || get(cursor-1) == '\n';
+	};
+
+	auto eol = [&](int cursor) {
+		return cursor >= text.size() || get(cursor) == '\n';
+	};
+
+	for (int i = 0, l = text.size(); i < l; i++) {
+		if (!sol(i)) continue;
+		if (get(i) == '\t') break;
+
+		if (get(i) == ' ') {
+			int p = i;
+			while (get(p) == ' ') p++;
+			int w = p-i;
+			if (w >= 2 && w <= 8)
+				return std::make_pair(false, w);
+		}
+	}
+
+	return std::make_pair(true, 4);
+}
+
 #include "syntax/cpp.cc"
 #include "syntax/ini.cc"
 #include "syntax/yaml.cc"
