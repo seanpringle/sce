@@ -155,7 +155,7 @@ void View::undo() {
 			auto it = text.begin()+change.offset;
 			std::vector<int> s = {it,it+change.length};
 			if (s != change.text) {
-				notef("undo: [%s] != [%s]", s, change.text);
+				notef("undo: [%s] != [%s]", std::string(s.begin(), s.end()), std::string(change.text.begin(), change.text.end()));
 				undos.clear();
 				break;
 			}
@@ -174,7 +174,7 @@ void View::undo() {
 		redos.push_back(change);
 	}
 
-	while (undos.size() > 1000) {
+	while (undos.size() > maxChanges) {
 		undos.erase(undos.begin());
 	}
 
@@ -209,7 +209,7 @@ void View::redo() {
 			auto it = text.begin()+change.offset;
 			std::vector<int> s = {it,it+change.length};
 			if (s != change.text) {
-				notef("redo: [%s] != [%s]", s, change.text);
+				notef("redo: [%s] != [%s]", std::string(s.begin(), s.end()), std::string(change.text.begin(), change.text.end()));
 				redos.clear();
 				break;
 			}
@@ -219,7 +219,7 @@ void View::redo() {
 		undos.push_back(change);
 	}
 
-	while (redos.size() > 1000) {
+	while (redos.size() > maxChanges) {
 		redos.erase(redos.begin());
 	}
 

@@ -64,6 +64,8 @@ struct View {
 	std::vector<Change> undos;
 	std::vector<Change> redos;
 
+	uint maxChanges = 10000;
+
 	View();
 	~View();
 	View(const View& other);
