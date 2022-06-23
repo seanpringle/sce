@@ -1372,14 +1372,16 @@ void View::draw() {
 		uint fg = 0xffffffff;
 		uint bg = 0x00000000;
 		std::vector<int> text;
-		bool hint = false;
+		bool synhint = false;
+		bool selhint = false;
 	};
 
 	std::vector<Output> out;
 
 	auto token = Syntax::Token::None;
 	auto state = Theme::State::Plain;
-	bool hint = false;
+	bool synhint = false;
+	bool selhint = false;
 
 	int lineCol = std::ceil(std::log10((int)text.lines.size()+1));
 	std::string lineFmt = fmt("%%0%dd ", lineCol);
@@ -1412,14 +1414,15 @@ void View::draw() {
 				out.back().bg = bg;
 			}
 
-			if (out.back().fg != fg || out.back().bg != bg || out.back().hint || hint) {
-				out.push_back({col,row,fg,bg,{},hint});
+			if (out.back().fg != fg || out.back().bg != bg || out.back().synhint != synhint || out.back().selhint != selhint) {
+				out.push_back({col,row,fg,bg,{},synhint,selhint});
 			}
 
 			out.back().text.push_back(c);
 		}
 		col++;
-		hint = false;
+		synhint = false;
+		selhint = false;
 	};
 
 	auto format = [&](auto f) {
@@ -1481,7 +1484,8 @@ void View::draw() {
 		}
 
 		int c = cursor < (int)text.size() ? text[cursor]: '\n';
-		hint = syntax->hint(text, cursor, selections);
+		synhint = syntax->hint(text, cursor, selections);
+		selhint = selecting && selections.size() > 1;
 		cursor++;
 
 		if (c == '\n') {
@@ -1522,6 +1526,14 @@ void View::draw() {
 			ImGui::GetWindowDrawList()->AddRectFilled(min, max, ImGui::ImColorSRGB(chunk.bg));
 		}
 
+		if (chunk.selhint) {
+			ImGui::GetWindowDrawList()->AddRectFilled(min, max, ImGui::ImColorSRGB(0xffff00ff));
+		}
+
+		if (chunk.synhint) {
+			ImGui::GetWindowDrawList()->AddRect(min, max, ImGui::ImColorSRGB(0xffff00ff));
+		}
+
 		for (uint i = 0; i < chunk.text.size(); i++) {
 			ImWchar c = chunk.text[i];
 			ImVec2 pos = (ImVec2){min.x+(i*cell.x),min.y};
@@ -1530,7 +1542,6 @@ void View::draw() {
 			if (c < 32) c = 0xfffd;
 			if (c>>8 == 0xc2) c &= 0xff;
 			ImGui::GetFont()->RenderChar(ImGui::GetWindowDrawList(), -1.0f, pos, ImGui::ImColorSRGB(chunk.fg), c);
-			if (chunk.hint) ImGui::GetFont()->RenderChar(ImGui::GetWindowDrawList(), -1.0f, pos, ImGui::ImColorSRGB(chunk.fg), '_');
 		}
 	}
 

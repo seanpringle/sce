@@ -471,7 +471,9 @@ int main(int argc, const char* argv[]) {
 						auto view = group.front();
 
 						TableSetBgColor(ImGuiTableBgTarget_CellBg,
-							GetColorU32(project.view() == view ? ImGuiCol_TitleBgActive: ImGuiCol_FrameBg)
+							project.view() == view
+								? GetColorU32(ImGuiCol_TitleBgActive)
+								: GetColorU32(ImGuiCol_FrameBg)
 						);
 
 						Text("%s", displayPath(view->path).c_str());
