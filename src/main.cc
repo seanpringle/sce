@@ -170,6 +170,8 @@ int main(int argc, const char* argv[]) {
 	ImGuiIO& io = ImGui::GetIO();
 	io.IniFilename = nullptr;
 	io.WantSaveIniSettings = false;
+	io.ConfigFlags |= ImGuiConfigFlags_NoMouse;
+	io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
 
 	ImGui::StyleColorsClassic();
 
@@ -230,11 +232,14 @@ int main(int argc, const char* argv[]) {
 	auto gotFocus = now();
 	auto lostFocus = now() - 24h;
 
+	//SDL_ShowCursor(SDL_DISABLE);
+
 	// Parts of IMGUI such as IsKeyPressed assume a rapid refresh rate to work
 	// properly, but since we're using SDL_WaitEvent that assumption breaks.
 	// Setting immediate=true anywhere forces a quick additional refresh pass
 	// before falling back into waiting for events.
 	bool immediate = false;
+	SDL_ShowCursor(SDL_DISABLE);
 
 	for (bool done = false; !done;)
 	{
@@ -243,11 +248,13 @@ int main(int argc, const char* argv[]) {
 		auto processEvent = [&]() {
 			if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_FOCUS_GAINED) {
 				gotFocus = now();
+				SDL_ShowCursor(SDL_DISABLE);
 			}
 
 			if (event.type == SDL_WINDOWEVENT && event.window.event == SDL_WINDOWEVENT_FOCUS_LOST) {
 				lostFocus = now();
 				if (project.autosave) project.save();
+				SDL_ShowCursor(SDL_ENABLE);
 			}
 
 			immediate = ImGui_ImplSDL2_ProcessEvent(&event);
