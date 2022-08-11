@@ -26,6 +26,10 @@ void FilterPopup::selectNavigate() {
 	selected = std::max(0, std::min((int)visible.size()-1, selected));
 }
 
+bool FilterPopup::multiple() {
+	return false;
+}
+
 void FilterPopup::setup() {
 	sync.lock();
 	if (!loading) {
@@ -67,7 +71,26 @@ void FilterPopup::render() {
 		immediate = true;
 	}
 
-	InputText(fmtc("%s#%s-input", name, name), input, sizeof(input));
+	BeginTable(fmtc("##%s-toolbar", name), multiple() ? 2: 1);
+	TableSetupColumn("", ImGuiTableColumnFlags_WidthStretch);
+
+	if (multiple())
+		TableSetupColumn("", ImGuiTableColumnFlags_WidthFixed);
+
+	TableNextColumn();
+	SetNextItemWidth(-1);
+	InputTextWithHint(fmtc("##%s-input", name), name.c_str(), input, sizeof(input));
+
+	if (multiple()) {
+		TableNextColumn();
+		SetNextItemWidth(-1);
+		if (Button("select all")) {
+			filterOptions();
+			for (auto i: visible) chosen(i);
+			CloseCurrentPopup();
+		}
+	}
+	EndTable();
 
 	if (BeginListBox(fmtc("#%s-matches", name), ImVec2(-1,-1))) {
 		filterOptions();

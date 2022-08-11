@@ -11,6 +11,7 @@ struct FilterPopup : Popup {
 	int selected = 0;
 	virtual void init() = 0;
 	virtual void chosen(int option) = 0;
+	virtual bool multiple();
 	void filterOptions();
 	void selectNavigate();
 	void setup();
