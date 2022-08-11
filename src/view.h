@@ -78,7 +78,7 @@ struct View {
 	void nav();
 	void undo();
 	void redo();
-	void insertAt(ViewRegion& selection, int c, bool autoindent);
+	void insertAt(ViewRegion selection, int c, bool autoindent);
 	void insert(int c, bool autoindent = false);
 	bool erase();
 	int upper(int c);
@@ -96,7 +96,7 @@ struct View {
 	void bumpup();
 	void bumpdown();
 	void back(int c = 0);
-	void delAt(ViewRegion& selection);
+	void delAt(ViewRegion selection);
 	void del(int c = 0);
 	void clip();
 	void cut();
@@ -112,7 +112,7 @@ struct View {
 	void selectUp();
 	void selectSkip();
 	void selectAll();
-	void intoView(const ViewRegion& region);
+	void intoView(ViewRegion region);
 	void boundaryRight();
 	void boundaryLeft();
 	void addCursorDown();
@@ -124,11 +124,11 @@ struct View {
 	int get(int offset);
 	bool sol(int offset);
 	bool eol(int offset);
-	std::string extract(const ViewRegion& region);
+	std::string extract(ViewRegion region);
 	void move(int xx, int yy, int ww, int hh);
 	void input();
 	void single();
-	void single(ViewRegion& selection);
+	void single(ViewRegion selection);
 	void shrink();
 	bool indent();
 	bool outdent();

@@ -120,7 +120,7 @@ bool View::eol(int offset) {
 	return offset >= (int)text.size() || get(offset) == '\n';
 }
 
-std::string View::extract(const ViewRegion& region) {
+std::string View::extract(ViewRegion region) {
 	std::string str;
 	for (int i = region.offset; i < region.offset+region.length && get(i); i++) {
 		str += get(i);
@@ -266,7 +266,7 @@ bool View::erase() {
 	return erased;
 }
 
-void View::insertAt(ViewRegion& selection, int c, bool autoindent) {
+void View::insertAt(ViewRegion selection, int c, bool autoindent) {
 	auto it = text.begin()+selection.offset;
 
 	if (selections.size() == 1U
@@ -350,7 +350,7 @@ bool View::outdent() {
 void View::back(int c) {
 	if (!erase()) {
 		for (int i = 0; i < (int)selections.size(); i++) {
-			auto& selection = selections[i];
+			auto selection = selections[i];
 			if (!selection.offset) continue;
 			auto it = text.begin()+selection.offset;
 			if (c && c != get(selection.offset-1)) continue;
@@ -364,6 +364,7 @@ void View::back(int c) {
 				undos.back().offset--;
 				undos.back().length++;
 				undos.back().text.insert(undos.back().text.begin(), text[undos.back().offset]);
+				undos.back().selections.front().offset--;
 			}
 			else {
 				Change change;
@@ -392,7 +393,7 @@ void View::back(int c) {
 	}
 }
 
-void View::delAt(ViewRegion& selection) {
+void View::delAt(ViewRegion selection) {
 	auto it = text.begin()+selection.offset;
 
 	if ((int)selections.size() == 1
@@ -731,7 +732,7 @@ void View::selectAll() {
 	sanity();
 }
 
-void View::intoView(const ViewRegion& selection) {
+void View::intoView(ViewRegion selection) {
 	int lineno = text.cursor(selection.offset+selection.length).line;
 
 	while (lineno+10 > top+h) {
@@ -781,7 +782,7 @@ void View::single() {
 	}
 }
 
-void View::single(ViewRegion& selection) {
+void View::single(ViewRegion selection) {
 	single();
 	selections = {selection};
 	sanity();
