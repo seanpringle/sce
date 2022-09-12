@@ -17,17 +17,19 @@ void FilterPopup::filterOptions() {
 	selected = std::max(0, std::min((int)visible.size()-1, selected));
 }
 
-void FilterPopup::selectNavigate() {
-	using namespace ImGui;
-	if (IsKeyPressed(KeyMap[KEY_DOWN])) selected++;
-	if (IsKeyPressed(KeyMap[KEY_UP])) selected--;
-	if (IsKeyPressed(KeyMap[KEY_PAGEDOWN])) selected += 10;
-	if (IsKeyPressed(KeyMap[KEY_PAGEUP])) selected -= 10;
-	selected = std::max(0, std::min((int)visible.size()-1, selected));
-}
-
 bool FilterPopup::multiple() {
 	return false;
+}
+
+bool FilterPopup::enterable() {
+	return false;
+}
+
+void FilterPopup::entered() {
+}
+
+std::string FilterPopup::hint() {
+	return name;
 }
 
 void FilterPopup::setup() {
@@ -41,6 +43,7 @@ void FilterPopup::setup() {
 		ready = false;
 		focus = false;
 		immediate = true;
+		scroll = false;
 		crew.job([&]() {
 			init();
 			sync.lock();
@@ -50,6 +53,40 @@ void FilterPopup::setup() {
 		});
 	}
 	sync.unlock();
+}
+
+bool FilterPopup::up() {
+	return selected > 0;
+}
+
+bool FilterPopup::down() {
+	return selected < visible.size();
+}
+
+bool FilterPopup::tab() {
+	return selected < visible.size();
+}
+
+namespace {
+	int callback(ImGuiInputTextCallbackData* data) {
+		FilterPopup* popup = (FilterPopup*)(data->UserData);
+
+		if (data->EventFlag == ImGuiInputTextFlags_CallbackCompletion && data->EventKey == ImGuiKey_Tab && popup->tab()) {
+			data->DeleteChars(0, data->BufTextLen);
+			data->InsertChars(0, popup->options[popup->visible[popup->selected]].c_str());
+			data->SelectAll();
+		}
+
+		if (data->EventFlag == ImGuiInputTextFlags_CallbackHistory && data->EventKey == ImGuiKey_UpArrow && popup->up()) {
+			popup->selected--;
+		}
+
+		if (data->EventFlag == ImGuiInputTextFlags_CallbackHistory && data->EventKey == ImGuiKey_DownArrow && popup->down()) {
+			popup->selected++;
+		}
+
+		return 0;
+	}
 }
 
 void FilterPopup::render() {
@@ -79,7 +116,21 @@ void FilterPopup::render() {
 
 	TableNextColumn();
 	SetNextItemWidth(-1);
-	InputTextWithHint(fmtc("##%s-input", name), name.c_str(), input, sizeof(input));
+
+	ImGuiInputTextFlags flags = ImGuiInputTextFlags_EnterReturnsTrue
+		| ImGuiInputTextFlags_CallbackHistory
+		| ImGuiInputTextFlags_CallbackCompletion;
+
+	if (InputTextWithHint(fmtc("##%s-input", name), hint().c_str(), input, sizeof(input), flags, callback, this)) {
+		if (enterable() && std::string(input).size()) {
+			entered();
+		}
+		else
+		if (visible.size() > selected) {
+			chosen(visible[selected]);
+		}
+		CloseCurrentPopup();
+	}
 
 	if (multiple()) {
 		TableNextColumn();
@@ -94,25 +145,13 @@ void FilterPopup::render() {
 
 	if (BeginListBox(fmtc("#%s-matches", name), ImVec2(-1,-1))) {
 		filterOptions();
-		selectNavigate();
-
-		if (IsKeyPressed(KeyMap[KEY_RETURN])) {
-			if (visible.size()) chosen(visible[selected]);
-			CloseCurrentPopup();
-		}
 
 		for (int i = 0; i < (int)visible.size(); i++) {
 			auto& option = options[visible[i]];
-
-			if (Selectable(option.c_str(), i == selected)) {
-				chosen(visible[i]);
-				CloseCurrentPopup();
-			}
-
-			if (selected == i) {
-				SetScrollHereY();
-			}
+			Selectable(option.c_str(), i == selected);
+			if (selected == i && scroll) SetScrollHereY();
 		}
 		EndListBox();
+		scroll = false;
 	}
 }

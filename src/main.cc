@@ -98,9 +98,6 @@ namespace {
 	#include "popup.cc"
 	#include "popup/filter.cc"
 
-	#include "popup/command.cc"
-	CommandPopup commandPopup;
-
 	#include "popup/setup.cc"
 	SetupPopup setupPopup;
 
@@ -118,6 +115,9 @@ namespace {
 
 	#include "popup/filter/refs.cc"
 	FilterPopupRefs refsPopup;
+
+	#include "popup/filter/cmd.cc"
+	FilterPopupCmd cmdPopup;
 }
 
 int main(int argc, const char* argv[]) {
@@ -394,25 +394,21 @@ int main(int argc, const char* argv[]) {
 				PushFont(fontProp);
 
 				if (command) {
-					commandPopup.prefix.clear();
-					commandPopup.activate = true;
+					cmdPopup.prefix.clear();
+					cmdPopup.activate = true;
 					find = false;
 				}
 
 				if (find) {
-					commandPopup.prefix = "find";
-					commandPopup.activate = true;
+					cmdPopup.prefix = "find";
+					cmdPopup.activate = true;
 					find = false;
 				}
 
 				if (line) {
-					commandPopup.prefix = "go";
-					commandPopup.activate = true;
+					cmdPopup.prefix = "go";
+					cmdPopup.activate = true;
 					line = false;
-				}
-
-				if (commandPopup.activate) {
-					OpenPopup("#command");
 				}
 
 				if (setupPopup.activate) {
@@ -438,6 +434,10 @@ int main(int argc, const char* argv[]) {
 				if (refsPopup.activate) {
 					refsPopup.needle = project.view()->selected();
 					OpenPopup("#refs");
+				}
+
+				if (cmdPopup.activate) {
+					OpenPopup("#cmd");
 				}
 
 				viewTitles.clear();
@@ -540,10 +540,6 @@ int main(int argc, const char* argv[]) {
 				PopStyleVar(1);
 				PushFont(fontPopup);
 
-				nextPopup();
-
-				immediate = commandPopup.run() || immediate;
-
 				nextPopup(config.window.height/3*2);
 
 				immediate = completePopup.run() || immediate;
@@ -555,6 +551,10 @@ int main(int argc, const char* argv[]) {
 				nextPopup(config.window.height/3*2);
 
 				immediate = refsPopup.run() || immediate;
+
+				nextPopup(config.window.height/3*2);
+
+				immediate = cmdPopup.run() || immediate;
 
 				nextPopup(config.window.height/3*2);
 
