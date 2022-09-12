@@ -1,7 +1,7 @@
 #pragma once
 
 struct Popup {
-	static inline workers<1> crew;
+	static inline workers crew;
 
 	bool activate = false;
 	bool immediate = false;
@@ -9,4 +9,5 @@ struct Popup {
 	virtual void setup() = 0;
 	virtual void render() = 0;
 	bool run();
+	Popup() { crew.start(1); }
 };

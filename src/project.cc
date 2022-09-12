@@ -454,7 +454,9 @@ std::vector<std::string> Project::files() {
 }
 
 std::vector<Project::Match> Project::search(std::string needle) {
-	workers<8> crew;
+	workers crew;
+	crew.start(8);
+
 	channel<Match,-1> matches;
 
 	std::vector<View*> state;

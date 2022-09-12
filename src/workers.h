@@ -5,13 +5,11 @@
 #include <functional>
 #include "channel.h"
 
-template <uint POOL>
 class workers {
 private:
 	std::vector<std::thread> threads;
-	channel<std::function<void(void)>,POOL> jobs;
+	channel<std::function<void(void)>,-1> work;
 	std::mutex mutex;
-	bool active = false;
 	uint64_t submitted = 0;
 	uint64_t completed = 0;
 	std::condition_variable waiting;
@@ -20,7 +18,7 @@ private:
 		std::unique_lock<std::mutex> m(mutex);
 		m.unlock();
 
-		for (auto job: jobs) {
+		for (auto job: work) {
 			job();
 
 			m.lock();
@@ -31,42 +29,46 @@ private:
 	}
 
 public:
-	workers<POOL>() {
+	workers() {
 	}
 
-	~workers<POOL>() {
+	workers(int p) {
+		start(p);
+	}
+
+	~workers() {
 		stop();
+	}
+
+	uint size() {
+		std::unique_lock<std::mutex> m(mutex);
+		return threads.size();
+	}
+
+	void start(uint p = 1) {
+		std::unique_lock<std::mutex> m(mutex);
+		work.open();
+		while (threads.size() < p) {
+			threads.push_back(std::thread(&workers::runner, this));
+		}
 	}
 
 	void stop() {
 		std::unique_lock<std::mutex> m(mutex);
-		if (active) {
-			active = false;
-			m.unlock();
-			jobs.close();
-			for (uint i = 0; i < POOL; i++) {
-				threads[i].join();
-			}
-			m.lock();
-			threads.clear();
-			submitted = 0;
-			completed = 0;
-		}
+		work.close();
 		m.unlock();
+		for (auto& thread: threads) thread.join();
+		m.lock();
+		threads.clear();
+		submitted = 0;
+		completed = 0;
 	}
 
-	// submit a job, starting the threads if necessary
 	bool job(std::function<void(void)> fn) {
 		std::unique_lock<std::mutex> m(mutex);
-		if (!active) {
-			active = true;
-			for (uint i = 0; i < POOL; i++) {
-				threads.push_back(std::thread(&workers<POOL>::runner, this));
-			}
-		}
 		submitted++;
 		m.unlock();
-		return jobs.send(fn);
+		return work.send(fn);
 	}
 
 	// single-sender pattern
@@ -75,6 +77,5 @@ public:
 		std::unique_lock<std::mutex> m(mutex);
 		uint64_t count = submitted;
 		while (count > completed) waiting.wait(m);
-		m.unlock();
 	}
 };

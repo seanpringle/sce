@@ -6,7 +6,8 @@ void FilterPopup::filterOptions() {
 	for (int i = 0, l = (int)options.size(); i < l; i++) {
 		auto& haystack = options[i];
 		bool match = true;
-		for (auto needle: discatenate(needles," ")) {
+		for (auto part: discatenate(needles," ")) {
+			auto needle = std::string(part);
 			trim(needle);
 			if (!needle.size()) continue;
 			if (needle.size() > haystack.size()) { match = false; break; }
@@ -148,8 +149,14 @@ void FilterPopup::render() {
 
 		for (int i = 0; i < (int)visible.size(); i++) {
 			auto& option = options[visible[i]];
-			Selectable(option.c_str(), i == selected);
-			if (selected == i && scroll) SetScrollHereY();
+			if (Selectable(option.c_str(), i == selected)) {
+				selected = i;
+				chosen(visible[i]);
+				CloseCurrentPopup();
+			}
+			if (selected == i && scroll) {
+				SetScrollHereY();
+			}
 		}
 		EndListBox();
 		scroll = false;

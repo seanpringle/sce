@@ -4,7 +4,6 @@
 #include <mutex>
 #include <condition_variable>
 #include <cassert>
-#include <new>
 
 /* Go-like channel
 
@@ -29,9 +28,9 @@ someChannel.close()
 
 */
 
-template <class V, int depth = 0>
+template <class V, int DEPTH = 0>
 class channel {
-	static_assert(depth >= -1, "channel size invalid");
+	static_assert(DEPTH >= -1, "channel size invalid");
 
 private:
 	std::mutex mutex;
@@ -42,11 +41,18 @@ private:
 	bool accepting = true;
 
 public:
-	channel<V,depth>() {
+	channel() {
 	}
 
-	~channel<V,depth>() {
+	~channel() {
 		close();
+	}
+
+	void reset() {
+		std::unique_lock<std::mutex> m(mutex);
+		packets.clear();
+		receivers = 0;
+		accepting = true;
 	}
 
 	// close a channel to senders; receivers will still be able to
@@ -58,7 +64,6 @@ public:
 			sendCond.notify_all();
 			recvCond.notify_all();
 		}
-		m.unlock();
 	}
 
 	// open a channel to senders
@@ -69,22 +74,21 @@ public:
 			sendCond.notify_all();
 			recvCond.notify_all();
 		}
-		m.unlock();
 	}
 
 	bool send(const V& v) {
 		std::unique_lock<std::mutex> m(mutex);
 
 		// zero-size channel writes blocks until a receiver is ready
-		if (depth == 0) {
+		if (DEPTH == 0) {
 			while (accepting && !receivers) {
 				sendCond.wait(m);
 			}
 		}
 
 		// non-zero-size channel blocks when queue is full
-		if (depth > 0) {
-			while (accepting && packets.size() >= depth) {
+		if (DEPTH > 0) {
+			while (accepting && packets.size() >= DEPTH) {
 				sendCond.wait(m);
 			}
 		}
@@ -96,35 +100,34 @@ public:
 			recvCond.notify_one();
 			sent = true;
 		}
-
-		m.unlock();
 		return sent;
 	}
 
-	template <typename B>
-	bool send_batch(const B& batch) {
-		if (!batch.size()) {
-			return true;
-		}
-
-		if (depth >= 0) {
-			for (auto& v: batch) {
-				if (!send(v)) return false;
-			}
-			return true;
-		}
-
+	bool send_if_empty(const V& v) {
 		std::unique_lock<std::mutex> m(mutex);
+		if (!accepting || packets.size()) return false;
+
+		// zero-size channel writes blocks until a receiver is ready
+		if (DEPTH == 0) {
+			while (accepting && !receivers) {
+				sendCond.wait(m);
+			}
+		}
+
+		// non-zero-size channel blocks when queue is full
+		if (DEPTH > 0) {
+			while (accepting && packets.size() >= DEPTH) {
+				sendCond.wait(m);
+			}
+		}
 
 		bool sent = false;
 
 		if (accepting) {
-			packets.insert(packets.end(), batch.begin(), batch.end());
-			recvCond.notify_all();
+			packets.push_back(v);
+			recvCond.notify_one();
 			sent = true;
 		}
-
-		m.unlock();
 		return sent;
 	}
 
@@ -139,9 +142,8 @@ public:
 			--receivers;
 		}
 
-		if (!accepting && !packets.size()) {
+		if (!packets.size()) {
 			V v = V();
-			m.unlock();
 			return v;
 		}
 
@@ -150,39 +152,7 @@ public:
 		packets.pop_front();
 		sendCond.notify_one();
 		if (packets.size()) recvCond.notify_one();
-		m.unlock();
 		return v;
-	}
-
-	std::vector<V> recv_batch(uint limit) {
-		std::unique_lock<std::mutex> m(mutex);
-
-		// only block if channel is open and queue is empty
-		while (accepting && !packets.size()) {
-			++receivers;
-			sendCond.notify_one();
-			recvCond.wait(m);
-			--receivers;
-		}
-
-		std::vector<V> batch;
-
-		if (!accepting && !packets.size()) {
-			m.unlock();
-			return batch;
-		}
-
-		// receivers can still drain a channel after it's closed
-		uint size = std::min(limit, (uint)packets.size());
-		auto it = packets.begin();
-
-		batch = {it, it+size};
-		packets.erase(it, it+size);
-
-		sendCond.notify_one();
-		if (packets.size()) recvCond.notify_one();
-		m.unlock();
-		return batch;
 	}
 
 	struct pair {
@@ -190,7 +160,7 @@ public:
 		V v;
 	};
 
-	pair recv_try() {
+	pair recv_pair() {
 		std::unique_lock<std::mutex> m(mutex);
 
 		// only block if channel is open and queue is empty
@@ -202,7 +172,6 @@ public:
 		}
 
 		if (!accepting && !packets.size()) {
-			m.unlock();
 			return (pair){false,V()};
 		}
 
@@ -211,7 +180,6 @@ public:
 		packets.pop_front();
 		sendCond.notify_one();
 		if (packets.size()) recvCond.notify_one();
-		m.unlock();
 		return (pair){true,v};
 	}
 
@@ -219,15 +187,14 @@ public:
 		std::unique_lock<std::mutex> m(mutex);
 		std::vector<V> batch = {packets.begin(), packets.end()};
 		packets.clear();
-		sendCond.notify_all();
-		m.unlock();
+		sendCond.notify_one();
 		return batch;
 	}
 
 	// Forward iteration until closed and drained
 	// for (auto v: chan) { ... }
 	class iterator {
-		channel<V,depth> *c;
+		channel<V,DEPTH> *c;
 		bool last;
 		V v;
 
@@ -238,14 +205,14 @@ public:
 		typedef V& reference;
 		typedef std::input_iterator_tag iterator_category;
 
-		explicit iterator(channel<V,depth> *cc, bool llast) {
+		explicit iterator(channel<V,DEPTH> *cc, bool llast) {
 			c = cc;
 			last = llast;
 			if (!last) read();
 		}
 
 		void read() {
-			auto p = c->recv_try();
+			auto p = c->recv_pair();
 			last = !p.ok;
 			v = p.v;
 		}

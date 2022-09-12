@@ -28,7 +28,9 @@ public:
     void parse(std::string text) {
         std::string section;
 
-        for (auto line: discatenate(text, "\n")) {
+        for (auto ln: discatenate(text, "\n")) {
+            auto line = std::string(ln);
+
             trim(line);
 
             if (starts_with(line, "[")) {
@@ -131,8 +133,8 @@ public:
     std::set<std::string> getWords(const std::string& section, const std::string& key) {
         std::set<std::string> words;
         if (has(section, key)) {
-            auto split = discatenate(sections[section][key], " ");
-            words = {split.begin(), split.end()};
+            for (auto wd: discatenate(sections[section][key], " "))
+                words.insert(std::string(wd));
         }
         return words;
     }

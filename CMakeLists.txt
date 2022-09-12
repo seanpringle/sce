@@ -24,7 +24,7 @@ add_library(gtest OBJECT EXCLUDE_FROM_ALL ${GTEST}/src/gtest-all.cc ${GTEST}/src
 target_include_directories(gtest PRIVATE ${GTEST} ${GTEST}/include)
 target_compile_options(gtest PRIVATE -isystem ${GTEST}/include)
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 add_executable(sce-test EXCLUDE_FROM_ALL src/test.cc)
 target_include_directories(sce-test PRIVATE ${GTEST}/include)
@@ -38,7 +38,7 @@ add_library(imgui OBJECT imgui/build.cpp)
 
 # sce
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 
 add_executable(sce src/main.cc src/config.cc src/theme.cc src/syntax.cc src/project.cc src/view.cc)
 include_directories(sce /home/sean/src/SDL/include ${FREETYPE_INCLUDE_DIRS})

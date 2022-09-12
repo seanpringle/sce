@@ -48,16 +48,16 @@ class discatenate {
 
 		explicit iterator(const discatenate* ddis, std::size_t ppos) {
 			dis = ddis;
-			pos = ppos;
+			pos = ppos == std::string::npos || ppos >= dis->doc.size() ? std::string::npos: ppos;
 			end = pos == std::string::npos ? std::string::npos: dis->doc.find(dis->sep, pos);
 		}
 
-		std::string operator*() const {
+		std::string_view operator*() const {
 			if (pos != std::string::npos && end == std::string::npos) {
-				return std::string(dis->doc.substr(pos));
+				return dis->doc.substr(pos);
 			}
 			if (pos != std::string::npos && end != std::string::npos) {
-				return std::string(dis->doc.substr(pos, end-pos));
+				return dis->doc.substr(pos, end-pos);
 			}
 			assert(pos == std::string::npos);
 			assert(end == std::string::npos);
@@ -97,20 +97,20 @@ class discatenate {
 public:
 	discatenate(const char* ddoc, const char* ssep) {
 		_doc = ddoc;
-		doc = {_doc};
+		doc = _doc;
 		_sep = ssep;
-		sep = {_sep};
+		sep = _sep;
 	}
 
 	discatenate(const std::string_view& ddoc, const char* ssep) {
-		doc = {ddoc};
+		doc = ddoc;
 		_sep = ssep;
-		sep = {_sep};
+		sep = _sep;
 	}
 
 	discatenate(const std::string_view& ddoc, const std::string_view& ssep) {
-		doc = {ddoc};
-		sep = {ssep};
+		doc = ddoc;
+		sep = ssep;
 	}
 
 	iterator begin() const {
