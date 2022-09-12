@@ -63,6 +63,8 @@ struct Project {
 		{".cpp", {".h", ".hpp"}},
 		{".h", {".c", ".cc", ".cpp"}},
 		{".hpp", {".cpp", ".cc"}},
+		{".fs", {".vs"}},
+		{".vs", {".fs"}},
 	};
 
 	void layout1();
