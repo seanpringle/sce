@@ -327,6 +327,13 @@ void View::insert(int c, bool autoindent) {
 	sanity();
 }
 
+bool View::whiteLeading(int offset) {
+	if (sol(offset)) return false;
+	while (!sol(offset))
+		if (!iswspace(get(--offset))) return false;
+	return true;
+}
+
 bool View::indent() {
 	if (tabs.hard) {
 		insert('\t');
@@ -348,6 +355,22 @@ bool View::outdent() {
 }
 
 void View::back(int c) {
+	if (!tabs.hard && tabs.width > 1
+		&& (int)selections.size() == 1
+		&& whiteLeading(selections.front().offset)
+	){
+		int here = selections.front().offset;
+		int offset = toSol(here);
+		int steps = offset % tabs.width;
+		if (!steps && offset)
+			steps = std::min(offset,tabs.width);
+		for (int i = 0; i < steps; i++) {
+			left(); del(' ');
+		}
+		sanity();
+		return;
+	}
+
 	if (!erase()) {
 		for (int i = 0; i < (int)selections.size(); i++) {
 			auto selection = selections[i];

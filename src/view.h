@@ -124,6 +124,7 @@ struct View {
 	int get(int offset);
 	bool sol(int offset);
 	bool eol(int offset);
+	bool whiteLeading(int offset);
 	std::string extract(ViewRegion region);
 	void move(int xx, int yy, int ww, int hh);
 	void input();
