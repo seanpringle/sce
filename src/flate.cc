@@ -8,6 +8,8 @@
 #include "sinfl.h"
 
 deflation deflate(const std::vector<char>& data, int quality) {
+	if (!data.size()) return {};
+
 	quality = std::max(0, std::min(9, quality));
 	std::size_t bounds = sdefl_bound(data.size());
 
@@ -23,6 +25,8 @@ deflation deflate(const std::vector<char>& data, int quality) {
 }
 
 std::vector<char> inflate(const deflation& def) {
+	if (!def.size) return {};
+
 	std::vector<char> data;
 	data.insert(data.begin(), def.size, 0);
 

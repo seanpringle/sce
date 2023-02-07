@@ -27,6 +27,7 @@ struct View {
 	int h = 0;
 	int top = 0;
 	Doc text;
+	deflation orig;
 	std::string path;
 	bool modified = false;
 	bool mouseOver = false;

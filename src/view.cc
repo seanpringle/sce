@@ -179,6 +179,8 @@ void View::undo() {
 	}
 
 	undos.pop_back();
+	if (!undos.size()) modified = !(inflate(orig) == text.exportRaw());
+
 	sanity();
 }
 
@@ -1133,6 +1135,8 @@ bool View::open(std::string path) {
 	tabs.hard = tabcfg.first;
 	tabs.width = tabcfg.second;
 
+	orig = deflate(text.exportRaw());
+
 	sanity();
 	return true;
 }
@@ -1267,6 +1271,7 @@ void View::save() {
 	}
 	out.close();
 	modified = false;
+	orig = deflate(text.exportRaw());
 }
 
 void View::reload() {
