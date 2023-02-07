@@ -11,10 +11,15 @@ struct ViewRegion;
 #include <chrono>
 #include "doc.h"
 #include "syntax.h"
+#include "flate.h"
 
 struct ViewRegion {
 	int offset;
 	int length;
+
+	bool operator==(const ViewRegion& o) const {
+		return offset == o.offset && length == o.length;
+	}
 };
 
 struct View {
@@ -45,20 +50,14 @@ struct View {
 	ViewRegion skip;
 
 	enum ChangeType {
-		Insertion,
-		Deletion,
+		SnapShot,
 		Navigation,
 	};
 
-	uint batches = 0;
-
 	struct Change {
-		uint batch = 0;
-		ChangeType type = Insertion;
-		int offset = 0;
-		int length = 0;
-		std::vector<int> text;
+		ChangeType type = SnapShot;
 		std::vector<ViewRegion> selections;
+		deflation text;
 	};
 
 	std::vector<Change> undos;
@@ -76,6 +75,9 @@ struct View {
 	void save();
 	void reload();
 	void nav();
+	void snap();
+	bool insertion();
+	bool deletion();
 	void undo();
 	void redo();
 	void insertAt(ViewRegion selection, int c, bool autoindent);

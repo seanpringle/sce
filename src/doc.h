@@ -3,6 +3,7 @@
 #include "common.h"
 #include <deque>
 #include <vector>
+#include <cstring>
 
 struct Doc {
 	Doc() = default;
@@ -19,6 +20,10 @@ struct Doc {
 		lines = other.lines;
 		last = other.last;
 		return *this;
+	}
+
+	bool operator==(const Doc& other) const {
+		return count == other.count && lines == other.lines;
 	}
 
 	uint count = 0;
@@ -42,12 +47,15 @@ struct Doc {
 		return sum == count;
 	};
 
+	mutable Cursor last;
+
 	void clear() {
 		lines.clear();
 		count = 0;
+		last.index = 0;
+		last.line = 0;
+		last.cell = 0;
 	};
-
-	mutable Cursor last;
 
 	Cursor cursor(uint index) const {
 		ensure(index <= size());
@@ -360,4 +368,19 @@ struct Doc {
 	iterator erase(iterator a, iterator b) {
 		return erase(a, b-a);
 	};
+
+	std::vector<char> exportRaw() {
+		std::vector<int> ints = {begin(), end()};
+		size_t bytes = ints.size() * sizeof(int);
+		std::vector<char> raw(bytes, 0);
+		std::memmove(raw.data(), ints.data(), bytes);
+		return raw;
+	}
+
+	void importRaw(const std::vector<char>& raw) {
+		clear();
+		std::vector<int> ints(raw.size() / sizeof(int));
+		std::memmove(ints.data(), raw.data(), raw.size());
+		for (auto c: ints) push_back(c);
+	}
 };

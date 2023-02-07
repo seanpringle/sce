@@ -26,6 +26,8 @@
 extern Theme theme;
 extern Config config;
 
+#include "flate.cc"
+
 View::View() {
 	sanity();
 	tabs.hard = config.tabs.hard;
@@ -41,7 +43,6 @@ View& View::operator=(const View& other) {
 	path = other.path;
 	text = other.text;
 	selections = other.selections;
-	batches = 0;
 	modified = other.modified;
 	undos.clear();
 	redos.clear();
@@ -130,54 +131,54 @@ std::string View::extract(ViewRegion region) {
 
 void View::nav() {
 	Change change;
-	change.batch = batches++;
 	change.type = Navigation;
 	change.selections = selections;
 	undos.push_back(change);
+	redos.clear();
+}
+
+void View::snap() {
+	redos.clear();
+	Change change;
+	change.type = SnapShot;
+	change.selections = selections;
+	change.text = deflate(text.exportRaw());
+	undos.push_back(change);
+}
+
+bool View::insertion() {
+	return undos.size() && undos.back().type == SnapShot && undos.back().text.size/sizeof(int) < text.size();
+}
+
+bool View::deletion() {
+	return undos.size() && undos.back().type == SnapShot && undos.back().text.size/sizeof(int) > text.size();
 }
 
 void View::undo() {
 	if (!undos.size()) return;
 	modified = true;
 
-	uint cbatch = undos.back().batch;
+	auto& undo = undos.back();
 
-	while (undos.size() && undos.back().batch == cbatch) {
-
-		Change change = undos.back();
-		undos.pop_back();
-
-		ensuref(change.length == (int)change.text.size(), "[%s] != %d", change.text, change.length);
-		selections = change.selections;
-
-		if (change.type == Insertion) {
-			// find the spot and remove the region
-			auto it = text.begin()+change.offset;
-			std::vector<int> s = {it,it+change.length};
-			if (s != change.text) {
-				notef("undo: [%s] != [%s]", std::string(s.begin(), s.end()), std::string(change.text.begin(), change.text.end()));
-				undos.clear();
-				break;
-			}
-			text.erase(it, it+change.length);
-		}
-
-		if (change.type == Deletion) {
-			// find the spot and reinsert the region
-			auto it = text.begin()+change.offset;
-			for (auto c: change.text) {
-				it = text.insert(it, c);
-				++it;
-			}
-		}
-
-		redos.push_back(change);
+	if (undo.type == SnapShot) {
+		Change redo;
+		redo.type = SnapShot;
+		redo.selections = selections;
+		redo.text = deflate(text.exportRaw());
+		redos.push_back(redo);
+		text.importRaw(inflate(undo.text));
+		selections = undo.selections;
 	}
 
-	while (undos.size() > maxChanges) {
-		undos.erase(undos.begin());
+	if (undo.type == Navigation) {
+		Change redo;
+		redo.type = Navigation;
+		redo.selections = selections;
+		redos.push_back(redo);
+		selections = undo.selections;
 	}
 
+	undos.pop_back();
 	sanity();
 }
 
@@ -185,49 +186,34 @@ void View::redo() {
 	if (!redos.size()) return;
 	modified = true;
 
-	uint cbatch = redos.back().batch;
+	auto& redo = redos.back();
 
-	while (redos.size() && redos.back().batch == cbatch) {
-
-		Change change = redos.back();
-		redos.pop_back();
-
-		ensure(change.length == (int)change.text.size());
-		selections = change.selections;
-
-		if (change.type == Insertion) {
-			// find the spot and reinsert the region
-			auto it = text.begin()+change.offset;
-			for (auto c: change.text) {
-				it = text.insert(it, c);
-				++it;
-			}
-		}
-
-		if (change.type == Deletion) {
-			// find the spot and remove the region
-			auto it = text.begin()+change.offset;
-			std::vector<int> s = {it,it+change.length};
-			if (s != change.text) {
-				notef("redo: [%s] != [%s]", std::string(s.begin(), s.end()), std::string(change.text.begin(), change.text.end()));
-				redos.clear();
-				break;
-			}
-			text.erase(it, it+change.length);
-		}
-
-		undos.push_back(change);
+	if (redo.type == SnapShot) {
+		Change undo;
+		undo.type = SnapShot;
+		undo.selections = selections;
+		undo.text = deflate(text.exportRaw());
+		undos.push_back(undo);
+		text.importRaw(inflate(redo.text));
+		selections = redo.selections;
 	}
 
-	while (redos.size() > maxChanges) {
-		redos.erase(redos.begin());
+	if (redo.type == Navigation) {
+		Change undo;
+		undo.type = Navigation;
+		undo.selections = selections;
+		undos.push_back(undo);
+		selections = redo.selections;
 	}
 
+	redos.pop_back();
 	sanity();
 }
 
 bool View::erase() {
+	snap();
 	bool erased = false;
+
 	for (int i = 0; i < (int)selections.size(); i++) {
 		auto& selection = selections[i];
 
@@ -237,16 +223,6 @@ bool View::erase() {
 		){
 			erased = true;
 			auto it = text.begin()+selection.offset;
-
-			Change change;
-			change.batch = batches;
-			change.type = Deletion;
-			change.offset = selection.offset;
-			change.length = selection.length;
-			change.text = {it, it+selection.length};
-			change.selections = selections;
-			undos.push_back(change);
-			redos.clear();
 
 			text.erase(it, it+selection.length);
 			for (int j = 0; j < (int)selections.size(); j++) {
@@ -258,8 +234,10 @@ bool View::erase() {
 			selection.length = 0;
 		}
 	}
+	if (!erased) {
+		undos.pop_back();
+	}
 	if (erased) {
-		batches++;
 		sanity();
 		modified = true;
 	}
@@ -268,28 +246,6 @@ bool View::erase() {
 
 void View::insertAt(ViewRegion selection, int c, bool autoindent) {
 	auto it = text.begin()+selection.offset;
-
-	if (selections.size() == 1U
-		&& undos.size() > 0
-		&& undos.back().type == Insertion
-		&& undos.back().selections.size() == 1
-		&& undos.back().offset+undos.back().length == selection.offset
-	){
-		undos.back().length++;
-		undos.back().text.push_back(c);
-	}
-	else {
-		Change change;
-		change.batch = batches;
-		change.type = Insertion;
-		change.offset = selection.offset;
-		change.length = 1;
-		change.text = {c};
-		change.selections = selections;
-		undos.push_back(change);
-	}
-
-	redos.clear();
 
 	int inserted = 1;
 	it = text.insert(it, c)+1;
@@ -305,8 +261,6 @@ void View::insertAt(ViewRegion selection, int c, bool autoindent) {
 
 		text.insert(it, indent.begin(), indent.end());
 		inserted += indent.size();
-		for (int c: indent) undos.back().text.push_back(c);
-		undos.back().length += (int)indent.size();
 	}
 
 	for (int j = 0; j < (int)selections.size(); j++) {
@@ -318,11 +272,10 @@ void View::insertAt(ViewRegion selection, int c, bool autoindent) {
 }
 
 void View::insert(int c, bool autoindent) {
-	erase();
+	if ((!erase() && !insertion()) || c == '\n') snap();
 	for (auto& selection: selections) {
 		insertAt(selection, c, autoindent);
 	}
-	batches++;
 	modified = true;
 	sanity();
 }
@@ -372,35 +325,12 @@ void View::back(int c) {
 	}
 
 	if (!erase()) {
+		if (!deletion()) snap();
 		for (int i = 0; i < (int)selections.size(); i++) {
 			auto selection = selections[i];
 			if (!selection.offset) continue;
 			auto it = text.begin()+selection.offset;
 			if (c && c != get(selection.offset-1)) continue;
-
-			if ((int)selections.size() == 1
-				&& undos.size() > 0
-				&& undos.back().type == Deletion
-				&& undos.back().selections.size() == 1
-				&& undos.back().offset == selection.offset
-			){
-				undos.back().offset--;
-				undos.back().length++;
-				undos.back().text.insert(undos.back().text.begin(), text[undos.back().offset]);
-				undos.back().selections.front().offset--;
-			}
-			else {
-				Change change;
-				change.batch = batches;
-				change.type = Deletion;
-				change.offset = selection.offset-1;
-				change.length = 1;
-				change.text = {it-1, it};
-				change.selections = selections;
-				undos.push_back(change);
-			}
-
-			redos.clear();
 
 			text.erase(it-1, it);
 			for (int j = 0; j < (int)selections.size(); j++) {
@@ -410,7 +340,6 @@ void View::back(int c) {
 				}
 			}
 		}
-		batches++;
 		modified = true;
 		sanity();
 	}
@@ -418,28 +347,6 @@ void View::back(int c) {
 
 void View::delAt(ViewRegion selection) {
 	auto it = text.begin()+selection.offset;
-
-	if ((int)selections.size() == 1
-		&& undos.size() > 0
-		&& undos.back().type == Deletion
-		&& undos.back().selections.size() == 1
-		&& undos.back().offset == selection.offset
-	){
-		undos.back().length++;
-		undos.back().text.push_back(text[undos.back().offset]);
-	}
-	else {
-		Change change;
-		change.batch = batches;
-		change.type = Deletion;
-		change.offset = selection.offset;
-		change.length = 1;
-		change.text = {it, it+1};
-		change.selections = selections;
-		undos.push_back(change);
-	}
-
-	redos.clear();
 
 	text.erase(it, it+1);
 	for (int j = 0; j < (int)selections.size(); j++) {
@@ -452,13 +359,13 @@ void View::delAt(ViewRegion selection) {
 
 void View::del(int c) {
 	if (!erase()) {
+		if (!deletion()) snap();
 		for (int i = 0; i < (int)selections.size(); i++) {
 			auto& selection = selections[i];
 			if (c && c != get(selection.offset)) continue;
 			if (selection.offset == text.size()) continue;
 			delAt(selection);
 		}
-		batches++;
 		modified = true;
 		sanity();
 	}
@@ -1127,7 +1034,7 @@ void View::autosyntax() {
 		return line.find(sub) != std::string::npos;
 	};
 
-	if ((std::set<std::string>{".cc", ".cpp", ".cxx", ".c", ".h", ".hpp", ".fs", ".vs", ".ct"}).count(ext)) {
+	if ((std::set<std::string>{".cc", ".cpp", ".cxx", ".c", ".h", ".hpp", ".fs", ".vs", ".ct", ".json"}).count(ext)) {
 		syntax = new CPP();
 	}
 	else
@@ -1186,7 +1093,6 @@ bool View::open(std::string path) {
 
 	text.clear();
 	selections.clear();
-	batches = 0;
 	modified = false;
 	undos.clear();
 	redos.clear();
@@ -1232,6 +1138,7 @@ bool View::open(std::string path) {
 }
 
 void View::convertTabsSoft() {
+	snap();
 	for (int i = 0; i < (int)text.size(); i++) {
 		if (get(i) == '\t') {
 			ViewRegion region = {i,0};
