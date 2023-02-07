@@ -61,6 +61,8 @@ struct View {
 		deflation text;
 	};
 
+	const int defl = 7;
+
 	std::vector<Change> undos;
 	std::vector<Change> redos;
 

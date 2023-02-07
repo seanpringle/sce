@@ -142,7 +142,7 @@ void View::snap() {
 	Change change;
 	change.type = SnapShot;
 	change.selections = selections;
-	change.text = deflate(text.exportRaw());
+	change.text = deflate(text.exportRaw(), defl);
 	undos.push_back(change);
 }
 
@@ -164,7 +164,7 @@ void View::undo() {
 		Change redo;
 		redo.type = SnapShot;
 		redo.selections = selections;
-		redo.text = deflate(text.exportRaw());
+		redo.text = deflate(text.exportRaw(), defl);
 		redos.push_back(redo);
 		text.importRaw(inflate(undo.text));
 		selections = undo.selections;
@@ -194,7 +194,7 @@ void View::redo() {
 		Change undo;
 		undo.type = SnapShot;
 		undo.selections = selections;
-		undo.text = deflate(text.exportRaw());
+		undo.text = deflate(text.exportRaw(), defl);
 		undos.push_back(undo);
 		text.importRaw(inflate(redo.text));
 		selections = redo.selections;
@@ -1135,7 +1135,7 @@ bool View::open(std::string path) {
 	tabs.hard = tabcfg.first;
 	tabs.width = tabcfg.second;
 
-	orig = deflate(text.exportRaw());
+	orig = deflate(text.exportRaw(), defl);
 
 	sanity();
 	return true;
@@ -1271,7 +1271,7 @@ void View::save() {
 	}
 	out.close();
 	modified = false;
-	orig = deflate(text.exportRaw());
+	orig = deflate(text.exportRaw(), defl);
 }
 
 void View::reload() {
