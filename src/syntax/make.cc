@@ -36,7 +36,7 @@ Syntax::Token Make::first(const Doc& text, int cursor) {
 
 Syntax::Token Make::next(const Doc& text, int cursor, Syntax::Token token) {
 
-	auto isVariable = [&](auto text, auto cursor) {
+	auto isVariable = [&](auto& text, auto cursor) {
 
 		auto at = [&](int offset = 0) {
 			return get(text, cursor+offset);
