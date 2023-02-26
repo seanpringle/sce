@@ -28,6 +28,8 @@ extern Config config;
 
 #include "flate.cc"
 
+using namespace std::literals::chrono_literals;
+
 View::View() {
 	sanity();
 	tabs.hard = config.tabs.hard;
@@ -1256,6 +1258,32 @@ std::string View::selected() {
 	return extract(selections.front());
 }
 
+std::string View::blurb() {
+	auto now = std::chrono::system_clock::now();
+	auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(now-lastGit);
+
+	if (ms > 100ms) {
+		lastGit = now;
+
+		git_repository *repo = nullptr;
+		git_reference *head = nullptr;
+
+		for (;;) {
+			if (!path.size()) break;
+			if (0 != git_repository_open_ext(&repo, path.c_str(), 0, nullptr)) break;
+			if (0 != git_repository_head(&head, repo)) break;
+			const char *branch = git_reference_shorthand(head);
+			if (branch) blurbGit = fmt("%s", branch);
+			break;
+		}
+
+		if (head) git_reference_free(head);
+		if (repo) git_repository_free(repo);
+	}
+
+	return blurbGit.size() ? blurbGit: "(no branch)";
+}
+
 void View::save() {
 	if (!path.size()) return;
 	trimTailingWhite();
@@ -1483,4 +1511,3 @@ void View::draw() {
 
 	ImGui::SetCursorPos((ImVec2){origin.x+(w*cell.x), origin.y+(h*cell.y)});
 }
-

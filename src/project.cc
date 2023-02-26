@@ -172,6 +172,8 @@ bool Project::interpret(const std::string& cmd) {
 }
 
 bool Project::load(const std::string path) {
+	config.defaults();
+
 	const std::string lpath = path.empty() ? ppath: path;
 	if (lpath.empty()) return false;
 
@@ -239,6 +241,15 @@ bool Project::load(const std::string path) {
 	bubble();
 
 	ppath = path;
+
+	if (pstate.contains("/config/sidebar/width"_json_pointer)) {
+		config.sidebar.width = pstate["/config/sidebar/width"_json_pointer];
+	}
+
+	if (pstate.contains("/config/layout2/split"_json_pointer)) {
+		config.layout2.split = pstate["/config/layout2/split"_json_pointer];
+	}
+
 	return true;
 }
 
@@ -305,6 +316,9 @@ bool Project::save(const std::string path) {
 	for (auto ignorePattern: ignorePatterns) {
 		pstate["ignorePatterns"][i++] = ignorePattern;
 	}
+
+	pstate["config"]["sidebar"]["width"] = config.sidebar.width;
+	pstate["config"]["layout2"]["split"] = config.layout2.split;
 
 	out << pstate.dump(4);
 	out.close();

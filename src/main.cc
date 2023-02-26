@@ -1,8 +1,9 @@
-
 #include "../imgui/imgui.h"
 #include "../imgui/imgui_impl_sdl.h"
 #include "../imgui/imgui_impl_sdlrenderer.h"
 #include <SDL.h>
+
+#include <git2.h>
 
 #include "theme.h"
 #include "config.h"
@@ -121,34 +122,10 @@ namespace {
 }
 
 int main(int argc, const char* argv[]) {
-	auto HOME = std::getenv("HOME");
+	git_libgit2_init();
 
-	project.load(fmt("%s/.sce-project", HOME));
-
-	for (auto arg: config.args(argc, argv)) {
-		auto path = std::filesystem::path(arg);
-
-		if (path.extension().string() == ".sce-project" && project.ppath.empty()) {
-			project.load(path);
-			continue;
-		}
-
-		if (std::filesystem::is_regular_file(path)) {
-			project.open(arg);
-			continue;
-		}
-
-		if (std::filesystem::is_directory(path)) {
-			project.searchPathAdd(arg);
-			continue;
-		}
-
-		notef("what is this? %s", path);
-	}
-
-	if (!project.searchPaths.size()) {
-		project.searchPathAdd(".");
-	}
+	config.args(argc, argv);
+	project.load(fmt("%s/.sce-project", std::getenv("HOME")));
 
 	ensuref(0 == SDL_Init(SDL_INIT_VIDEO|SDL_INIT_EVENTS), "%s", SDL_GetError());
 
@@ -316,6 +293,11 @@ int main(int argc, const char* argv[]) {
 
 				setupPopup.activate = IsKeyPressed(KeyMap[KEY_F6]);
 
+				if (IsKeyPressed(KeyMap[KEY_F12])) {
+					config.defaults();
+					immediate = true;
+				}
+
 				if (IsKeyPressed(KeyMap[KEY_F11])) {
 					fullscreen = !fullscreen;
 					SDL_SetWindowFullscreen(window, fullscreen ? SDL_WINDOW_FULLSCREEN_DESKTOP: 0);
@@ -447,7 +429,7 @@ int main(int argc, const char* argv[]) {
 
 				if (BeginTable("#layout", project.groups.size()+1)) {
 
-					float sidebarWidth = vsplit(config.window.width, config.sidebar.split);
+					float sidebarWidth = vsplit(config.window.width, config.sidebar.width);
 					TableSetupColumn("files", ImGuiTableColumnFlags_WidthFixed, sidebarWidth);
 
 					if (project.layout == 2 && project.groups.size() == 2U && config.layout2.split > 0.01f) {
@@ -480,7 +462,9 @@ int main(int argc, const char* argv[]) {
 								: GetColorU32(ImGuiCol_FrameBg)
 						);
 
+						SetCursorPosX(GetCursorPosX() + GetStyle().ItemSpacing.x);
 						Text("%s", displayPath(view->path).c_str());
+						SameLine(); PrintRight(view->blurb().c_str());
 					}
 
 					TableNextRow();
@@ -526,6 +510,8 @@ int main(int argc, const char* argv[]) {
 							view->input();
 						}
 
+						auto gap = GetStyle().ItemSpacing.x;
+						SetCursorPos(ImVec2(GetCursorPosX() + gap, GetCursorPosY() + gap));
 						view->draw();
 
 						if (IsAnyMouseDown() && view->mouseOver) {
@@ -579,7 +565,7 @@ int main(int argc, const char* argv[]) {
 	}
 
 	if (project.ppath.empty()) {
-		project.ppath = fmt("%s/.sce-project", HOME);
+		project.ppath = fmt("%s/.sce-project", std::getenv("HOME"));
 	}
 
 	project.save();
@@ -592,5 +578,6 @@ int main(int argc, const char* argv[]) {
 	SDL_DestroyWindow(window);
 	SDL_Quit();
 
+	git_libgit2_shutdown();
 	return 0;
 }

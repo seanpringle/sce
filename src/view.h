@@ -12,6 +12,7 @@ struct ViewRegion;
 #include "doc.h"
 #include "syntax.h"
 #include "flate.h"
+#include <git2.h>
 
 struct ViewRegion {
 	int offset;
@@ -33,6 +34,9 @@ struct View {
 	bool mouseOver = false;
 	Syntax* syntax = nullptr;
 	std::chrono::time_point<std::chrono::system_clock> lastWheel;
+
+	std::chrono::time_point<std::chrono::system_clock> lastGit;
+	std::string blurbGit;
 
 	struct {
 		bool hard = true;
@@ -147,4 +151,5 @@ struct View {
 	void trimTailingWhite();
 	std::vector<ViewRegion> search(const std::string& needle);
 	std::string selected();
+	std::string blurb();
 };

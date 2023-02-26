@@ -4,6 +4,9 @@
 #include <vector>
 
 struct Config {
+	int argc = 0;
+	const char** argv = nullptr;
+
 	struct {
 		int width = 1920;
 		int height = 1080;
@@ -37,7 +40,7 @@ struct Config {
 
 	struct {
 		float font = 1.0f;
-		float split = 0.1f;
+		float width = 0.1f;
 	} sidebar;
 
 	struct {
@@ -52,5 +55,7 @@ struct Config {
 
 	bool newProject = false;
 
-	std::vector<std::string> args(int argc, const char** argv);
+	void args(int argc, const char** argv);
+	void defaults();
+	bool interpret(const std::string& cmd);
 };

@@ -16,7 +16,7 @@ void FilterPopupCmd::exec(std::string suffix) {
 	group.insert(group.begin(), suffix);
 
 	auto cmd = prefix.size() ? fmt("%s %s", prefix, suffix): suffix;
-	project.interpret(cmd) || project.view()->interpret(cmd);
+	config.interpret(cmd) || project.interpret(cmd) || project.view()->interpret(cmd);
 }
 
 void FilterPopupCmd::init() {

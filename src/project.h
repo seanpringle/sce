@@ -1,6 +1,7 @@
 #pragma once
 
 #include "view.h"
+#include <git2.h>
 #include <map>
 
 struct Project {
