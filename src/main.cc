@@ -96,6 +96,71 @@ namespace {
 		return weakly_canonical(ipath).string();
 	};
 
+	void fileTree() {
+		using namespace ImGui;
+		using namespace std::filesystem;
+
+		std::function<void(const std::filesystem::path&, ImGuiTreeNodeFlags flags)> walk;
+
+		walk = [&](const std::filesystem::path& walkPath, ImGuiTreeNodeFlags flags) {
+			if (!exists(walkPath)) return;
+
+			std::string label = fmt("%s##%s", walkPath.filename().string(), walkPath.string());
+			if (!TreeNodeEx(label.c_str(), flags | ImGuiTreeNodeFlags_SpanAvailWidth)) return;
+
+			auto it = directory_iterator(walkPath,
+				directory_options::skip_permission_denied
+			);
+
+			std::vector<directory_entry> entries;
+
+			for (const directory_entry& entry: it) {
+				auto entryPath = weakly_canonical(entry.path().string());
+
+				bool ignore = false;
+				for (auto ipath: project.ignorePaths) {
+					auto ignorePath = weakly_canonical(ipath);
+					ignore = ignore || starts_with(entryPath.string(), ignorePath.string());
+				}
+				if (ignore) continue;
+
+				entries.push_back(entry);
+			}
+
+			std::sort(entries.begin(), entries.end());
+
+			for (const auto& entry: entries) {
+				if (is_directory(entry)) {
+					walk(entry.path(), ImGuiTreeNodeFlags_None);
+					continue;
+				}
+
+				if (is_regular_file(entry)) {
+					auto index = project.find(entry.path().string());
+
+					if (index >= 0 && project.views[index]->modified)
+						PushStyleColor(ImGuiCol_Text, ImColorSRGB(0xffff00ff));
+					else if (index >= 0)
+						PushStyleColor(ImGuiCol_Text, ImColorSRGB(0x99ff99ff));
+					else
+						PushStyleColor(ImGuiCol_Text, GetColorU32(ImGuiCol_Text));
+
+					if (Selectable(fmtc("%s##%s", entry.path().filename().string(), entry.path().string()))) {
+						project.open(weakly_canonical(entry.path()).string());
+					}
+
+					PopStyleColor();
+					continue;
+				}
+			}
+
+			TreePop();
+		};
+
+		for (auto spath: project.searchPaths)
+			walk(weakly_canonical(spath), ImGuiTreeNodeFlags_DefaultOpen);
+	}
+
 	#include "popup.cc"
 	#include "popup/filter.cc"
 
@@ -473,24 +538,37 @@ int main(int argc, const char* argv[]) {
 					TableSetBgColor(ImGuiTableBgTarget_CellBg, bg);
 					PushStyleColor(ImGuiCol_FrameBg, bg);
 					PushFont(fontSidebar);
-					if (BeginListBox("#open", ImVec2(-1,-1))) {
-						for (uint i = 0; i < project.views.size(); i++) {
-							auto view = project.views[i];
-							char* title = viewTitles[i].text;
-							uint size = sizeof(viewTitles[i].text);
+					if (BeginTabBar("#left-tabs")) {
+						if (BeginTabItem("open files")) {
+							if (BeginListBox("#open", ImVec2(-1,-1))) {
+								for (uint i = 0; i < project.views.size(); i++) {
+									auto view = project.views[i];
+									char* title = viewTitles[i].text;
+									uint size = sizeof(viewTitles[i].text);
 
-							const char* modified = view->modified ? "*": "";
-							std::snprintf(title, size, "%s%s", displayPath(view->path).c_str(), modified);
+									const char* modified = view->modified ? "*": "";
+									std::snprintf(title, size, "%s%s", displayPath(view->path).c_str(), modified);
 
-							PushStyleColor(ImGuiCol_Text, view->modified ? ImColorSRGB(0xffff00ff) : GetColorU32(ImGuiCol_Text));
+									PushStyleColor(ImGuiCol_Text, view->modified ? ImColorSRGB(0xffff00ff) : GetColorU32(ImGuiCol_Text));
 
-							if (Selectable(title, project.active == (int)i)) {
-								project.active = i;
-								project.bubble();
+									if (Selectable(title, project.active == (int)i)) {
+										project.active = i;
+										project.bubble();
+									}
+									PopStyleColor(1);
+								}
+								EndListBox();
 							}
-							PopStyleColor(1);
+							EndTabItem();
 						}
-						EndListBox();
+
+						if (BeginTabItem("browse")) {
+							BeginChild("##browse-pane");
+							fileTree();
+							EndChild();
+							EndTabItem();
+						}
+						EndTabBar();
 					}
 					PopFont();
 					PopStyleColor(1);

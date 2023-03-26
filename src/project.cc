@@ -459,7 +459,7 @@ std::vector<std::string> Project::files() {
 				ignore = ignore || std::regex_search(entryPath.string(), re);
 			}
 			if (!ignore) {
-				results.push_back(std::filesystem::canonical(entryPath.string()));
+				results.push_back(canonical(entryPath.string()));
 			}
 		}
 	}
