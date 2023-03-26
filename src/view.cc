@@ -411,7 +411,7 @@ void View::copy() {
 }
 
 void View::paste() {
-	erase();
+	if (!erase()) snap();
 	int nclips = clips.size();
 
 	std::vector<int> clipstring;
@@ -613,44 +613,35 @@ bool View::selectNext() {
 	auto& marker = selections.back();
 	if (!pattern.length) return false;
 
-	nav();
+	auto duplicate = [&](int i) {
+		for (auto& other: selections)
+			if (other.offset == i) return true;
+		return false;
+	};
 
-	for (int i = marker.offset+1; i < (int)text.size()-pattern.length && !match; i++) {
+	auto check = [&](int i) {
 		auto a = text.begin()+pattern.offset;
 		auto b = text.begin()+i;
-		match = true;
+		bool match = true;
 		for (int j = 0; j < pattern.length && match; j++) {
 			match = match && (*a == *b);
 			++a; ++b;
 		}
 		if (match) {
+			nav();
 			if (marker.offset == skip.offset && marker.length == skip.length)
 				selections.pop_back();
 			selections.push_back({i,pattern.length});
 			skip = {-1,-1};
 		}
+		return match;
+	};
+
+	for (int i = marker.offset+1; i < (int)text.size()-pattern.length && !match; i++) {
+		if (!duplicate(i)) match = check(i);
 	}
-	if (!match) {
-		for (int i = 0; i < pattern.offset && i < (int)text.size()-pattern.length && !match; i++) {
-			bool duplicate = false;
-			for (auto& other: selections) {
-				duplicate = duplicate || other.offset == i;
-			}
-			if (duplicate) continue;
-			auto a = text.begin()+pattern.offset;
-			auto b = text.begin()+i;
-			match = true;
-			for (int j = 0; j < pattern.length && match; j++) {
-				match = match && (*a == *b);
-				++a; ++b;
-			}
-			if (match) {
-				if (marker.offset == skip.offset && marker.length == skip.length)
-					selections.pop_back();
-				selections.push_back({i,pattern.length});
-				skip = {-1,-1};
-			}
-		}
+	for (int i = 0; i < pattern.offset && i < (int)text.size()-pattern.length && !match; i++) {
+		if (!duplicate(i)) match = check(i);
 	}
 	sanity();
 	return true;
@@ -756,12 +747,6 @@ void View::addCursorUp() {
 	selection.offset += std::min(left, right);
 	selection.length = 0;
 
-	sanity();
-}
-
-void View::unwind() {
-	if (selections.size() < 2) return;
-	selections.pop_back();
 	sanity();
 }
 
@@ -943,9 +928,14 @@ bool View::interpret(const std::string& cmd) {
 }
 
 std::vector<std::string> View::autocomplete() {
-	if (selections.size() > 1U) return {};
-	int cursor = selections.back().offset;
-	return syntax->matches(text, cursor);
+	std::vector<std::string> matches;
+	for (auto& selection: selections) {
+		auto batch = syntax->matches(text, selection.offset);
+		matches.insert(matches.end(), batch.begin(), batch.end());
+	}
+	std::sort(matches.begin(), matches.end());
+	matches.erase(std::unique(matches.begin(), matches.end()), matches.end());
+	return matches;
 }
 
 void View::input() {
@@ -982,7 +972,6 @@ void View::input() {
 	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_V])) { paste(); return; }
 	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_D])) { selectNext(); return; }
 	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_K])) { selectSkip(); return; }
-	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_B])) { unwind(); return; }
 	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_A])) { selectAll(); return; }
 
 	if (Ctrl && ImGui::IsKeyReleased(KeyMap[KEY_S])) { save(); return; }

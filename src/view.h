@@ -126,7 +126,6 @@ struct View {
 	void boundaryLeft();
 	void addCursorDown();
 	void addCursorUp();
-	void unwind();
 	void sanity();
 	int toSol(int offset);
 	int toEol(int offset);
