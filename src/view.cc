@@ -1253,21 +1253,8 @@ std::string View::blurb() {
 
 	if (ms > 100ms) {
 		lastGit = now;
-
-		git_repository *repo = nullptr;
-		git_reference *head = nullptr;
-
-		for (;;) {
-			if (!path.size()) break;
-			if (0 != git_repository_open_ext(&repo, path.c_str(), 0, nullptr)) break;
-			if (0 != git_repository_head(&head, repo)) break;
-			const char *branch = git_reference_shorthand(head);
-			if (branch) blurbGit = fmt("%s", branch);
-			break;
-		}
-
-		if (head) git_reference_free(head);
-		if (repo) git_repository_free(repo);
+		auto repo = Repo::open(path);
+		blurbGit = repo ? repo->branch(): "";
 	}
 
 	return blurbGit.size() ? blurbGit: "(no branch)";

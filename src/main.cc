@@ -3,8 +3,6 @@
 #include "../imgui/imgui_impl_sdlrenderer.h"
 #include <SDL.h>
 
-#include <git2.h>
-
 #include "theme.h"
 #include "config.h"
 #include "project.h"
@@ -13,6 +11,7 @@
 #include "catenate.h"
 #include "channel.h"
 #include "workers.h"
+#include "repo.h"
 #include <filesystem>
 #include <chrono>
 #include <algorithm>
@@ -96,16 +95,24 @@ namespace {
 		return weakly_canonical(ipath).string();
 	};
 
-	void fileTree() {
+	void fileTree(const std::set<std::string>& subset = {}) {
 		using namespace ImGui;
 		using namespace std::filesystem;
 
-		std::function<void(const std::filesystem::path&, ImGuiTreeNodeFlags flags)> walk;
+		std::function<void(const std::filesystem::path&, ImGuiTreeNodeFlags, Repo*)> walk;
 
-		walk = [&](const std::filesystem::path& walkPath, ImGuiTreeNodeFlags flags) {
+		walk = [&](const std::filesystem::path& walkPath, ImGuiTreeNodeFlags flags, Repo* repo) {
 			if (!exists(walkPath)) return;
 
+			bool show = subset.empty();
+			for (auto& spath: subset) {
+				auto subPath = weakly_canonical(spath);
+				show = show || starts_with(subPath.string(), walkPath.string());
+			}
+			if (!show) return;
+
 			std::string label = fmt("%s##%s", walkPath.filename().string(), walkPath.string());
+			if (!subset.empty()) flags |= ImGuiTreeNodeFlags_DefaultOpen;
 			if (!TreeNodeEx(label.c_str(), flags | ImGuiTreeNodeFlags_SpanAvailWidth)) return;
 
 			auto it = directory_iterator(walkPath,
@@ -113,29 +120,19 @@ namespace {
 			);
 
 			std::vector<directory_entry> entries;
-
-			for (const directory_entry& entry: it) {
-				auto entryPath = weakly_canonical(entry.path().string());
-
-				bool ignore = false;
-				for (auto ipath: project.ignorePaths) {
-					auto ignorePath = weakly_canonical(ipath);
-					ignore = ignore || starts_with(entryPath.string(), ignorePath.string());
-				}
-				if (ignore) continue;
-
-				entries.push_back(entry);
-			}
-
+			for (const directory_entry& entry: it) entries.push_back(entry);
 			std::sort(entries.begin(), entries.end());
 
 			for (const auto& entry: entries) {
+
 				if (is_directory(entry)) {
-					walk(entry.path(), ImGuiTreeNodeFlags_None);
+					walk(entry.path(), ImGuiTreeNodeFlags_None, repo);
 					continue;
 				}
 
 				if (is_regular_file(entry)) {
+					if (!subset.empty() && !subset.count(entry.path().string())) continue;
+
 					auto index = project.find(entry.path().string());
 
 					if (index >= 0 && project.views[index]->modified)
@@ -150,6 +147,19 @@ namespace {
 					}
 
 					PopStyleColor();
+
+					if (repo && repo->ok()) {
+						auto status = repo->status(entry.path());
+						if (status.created()) {
+							SameLine();
+							PrintRight("A");
+						}
+						if (status.modified()) {
+							SameLine();
+							PrintRight("M");
+						}
+					}
+
 					continue;
 				}
 			}
@@ -157,8 +167,11 @@ namespace {
 			TreePop();
 		};
 
-		for (auto spath: project.searchPaths)
-			walk(weakly_canonical(spath), ImGuiTreeNodeFlags_DefaultOpen);
+		for (auto spath: project.searchPaths) {
+			auto wpath = weakly_canonical(spath);
+			auto repo = Repo::open(wpath);
+			walk(wpath, ImGuiTreeNodeFlags_DefaultOpen, repo);
+		}
 	}
 
 	#include "popup.cc"
@@ -540,27 +553,36 @@ int main(int argc, const char* argv[]) {
 					PushFont(fontSidebar);
 					if (BeginTabBar("#left-tabs")) {
 						if (BeginTabItem("open files")) {
-							if (BeginListBox("#open", ImVec2(-1,-1))) {
-								for (uint i = 0; i < project.views.size(); i++) {
-									auto view = project.views[i];
-									char* title = viewTitles[i].text;
-									uint size = sizeof(viewTitles[i].text);
-
-									const char* modified = view->modified ? "*": "";
-									std::snprintf(title, size, "%s%s", displayPath(view->path).c_str(), modified);
-
-									PushStyleColor(ImGuiCol_Text, view->modified ? ImColorSRGB(0xffff00ff) : GetColorU32(ImGuiCol_Text));
-
-									if (Selectable(title, project.active == (int)i)) {
-										project.active = i;
-										project.bubble();
-									}
-									PopStyleColor(1);
-								}
-								EndListBox();
-							}
+							BeginChild("##open-pane");
+							std::set<std::string> viewPaths;
+							for (auto view: project.views)
+								viewPaths.insert(view->path);
+							fileTree(viewPaths);
+							EndChild();
 							EndTabItem();
 						}
+
+//							if (BeginListBox("#open", ImVec2(-1,-1))) {
+//								for (uint i = 0; i < project.views.size(); i++) {
+//									auto view = project.views[i];
+//									char* title = viewTitles[i].text;
+//									uint size = sizeof(viewTitles[i].text);
+//
+//									const char* modified = view->modified ? "*": "";
+//									std::snprintf(title, size, "%s%s", displayPath(view->path).c_str(), modified);
+//
+//									PushStyleColor(ImGuiCol_Text, view->modified ? ImColorSRGB(0xffff00ff) : GetColorU32(ImGuiCol_Text));
+//
+//									if (Selectable(title, project.active == (int)i)) {
+//										project.active = i;
+//										project.bubble();
+//									}
+//									PopStyleColor(1);
+//								}
+//								EndListBox();
+//							}
+//							EndTabItem();
+//						}
 
 						if (BeginTabItem("browse")) {
 							BeginChild("##browse-pane");
@@ -656,6 +678,7 @@ int main(int argc, const char* argv[]) {
 	SDL_DestroyWindow(window);
 	SDL_Quit();
 
+	Repo::repos.clear();
 	git_libgit2_shutdown();
 	return 0;
 }

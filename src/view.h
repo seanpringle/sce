@@ -12,7 +12,7 @@ struct ViewRegion;
 #include "doc.h"
 #include "syntax.h"
 #include "flate.h"
-#include <git2.h>
+#include "repo.h"
 
 struct ViewRegion {
 	int offset;

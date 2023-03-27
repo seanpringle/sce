@@ -1,7 +1,7 @@
 #pragma once
 
 #include "view.h"
-#include <git2.h>
+#include "repo.h"
 #include <map>
 
 struct Project {
