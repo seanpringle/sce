@@ -4,8 +4,7 @@
 using namespace std::literals::chrono_literals;
 
 Repo::Repo(const std::filesystem::path& rpath) {
-	path = std::filesystem::weakly_canonical(rpath);
-	if (0 != git_repository_open_ext(&repo, path.c_str(), 0, nullptr)) return;
+	if (0 != git_repository_open_ext(&repo, rpath.string().c_str(), 0, nullptr)) return;
 	if (ok()) {
 		path = std::filesystem::weakly_canonical(git_repository_path(repo));
 		path = path.parent_path();
@@ -35,22 +34,22 @@ std::string Repo::branch() {
 
 Repo::Status Repo::status(const std::filesystem::path& fpath) {
 	auto stamp = std::chrono::system_clock::now();
-	auto wpath = std::filesystem::weakly_canonical(fpath);
 
-	if (!cache.count(wpath)) {
-		cache[wpath] = Status(*this, fpath);
+	if (cache.count(fpath)) {
+		auto& status = cache[fpath];
+		auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(stamp-status.stamp);
+		if (ms < 100ms) return status;
 	}
 
-	auto& status = cache[wpath];
-	auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(stamp-status.stamp);
-	if (ms > 100ms) status = Status(*this, fpath);
+	auto status = Status(*this, fpath);
+	cache[status.path] = status;
 
 	return status;
 }
 
 Repo::Status::Status(Repo& repo, const std::filesystem::path& fpath) {
 	stamp = std::chrono::system_clock::now();
-	path = std::filesystem::weakly_canonical(fpath);
+	path = fpath;
 	if (repo.ok() && std::filesystem::exists(path)) {
 		auto rel = std::filesystem::relative(path, repo.path);
 		err = git_status_file(&flags, repo.repo, rel.string().c_str());
@@ -74,13 +73,12 @@ bool Repo::Status::modified() const {
 }
 
 Repo* Repo::open(const std::filesystem::path& opath) {
-	auto wpath = std::filesystem::weakly_canonical(opath);
 	for (auto& repo: repos) {
-		if (wpath == repo.path) return &repo;
-		auto rel = std::filesystem::relative(wpath, repo.path);
+		if (opath == repo.path) return &repo;
+		auto rel = std::filesystem::relative(opath, repo.path);
 		if (!rel.empty() && rel.string().front() != '.') return &repo;
 	}
-	auto& repo = repos.emplace_back(wpath);
+	auto& repo = repos.emplace_back(opath);
 	if (repo.ok()) return &repo;
 	repos.pop_back();
 	return nullptr;

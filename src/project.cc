@@ -43,8 +43,7 @@ void Project::sanity() {
 	ensure(!viewset.size());
 }
 
-int Project::find(const std::string& path) {
-	auto vpath = std::filesystem::weakly_canonical(path).string();
+int Project::find(const std::string& vpath) {
 	auto it = std::find_if(views.begin(), views.end(), [&](auto view) { return view->path == vpath; });
 	return it == views.end() ? -1: it-views.begin();
 }
@@ -438,8 +437,8 @@ std::vector<std::string> Project::files() {
 		}
 	}
 
-	for (auto path: searchPaths) {
-		auto searchPath = weakly_canonical(path);
+	for (auto spath: searchPaths) {
+		auto searchPath = path(spath);
 		if (!exists(searchPath)) continue;
 
 		auto it = recursive_directory_iterator(searchPath,
@@ -448,12 +447,11 @@ std::vector<std::string> Project::files() {
 
 		for (const directory_entry& entry: it) {
 			if (!is_regular_file(entry)) continue;
-			auto entryPath = weakly_canonical(entry.path().string());
+			auto entryPath = entry.path();
 
 			bool ignore = false;
 			for (auto path: ignorePaths) {
-				auto ignorePath = weakly_canonical(path);
-				ignore = ignore || starts_with(entryPath.string(), ignorePath.string());
+				ignore = ignore || starts_with(entryPath.string(), path);
 			}
 			for (auto re: patterns) {
 				ignore = ignore || std::regex_search(entryPath.string(), re);

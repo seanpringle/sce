@@ -85,14 +85,13 @@ namespace {
 
 	std::string displayPath(std::string& ipath) {
 		using namespace std::filesystem;
-		auto cpath = weakly_canonical(ipath);
-		for (auto& path: project.searchPaths) {
-			auto spath = weakly_canonical(path);
-			if (starts_with(cpath.string(), spath.string())) {
+		auto cpath = path(ipath);
+		for (auto& spath: project.searchPaths) {
+			if (starts_with(ipath, spath)) {
 				return relative(cpath, spath).string();
 			}
 		}
-		return weakly_canonical(ipath).string();
+		return ipath;
 	};
 
 	void fileTree(const std::set<std::string>& subset = {}) {
@@ -106,8 +105,7 @@ namespace {
 
 			bool show = subset.empty();
 			for (auto& spath: subset) {
-				auto subPath = weakly_canonical(spath);
-				show = show || starts_with(subPath.string(), walkPath.string());
+				show = show || starts_with(spath, walkPath.string());
 			}
 			if (!show) return;
 
@@ -143,7 +141,7 @@ namespace {
 						PushStyleColor(ImGuiCol_Text, GetColorU32(ImGuiCol_Text));
 
 					if (Selectable(fmtc("%s##%s", entry.path().filename().string(), entry.path().string()))) {
-						project.open(weakly_canonical(entry.path()).string());
+						project.open(entry.path().string());
 					}
 
 					PopStyleColor();
@@ -168,9 +166,8 @@ namespace {
 		};
 
 		for (auto spath: project.searchPaths) {
-			auto wpath = weakly_canonical(spath);
-			auto repo = Repo::open(wpath);
-			walk(wpath, ImGuiTreeNodeFlags_DefaultOpen, repo);
+			auto repo = Repo::open(spath);
+			walk(spath, ImGuiTreeNodeFlags_DefaultOpen, repo);
 		}
 	}
 
@@ -561,29 +558,6 @@ int main(int argc, const char* argv[]) {
 							EndChild();
 							EndTabItem();
 						}
-
-//							if (BeginListBox("#open", ImVec2(-1,-1))) {
-//								for (uint i = 0; i < project.views.size(); i++) {
-//									auto view = project.views[i];
-//									char* title = viewTitles[i].text;
-//									uint size = sizeof(viewTitles[i].text);
-//
-//									const char* modified = view->modified ? "*": "";
-//									std::snprintf(title, size, "%s%s", displayPath(view->path).c_str(), modified);
-//
-//									PushStyleColor(ImGuiCol_Text, view->modified ? ImColorSRGB(0xffff00ff) : GetColorU32(ImGuiCol_Text));
-//
-//									if (Selectable(title, project.active == (int)i)) {
-//										project.active = i;
-//										project.bubble();
-//									}
-//									PopStyleColor(1);
-//								}
-//								EndListBox();
-//							}
-//							EndTabItem();
-//						}
-
 						if (BeginTabItem("browse")) {
 							BeginChild("##browse-pane");
 							fileTree();
