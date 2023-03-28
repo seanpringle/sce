@@ -12,6 +12,7 @@
 #include "channel.h"
 #include "workers.h"
 #include "repo.h"
+#include "filetree.h"
 #include <filesystem>
 #include <chrono>
 #include <algorithm>
@@ -94,81 +95,47 @@ namespace {
 		return ipath;
 	};
 
-	void fileTree(const std::set<std::string>& subset = {}) {
-		using namespace ImGui;
-		using namespace std::filesystem;
-
-		std::function<void(const std::filesystem::path&, ImGuiTreeNodeFlags, Repo*)> walk;
-
-		walk = [&](const std::filesystem::path& walkPath, ImGuiTreeNodeFlags flags, Repo* repo) {
-			if (!exists(walkPath)) return;
-
-			bool show = subset.empty();
-			for (auto& spath: subset) {
-				show = show || starts_with(spath, walkPath.string());
-			}
-			if (!show) return;
-
-			std::string label = fmt("%s##%s", walkPath.filename().string(), walkPath.string());
-			if (!subset.empty()) flags |= ImGuiTreeNodeFlags_DefaultOpen;
-			if (!TreeNodeEx(label.c_str(), flags | ImGuiTreeNodeFlags_SpanAvailWidth)) return;
-
-			auto it = directory_iterator(walkPath,
-				directory_options::skip_permission_denied
-			);
-
-			std::vector<directory_entry> entries;
-			for (const directory_entry& entry: it) entries.push_back(entry);
-			std::sort(entries.begin(), entries.end());
-
-			for (const auto& entry: entries) {
-
-				if (is_directory(entry)) {
-					walk(entry.path(), ImGuiTreeNodeFlags_None, repo);
-					continue;
-				}
-
-				if (is_regular_file(entry)) {
-					if (!subset.empty() && !subset.count(entry.path().string())) continue;
-
-					auto index = project.find(entry.path().string());
-
-					if (index >= 0 && project.views[index]->modified)
-						PushStyleColor(ImGuiCol_Text, ImColorSRGB(0xffff00ff));
-					else if (index >= 0)
-						PushStyleColor(ImGuiCol_Text, ImColorSRGB(0x99ff99ff));
-					else
-						PushStyleColor(ImGuiCol_Text, GetColorU32(ImGuiCol_Text));
-
-					if (Selectable(fmtc("%s##%s", entry.path().filename().string(), entry.path().string()))) {
-						project.open(entry.path().string());
-					}
-
-					PopStyleColor();
-
-					if (repo && repo->ok()) {
-						auto status = repo->status(entry.path());
-						if (status.created()) {
-							SameLine();
-							PrintRight("A");
-						}
-						if (status.modified()) {
-							SameLine();
-							PrintRight("M");
-						}
-					}
-
-					continue;
-				}
-			}
-
-			TreePop();
-		};
-
-		for (auto spath: project.searchPaths) {
-			auto repo = Repo::open(spath);
-			walk(spath, ImGuiTreeNodeFlags_DefaultOpen, repo);
+	struct FileTreeBuffers : FileTree {
+		bool isOpen(const std::string& fpath) override {
+			int index = project.find(fpath);
+			return index >= 0;
 		}
+
+		bool isModified(const std::string& fpath) override {
+			int index = project.find(fpath);
+			return index >= 0 ? project.views[index]->modified: false;
+		}
+
+		bool isActive(const std::string& fpath) override {
+			int index = project.find(fpath);
+			return index == project.active;
+		}
+
+		void onSelect(const std::string& spath) override {
+			project.open(spath);
+		}
+
+		void annotate(const std::string& fpath) override {
+			using namespace ImGui;
+			auto repo = Repo::open(fpath);
+
+			if (repo && repo->ok()) {
+				auto status = repo->status(fpath);
+				if (status.created()) {
+					SameLine();
+					PrintRight("A");
+				}
+				if (status.modified()) {
+					SameLine();
+					PrintRight("M");
+				}
+			}
+		}
+	};
+
+	void fileTree(const std::set<std::string>& subset = {}) {
+		FileTreeBuffers tree;
+		tree.render(project.searchPaths, subset);
 	}
 
 	#include "popup.cc"
@@ -351,10 +318,15 @@ int main(int argc, const char* argv[]) {
 		{
 			using namespace ImGui;
 
+			std::chrono::time_point<std::chrono::system_clock> popupLastOpen;
+			if (IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup)) popupLastOpen = std::chrono::system_clock::now();
+
+			bool suppressInputView = popupLastOpen > std::chrono::system_clock::now()-100ms;
+
 			if (!suppressInput) {
 
-				if (io.KeyCtrl && !io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEUP])) project.prev();
-				if (io.KeyCtrl && !io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEDOWN])) project.next();
+				if (io.KeyCtrl && !io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEUP])) project.activeUpTree();
+				if (io.KeyCtrl && !io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEDOWN])) project.activeDownTree();
 
 				find = io.KeyCtrl && !io.KeyShift && IsKeyPressed(KeyMap[KEY_F]);
 				line = io.KeyCtrl && !io.KeyShift && IsKeyPressed(KeyMap[KEY_G]);
@@ -379,7 +351,7 @@ int main(int argc, const char* argv[]) {
 					immediate = true;
 				}
 
-				if (!IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup)) {
+				if (!suppressInputView) {
 
 					if (IsKeyPressed(KeyMap[KEY_F1])) {
 						project.layout1();
@@ -405,11 +377,11 @@ int main(int argc, const char* argv[]) {
 						}
 
 						if (io.KeyCtrl && io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEUP])) {
-							project.movePrev();
+							project.movePrevGroup();
 						}
 
 						if (io.KeyCtrl && io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEDOWN])) {
-							project.moveNext();
+							project.moveNextGroup();
 						}
 
 						if (io.KeyCtrl && IsKeyPressed(KeyMap[KEY_N])) {
@@ -549,7 +521,7 @@ int main(int argc, const char* argv[]) {
 					PushStyleColor(ImGuiCol_FrameBg, bg);
 					PushFont(fontSidebar);
 					if (BeginTabBar("#left-tabs")) {
-						if (BeginTabItem("open files")) {
+						if (BeginTabItem("buffers")) {
 							BeginChild("##open-pane");
 							std::set<std::string> viewPaths;
 							for (auto view: project.views)
@@ -577,7 +549,7 @@ int main(int argc, const char* argv[]) {
 						auto view = group.front();
 
 						bool viewHasInput = project.view() == view
-							&& !IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopup)
+							&& !suppressInputView
 							&& !suppressInput;
 
 						if (viewHasInput) {

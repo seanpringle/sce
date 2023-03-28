@@ -19,6 +19,7 @@ struct FilterPopup : Popup {
 	void filterOptions();
 	void setup();
 	void render();
+	virtual void renderOptions();
 	bool up();
 	bool down();
 	bool tab();

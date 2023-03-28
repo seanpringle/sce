@@ -144,9 +144,14 @@ void FilterPopup::render() {
 	}
 	EndTable();
 
-	if (BeginListBox(fmtc("#%s-matches", name), ImVec2(-1,-1))) {
-		filterOptions();
+	filterOptions();
+	renderOptions();
+}
 
+void FilterPopup::renderOptions() {
+	using namespace ImGui;
+
+	if (BeginListBox(fmtc("#%s-matches", name), ImVec2(-1,-1))) {
 		for (int i = 0; i < (int)visible.size(); i++) {
 			auto& option = options[visible[i]];
 			if (Selectable(option.c_str(), i == selected)) {

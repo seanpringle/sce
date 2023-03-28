@@ -42,10 +42,10 @@ struct Project {
 	void bubble();
 
 	void cycle();
-	void prev();
-	void next();
-	void movePrev();
-	void moveNext();
+	void activeUpTree();
+	void activeDownTree();
+	void movePrevGroup();
+	void moveNextGroup();
 
 	std::vector<std::string> files();
 

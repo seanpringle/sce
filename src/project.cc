@@ -386,17 +386,45 @@ void Project::cycle() {
 	bubble();
 }
 
-void Project::prev() {
-	active--;
+void Project::activeUpTree() {
+	std::vector<View*> tree = views;
+	std::sort(tree.begin(), tree.end(), [&](auto a, auto b) {
+		return a->path < b->path;
+	});
+
+	for (int i = 1, l = tree.size(); i < l; i++) {
+		if (tree[i] != views[active]) continue;
+		for (int j = 0, l = views.size(); j < l; j++) {
+			if (tree[i-1] == views[j]) {
+				active = j;
+				i = l;
+				j = l;
+			}
+		}
+	}
 	bubble();
 }
 
-void Project::next() {
-	active++;
+void Project::activeDownTree() {
+	std::vector<View*> tree = views;
+	std::sort(tree.begin(), tree.end(), [&](auto a, auto b) {
+		return a->path < b->path;
+	});
+
+	for (int i = 0, l = tree.size(); i < l-1; i++) {
+		if (tree[i] != views[active]) continue;
+		for (int j = 0, l = views.size(); j < l; j++) {
+			if (tree[i+1] == views[j]) {
+				active = j;
+				i = l;
+				j = l;
+			}
+		}
+	}
 	bubble();
 }
 
-void Project::movePrev() {
+void Project::movePrevGroup() {
 	auto gactive = group(view());
 	if (gactive == 0) {
 		forget(view());
@@ -409,7 +437,7 @@ void Project::movePrev() {
 	bubble();
 }
 
-void Project::moveNext() {
+void Project::moveNextGroup() {
 	auto gactive = group(view());
 	if (gactive == (int)groups.size()-1) {
 		forget(view());

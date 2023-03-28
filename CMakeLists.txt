@@ -40,6 +40,6 @@ add_library(imgui OBJECT imgui/build.cpp)
 
 set(CMAKE_CXX_STANDARD 20)
 
-add_executable(sce src/main.cc src/config.cc src/theme.cc src/syntax.cc src/project.cc src/view.cc src/repo.cc)
+add_executable(sce src/main.cc src/config.cc src/theme.cc src/syntax.cc src/project.cc src/view.cc src/repo.cc src/filetree.cc)
 include_directories(sce /home/sean/src/SDL/include ${FREETYPE_INCLUDE_DIRS})
 target_link_libraries(sce imgui /home/sean/src/SDL/build/.libs/libSDL2.so ${FREETYPE_LIBRARIES} stdc++fs Threads::Threads git2)
