@@ -1,13 +1,14 @@
 #pragma once
 
 #include "common.h"
+#include "utf8.h"
 #include <deque>
 #include <vector>
 #include <cstring>
 
 struct Doc {
 	Doc() = default;
-	Doc(std::initializer_list<int> l) {
+	Doc(std::initializer_list<uint32_t> l) {
 		for (auto v: l) push_back(v);
 	}
 	Doc(const Doc& other) {
@@ -27,7 +28,7 @@ struct Doc {
 	}
 
 	uint count = 0;
-	std::vector<std::vector<int>> lines;
+	std::vector<std::vector<uint32_t>> lines;
 
 	struct Cursor {
 		uint index = 0;
@@ -136,26 +137,41 @@ struct Doc {
 		return last.index;
 	}
 
-	int* cell(uint index) const {
+	uint32_t* cell(uint index) const {
 		ensure(index < size());
 		auto cur = cursor(index);
-		return (int*)&lines[cur.line][cur.cell];
+		return (uint32_t*)&lines[cur.line][cur.cell];
 	};
 
 	uint size() const {
 		return count;
 	};
 
-	void push_back(int v) {
+	void push_back(uint32_t v) {
 		insert(end(), v);
 	}
 
 	void push_back(std::string s) {
-		for (auto c: s) push_back(c);
+		UTF8 utf8(s);
+		UTF8 test(utf8.text);
+		if (utf8.codes != test.codes) notef("in codes don't match");
+		if (utf8.text != test.text) notef("in texts don't match");
+		for (auto c: utf8.codes) push_back(c);
+	}
+
+	std::string extract(size_t offset, size_t length) const {
+		std::vector<uint32_t> out;
+		for (size_t i = offset; i < offset+length && i < size(); i++)
+			out.push_back(*cell(i));
+		UTF8 utf8(out);
+		UTF8 test(utf8.text);
+		if (utf8.codes != test.codes) notef("out codes don't match");
+		if (utf8.text != test.text) notef("out texts don't match");
+		return utf8.text;
 	}
 
 	operator std::string() const {
-		return std::string({begin(), end()});
+		return extract((size_t)0, size());
 	}
 
 	class iterator {
@@ -163,8 +179,8 @@ struct Doc {
 		uint ii;
 		const Doc* doc;
 
-		typedef int V;
-		typedef int value_type;
+		typedef uint32_t V;
+		typedef uint32_t value_type;
 		typedef uint difference_type;
 		typedef V* pointer;
 		typedef V& reference;
@@ -278,11 +294,11 @@ struct Doc {
 		return iterator(this, size());
 	};
 
-	const int& operator[](uint index) const {
+	const uint32_t& operator[](uint index) const {
 		return *cell(index);
 	};
 
-	iterator insert(iterator it, int v) {
+	iterator insert(iterator it, uint32_t v) {
 		if (!lines.size()) {
 			lines.push_back({v});
 			count++;
@@ -314,7 +330,7 @@ struct Doc {
 		count++;
 		if (v == '\n') {
 			auto split = pos+1;
-			std::vector<int> eol = {split, line.end()};
+			std::vector<uint32_t> eol = {split, line.end()};
 			line.erase(split, line.end());
 			auto lit = lines.begin()+cur.line;
 			lines.insert(lit+1, eol);
@@ -346,7 +362,7 @@ struct Doc {
 
 		auto& line = lines[cur.line];
 		ensure(line.size());
-		int c = line[cur.cell];
+		uint32_t c = line[cur.cell];
 		line.erase(line.begin()+cur.cell);
 		count--;
 		if (c == '\n') {
@@ -369,18 +385,22 @@ struct Doc {
 		return erase(a, b-a);
 	};
 
+	std::string extract(iterator a, iterator b) {
+		return a < b ? extract(a-begin(), b-a): "";
+	}
+
 	std::vector<char> exportRaw() {
-		std::vector<int> ints = {begin(), end()};
-		size_t bytes = ints.size() * sizeof(int);
+		std::vector<uint32_t> cells = {begin(), end()};
+		size_t bytes = cells.size() * sizeof(uint32_t);
 		std::vector<char> raw(bytes, 0);
-		std::memmove(raw.data(), ints.data(), bytes);
+		std::memmove(raw.data(), cells.data(), bytes);
 		return raw;
 	}
 
 	void importRaw(const std::vector<char>& raw) {
 		clear();
-		std::vector<int> ints(raw.size() / sizeof(int));
-		std::memmove(ints.data(), raw.data(), raw.size());
-		for (auto c: ints) push_back(c);
+		std::vector<uint32_t> cells(raw.size() / sizeof(int));
+		std::memmove(cells.data(), raw.data(), raw.size());
+		for (auto c: cells) push_back(c);
 	}
 };

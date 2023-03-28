@@ -5,8 +5,8 @@ struct FilterPopup : Popup {
 	bool ready = false;
 	bool loading = false;
 	bool focus = false;
-	bool scroll = false;
 	char input[100];
+	std::vector<std::string> needles;
 	std::vector<std::string> options;
 	std::vector<int> visible;
 	int selected = 0;
@@ -19,7 +19,6 @@ struct FilterPopup : Popup {
 	void filterOptions();
 	void setup();
 	void render();
-	virtual void renderOptions();
 	bool up();
 	bool down();
 	bool tab();

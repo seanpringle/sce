@@ -124,11 +124,7 @@ bool View::eol(int offset) {
 }
 
 std::string View::extract(ViewRegion region) {
-	std::string str;
-	for (int i = region.offset; i < region.offset+region.length && get(i); i++) {
-		str += get(i);
-	}
-	return str;
+	return text.extract(region.offset, region.length);
 }
 
 void View::nav() {
@@ -258,7 +254,7 @@ void View::insertAt(ViewRegion selection, int c, bool autoindent) {
 		int left = toSol(selection.offset);
 		int start = selection.offset-left;
 
-		std::vector<int> indent;
+		std::vector<uint32_t> indent;
 		while (iswspace(text[start]) && text[start] != '\n') {
 			indent.push_back(text[start++]);
 		}
@@ -388,16 +384,20 @@ void View::clip() {
 		}
 	}
 	sanity();
+
+	std::string cliptext;
 	for (auto& selection: selections) {
 		auto it = text.begin()+selection.offset;
 		Clip clip;
 		clip.text = {it, it+selection.length};
+		cliptext = text.extract(it, it+selection.length);
 		clip.line = lines.front();
 		lines.pop_front();
 		clips.push_back(clip);
 	}
-	auto cliptext = std::string({clips.front().text.begin(), clips.front().text.end()});
-	ImGui::SetClipboardText(cliptext.c_str());
+
+	if (cliptext.size())
+		ImGui::SetClipboardText(cliptext.c_str());
 }
 
 void View::cut() {
@@ -414,23 +414,12 @@ void View::paste() {
 	if (!erase()) snap();
 	int nclips = clips.size();
 
-	std::vector<int> clipstring;
-	const char* cliptext = ImGui::GetClipboardText();
-
-	while (cliptext && *cliptext) {
-		unsigned char c = *cliptext++;
-		if (c == 0xc2) {
-			unsigned char d = *cliptext++;
-			clipstring.push_back(((unsigned int)c << 8)|(unsigned int)d);
-			continue;
-		}
-		clipstring.push_back(c);
-	}
+	UTF8 clipboard(ImGui::GetClipboardText());
 
 	for (int i = selections.size()-1; i >= 0; --i) {
 		auto& selection = selections[i];
 		// when single clip/selection, clipboard takes precedence
-		auto clipText = nclips > 1 && nclips > i ? clips[i].text: clipstring;
+		auto clipText = nclips > 1 && nclips > i ? clips[i].text: clipboard.codes;
 		auto clipLine = nclips > 1 && nclips > i ? clips[i].line: false;
 		int offset = selection.offset;
 
@@ -1021,7 +1010,7 @@ void View::autosyntax() {
 	auto stem = fpath.stem().string();
 	auto name = fpath.filename().string();
 
-	std::string line = {text.begin(), text.begin() + toEol(0)};
+	std::string line = text.extract(0, toEol(0));
 
 	auto shebang = [&](std::string sub) {
 		return line.find(sub) != std::string::npos;
@@ -1076,6 +1065,7 @@ void View::autosyntax() {
 }
 
 bool View::open(std::string path) {
+	notef("open %s", path);
 	auto fpath = std::filesystem::weakly_canonical(path);
 
 	// figure out why wifstream doesn't work
@@ -1090,35 +1080,9 @@ bool View::open(std::string path) {
 	undos.clear();
 	redos.clear();
 
-	auto bytes = std::filesystem::file_size(fpath);
-	std::string raw(bytes, '\0');
-	in.read(raw.data(), bytes);
-
-	int at = 0;
-
-	auto more = [&]() {
-		return at < bytes;
-	};
-
-	auto next = [&]() {
-		return more() ? (int)raw[at++]: EOF;
-	};
-
-	while (more()) {
-		int c = next();
-
-		if (c == 0xc2 && !more()) {
-			notef("invalid utf8 sequence at offset %d", at-1);
-			continue;
-		}
-
-		if (c == 0xc2) {
-			text.push_back((c << 8)|next());
-			continue;
-		}
-
-		text.push_back(c);
-	}
+	std::string content((std::istreambuf_iterator<char>(in)), (std::istreambuf_iterator<char>()));
+	text.push_back(content);
+	in.close();
 
 	autosyntax();
 
@@ -1214,7 +1178,7 @@ void View::trimTailingWhite() {
 	}
 	text.cursor(0);
 	for (auto& line: text.lines) {
-		while (line.size() > 1 && isspace(line[line.size()-2])) {
+		while (line.size() > 1 && iswspace(line[line.size()-2])) {
 			line.erase(line.begin()+line.size()-2);
 			text.count--;
 		}
@@ -1264,15 +1228,7 @@ void View::save() {
 	if (!path.size()) return;
 	trimTailingWhite();
 	auto out = std::ofstream(path);
-	for (auto& line: text.lines) {
-		for (int c: line) {
-			if (c&0xff00) {
-				out << (unsigned char)((c&0xff00)>>8);
-				c = c&0xff;
-			}
-			out << (unsigned char)c;
-		}
-	}
+	out << std::string(text);
 	out.close();
 	modified = false;
 	orig = deflate(text.exportRaw(), defl);
@@ -1311,7 +1267,7 @@ void View::draw() {
 		int y = 0;
 		uint fg = 0xffffffff;
 		uint bg = 0x00000000;
-		std::vector<int> text;
+		std::vector<uint32_t> text;
 		bool synhint = false;
 		bool selhint = false;
 	};

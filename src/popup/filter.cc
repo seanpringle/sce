@@ -2,19 +2,33 @@
 
 void FilterPopup::filterOptions() {
 	visible.clear();
-	auto needles = std::string(input);
-	for (int i = 0, l = (int)options.size(); i < l; i++) {
-		auto& haystack = options[i];
-		bool match = true;
-		for (auto part: discatenate(needles," ")) {
-			auto needle = std::string(part);
-			trim(needle);
-			if (!needle.size()) continue;
-			if (needle.size() > haystack.size()) { match = false; break; }
-			if (haystack.find(needle) == std::string::npos) { match = false; break; }
-		}
-		if (match) visible.push_back(i);
+	needles.clear();
+
+	for (auto part: discatenate(input," ")) {
+		auto needle = std::string(part);
+		trim(needle);
+		if (!needle.size()) continue;
+		needles.push_back(std::move(needle));
 	}
+
+	for (int i = 0, l = (int)options.size(); i < l; i++) {
+		std::string_view oview(options[i]);
+		size_t needle = 0;
+		for (size_t cursor = 0; cursor < oview.size(); ) {
+			if (needle < needles.size()) {
+				std::string_view nview(needles[needle]);
+				if (oview[cursor] == nview.front() && oview.substr(cursor,nview.size()) == nview) {
+					cursor += nview.size();
+					needle++;
+					continue;
+				}
+			}
+			cursor++;
+		}
+		if (needle == needles.size())
+			visible.push_back(i);
+	}
+
 	selected = std::max(0, std::min((int)visible.size()-1, selected));
 }
 
@@ -44,7 +58,6 @@ void FilterPopup::setup() {
 		ready = false;
 		focus = false;
 		immediate = true;
-		scroll = false;
 		crew.job([&]() {
 			init();
 			sync.lock();
@@ -145,25 +158,98 @@ void FilterPopup::render() {
 	EndTable();
 
 	filterOptions();
-	renderOptions();
-}
 
-void FilterPopup::renderOptions() {
-	using namespace ImGui;
+	if (BeginListBox(fmtc("##%s-matches", name), ImVec2(-1,-1))) {
+		struct Section {
+			ImU32 color = 0;
+			size_t offset = 0;
+			size_t length = 0;
+		};
 
-	if (BeginListBox(fmtc("#%s-matches", name), ImVec2(-1,-1))) {
+		std::vector<Section> sections;
+
 		for (int i = 0; i < (int)visible.size(); i++) {
-			auto& option = options[visible[i]];
-			if (Selectable(option.c_str(), i == selected)) {
+			const auto& option = options[visible[i]];
+
+			GetWindowDrawList()->ChannelsSplit(2);
+			GetWindowDrawList()->ChannelsSetCurrent(1);
+
+			float width = GetContentRegionAvail().x;
+
+			BeginGroup();
+			Indent(GetStyle().ItemSpacing.x/2);
+
+			sections.clear();
+			sections.emplace_back();
+			sections.back().color = GetColorU32(ImGuiCol_Text);
+
+			std::string_view oview(option);
+			size_t nextNeedle = 0;
+
+			for (size_t cursor = 0; cursor < option.size(); ) {
+				bool match = false;
+				if (nextNeedle < needles.size()) {
+					std::string_view nview(needles[nextNeedle]);
+					if (oview[cursor] == nview.front() && oview.substr(cursor,nview.size()) == nview) {
+						sections.emplace_back();
+						sections.back().color = ImColorSRGB(0xffff00ff);
+						sections.back().offset = cursor;
+						sections.back().length = nview.size();
+						cursor += nview.size();
+						nextNeedle++;
+						match = true;
+						sections.emplace_back();
+						sections.back().color = sections.front().color;
+						sections.back().offset = cursor;
+					}
+				}
+				if (!match) {
+					sections.back().length++;
+					cursor++;
+				}
+			}
+
+			for (
+				auto it = sections.begin();
+				it != sections.end();
+				it = it->length > 0 ? ++it: sections.erase(it)
+			);
+
+			for (auto& section: sections) {
+				PushStyleColor(ImGuiCol_Text, section.color);
+				TextUnformatted(option.c_str() + section.offset, option.c_str() + section.offset + section.length);
+				SameLine();
+				SetCursorPosX(GetCursorPosX()-GetStyle().ItemSpacing.x);
+				PopStyleColor();
+			}
+			NewLine();
+
+			Unindent(GetStyle().ItemSpacing.x/2);
+			SetCursorPosX(width);
+			EndGroup();
+
+			if (IsItemHovered()) {
+				GetWindowDrawList()->ChannelsSetCurrent(0);
+				GetWindowDrawList()->AddRectFilled(GetItemRectMin(), GetItemRectMax(), GetColorU32(ImGuiCol_HeaderHovered));
+			}
+			else
+			if (selected == i) {
+				GetWindowDrawList()->ChannelsSetCurrent(0);
+				GetWindowDrawList()->AddRectFilled(GetItemRectMin(), GetItemRectMax(), GetColorU32(ImGuiCol_Header));
+			}
+
+			GetWindowDrawList()->ChannelsMerge();
+
+			if (IsItemClicked()) {
 				selected = i;
 				chosen(visible[i]);
 				CloseCurrentPopup();
 			}
-			if (selected == i && scroll) {
+
+			if (selected == i && !IsWindowHovered()) {
 				SetScrollHereY();
 			}
 		}
 		EndListBox();
-		scroll = false;
 	}
 }
