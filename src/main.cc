@@ -86,10 +86,9 @@ namespace {
 
 	std::string displayPath(std::string& ipath) {
 		using namespace std::filesystem;
-		auto cpath = path(ipath);
 		for (auto& spath: project.searchPaths) {
 			if (starts_with(ipath, spath)) {
-				return relative(cpath, spath).string();
+				return ipath.substr(spath.size()+1);
 			}
 		}
 		return ipath;

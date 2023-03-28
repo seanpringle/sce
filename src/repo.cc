@@ -50,9 +50,9 @@ Repo::Status Repo::status(const std::filesystem::path& fpath) {
 Repo::Status::Status(Repo& repo, const std::filesystem::path& fpath) {
 	stamp = std::chrono::system_clock::now();
 	path = fpath;
-	if (repo.ok() && std::filesystem::exists(path)) {
-		auto rel = std::filesystem::relative(path, repo.path);
-		err = git_status_file(&flags, repo.repo, rel.string().c_str());
+	if (repo.ok() && std::filesystem::exists(path) && starts_with(fpath, repo.path)) {
+		std::string rel = fpath.string().substr(repo.path.string().size()+1);
+		err = git_status_file(&flags, repo.repo, rel.c_str());
 	}
 }
 
@@ -75,8 +75,7 @@ bool Repo::Status::modified() const {
 Repo* Repo::open(const std::filesystem::path& opath) {
 	for (auto& repo: repos) {
 		if (opath == repo.path) return &repo;
-		auto rel = std::filesystem::relative(opath, repo.path);
-		if (!rel.empty() && rel.string().front() != '.') return &repo;
+		if (starts_with(opath, repo.path)) return &repo;
 	}
 	auto& repo = repos.emplace_back(opath);
 	if (repo.ok()) return &repo;
