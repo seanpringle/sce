@@ -167,7 +167,7 @@ struct Doc {
 		UTF8 test(utf8.text);
 		if (utf8.codes != test.codes) notef("out codes don't match");
 		if (utf8.text != test.text) notef("out texts don't match");
-		return utf8.text;
+		return utf8;
 	}
 
 	operator std::string() const {

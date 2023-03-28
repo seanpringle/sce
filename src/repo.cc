@@ -1,7 +1,12 @@
 #include "repo.h"
-#include "common.h"
 
 using namespace std::literals::chrono_literals;
+
+namespace {
+	bool starts_with(const std::string& str, const std::string& prefix) {
+	    return str.size() >= prefix.size() && 0 == str.compare(0, prefix.size(), prefix);
+	}
+}
 
 Repo::Repo(const std::filesystem::path& rpath) {
 	if (0 != git_repository_open_ext(&repo, rpath.string().c_str(), 0, nullptr)) return;
@@ -26,7 +31,7 @@ std::string Repo::branch() {
 	git_repository_head(&head, repo);
 	if (head) {
 		const char *branch = git_reference_shorthand(head);
-		if (branch) result = fmt("%s", branch);
+		if (branch) result = branch;
 		git_reference_free(head);
 	}
 	return result;

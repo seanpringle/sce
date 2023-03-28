@@ -1,5 +1,7 @@
 #include "utf8.h"
-#include "common.h"
+#include <iostream>
+
+using namespace std;
 
 #define UTF8_2 0b11000000
 #define UTF8_2_MASK 0b11100000
@@ -17,7 +19,7 @@ bool UTF8::ok() const {
 	return encodeErrors.size() == 0 && decodeErrors.size() == 0;
 }
 
-UTF8::UTF8(const std::string& in) {
+UTF8::UTF8(const string& in) {
 	text = in;
 	size_t cursor = 0;
 
@@ -74,10 +76,10 @@ UTF8::UTF8(const std::string& in) {
 	}
 
 	if (decodeErrors.size())
-		notef("invalid UTF8 decode");
+		cout << "invalid UTF8 decode" << endl;
 }
 
-UTF8::UTF8(const std::vector<uint32_t>& in) {
+UTF8::UTF8(const vector<uint32_t>& in) {
 	codes = in;
 
 	for (size_t cursor = 0; cursor < in.size(); cursor++) {
@@ -126,5 +128,5 @@ UTF8::UTF8(const std::vector<uint32_t>& in) {
 	}
 
 	if (encodeErrors.size())
-		notef("invalid UTF8 encode");
+		cout << "invalid UTF8 encode" << endl;
 }

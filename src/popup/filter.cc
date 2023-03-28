@@ -187,6 +187,17 @@ void FilterPopup::render() {
 			size_t nextNeedle = 0;
 
 			for (size_t cursor = 0; cursor < option.size(); ) {
+				if (option[cursor] == '\n') {
+					sections.emplace_back();
+					sections.back().color = sections.front().color;
+					sections.back().offset = cursor;
+					sections.back().length = 1;
+					cursor++;
+					sections.emplace_back();
+					sections.back().color = sections.front().color;
+					sections.back().offset = cursor;
+					continue;
+				}
 				bool match = false;
 				if (nextNeedle < needles.size()) {
 					std::string_view nview(needles[nextNeedle]);
@@ -217,9 +228,13 @@ void FilterPopup::render() {
 
 			for (auto& section: sections) {
 				PushStyleColor(ImGuiCol_Text, section.color);
-				TextUnformatted(option.c_str() + section.offset, option.c_str() + section.offset + section.length);
-				SameLine();
-				SetCursorPosX(GetCursorPosX()-GetStyle().ItemSpacing.x);
+				if (section.length == 1 && option[section.offset] == '\n')
+					NewLine();
+				else {
+					TextUnformatted(option.c_str() + section.offset, option.c_str() + section.offset + section.length);
+					SameLine();
+					SetCursorPosX(GetCursorPosX()-GetStyle().ItemSpacing.x);
+				}
 				PopStyleColor();
 			}
 			NewLine();

@@ -5,6 +5,7 @@ FilterPopupRefs::FilterPopupRefs() {
 }
 
 void FilterPopupRefs::init() {
+	std::snprintf(input, sizeof(input), "%s", needle.c_str());
 	results = project.search(needle);
 
 	std::sort(results.begin(), results.end(), [](auto a, auto b) {

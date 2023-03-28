@@ -8,7 +8,12 @@ struct UTF8 {
 	std::vector<size_t> encodeErrors;
 	std::vector<uint32_t> codes;
 	std::string text;
+	bool ok() const;
+
 	UTF8(const std::string& in);
 	UTF8(const std::vector<uint32_t>& in);
-	bool ok() const;
+
+	operator std::string() const {
+		return text;
+	}
 };
