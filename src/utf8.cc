@@ -23,12 +23,26 @@ UTF8::UTF8(const string& in) {
 	text = in;
 	size_t cursor = 0;
 
+	auto remaining = [&]() {
+		return in.size() > cursor ? in.size()-cursor: 0u;
+	};
+
 	auto more = [&]() {
-		return cursor < in.size();
+		return remaining() > 0;
 	};
 
 	auto next = [&]() {
 		return (uint32_t)in[cursor++];
+	};
+
+	auto peek = [&](size_t offset) {
+		return remaining() >= offset ? in[cursor+offset]: 0;
+	};
+
+	auto continuations = [&](size_t n) {
+		for (size_t i = 0; i < n; i++)
+			if ((peek(i) & ~UTF8_PAYLOAD) != UTF8_MARKER) return false;
+		return true;
 	};
 
 	int errors = 0;
@@ -41,7 +55,7 @@ UTF8::UTF8(const string& in) {
 			continue;
 		}
 
-		if ((ch & UTF8_4_MASK) == UTF8_4) {
+		if ((ch & UTF8_4_MASK) == UTF8_4 && continuations(3)) {
 			uint32_t a, b, c, d;
 			a = (ch & UTF8_4_PAYLOAD);
 			b = (next() & UTF8_PAYLOAD);
@@ -52,7 +66,7 @@ UTF8::UTF8(const string& in) {
 			continue;
 		}
 
-		if ((ch & UTF8_3_MASK) == UTF8_3) {
+		if ((ch & UTF8_3_MASK) == UTF8_3 && continuations(2)) {
 			uint32_t a, b, c;
 			a = (ch & UTF8_3_PAYLOAD);
 			b = (next() & UTF8_PAYLOAD);
@@ -62,7 +76,7 @@ UTF8::UTF8(const string& in) {
 			continue;
 		}
 
-		if ((ch & UTF8_2_MASK) == UTF8_2) {
+		if ((ch & UTF8_2_MASK) == UTF8_2 && continuations(1)) {
 			uint32_t a, b;
 			a = (ch & UTF8_2_PAYLOAD);
 			b = (next() & UTF8_PAYLOAD);
