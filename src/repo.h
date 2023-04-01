@@ -29,9 +29,22 @@ struct Repo {
 
 	Status status(const std::filesystem::path& fpath);
 
+	struct Diff {
+		int err = -1;
+		std::filesystem::path path;
+		std::chrono::time_point<std::chrono::system_clock> stamp;
+		std::string patch;
+		Diff() = default;
+		Diff(Repo& repo, const std::filesystem::path& fpath);
+		bool ok() const;
+	};
+
+	Diff diff(const std::filesystem::path& fpath);
+
 	static inline std::deque<Repo> repos;
 	static Repo* open(const std::filesystem::path& path);
 
-	static inline std::map<std::filesystem::path,Status> cache;
+	static inline std::map<std::filesystem::path,Status> cacheStatus;
+	static inline std::map<std::filesystem::path,Diff> cacheDiff;
 };
 

@@ -390,17 +390,12 @@ struct Doc {
 	}
 
 	std::vector<char> exportRaw() {
-		std::vector<uint32_t> cells = {begin(), end()};
-		size_t bytes = cells.size() * sizeof(uint32_t);
-		std::vector<char> raw(bytes, 0);
-		std::memmove(raw.data(), cells.data(), bytes);
-		return raw;
+		auto str = extract(begin(), end());
+		return {str.begin(), str.end()};
 	}
 
 	void importRaw(const std::vector<char>& raw) {
 		clear();
-		std::vector<uint32_t> cells(raw.size() / sizeof(int));
-		std::memmove(cells.data(), raw.data(), raw.size());
-		for (auto c: cells) push_back(c);
+		push_back(std::string(raw.begin(), raw.end()));
 	}
 };

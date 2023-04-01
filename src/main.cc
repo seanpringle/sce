@@ -25,6 +25,12 @@ Theme theme;
 Config config;
 Project project;
 
+ImFont* fontProp = nullptr;
+ImFont* fontMono = nullptr;
+ImFont* fontView = nullptr;
+ImFont* fontSidebar = nullptr;
+ImFont* fontPopup = nullptr;
+
 int KeyMap[100] = {
 	[KEY_ESCAPE] = SDL_SCANCODE_ESCAPE,
 	[KEY_BACKSPACE] = SDL_SCANCODE_BACKSPACE,
@@ -127,6 +133,28 @@ namespace {
 				if (status.modified()) {
 					SameLine();
 					PrintRight("M");
+					if (IsItemHovered()) {
+						BeginTooltip();
+							PushFont(fontView);
+							auto diff = repo->diff(fpath);
+							if (diff.ok()) {
+								for (auto line: discatenate(diff.patch, "\n")) {
+									int pushed = 0;
+									if (line.size() && line.front() == '+') {
+										PushStyleColor(ImGuiCol_Text, ImColorSRGB(0x009900ff));
+										pushed++;
+									}
+									if (line.size() && line.front() == '-') {
+										PushStyleColor(ImGuiCol_Text, ImColorSRGB(0xcc0000ff));
+										pushed++;
+									}
+									TextUnformatted(&line.front(), &line.back()+1);
+									PopStyleColor(pushed);
+								}
+							}
+							PopFont();
+						EndTooltip();
+					}
 				}
 			}
 		}
@@ -216,23 +244,23 @@ int main(int argc, const char* argv[]) {
 	bool haveFontProp = config.font.prop.face.size() && std::filesystem::exists(config.font.prop.face);
 	bool haveFontMono = config.font.mono.face.size() && std::filesystem::exists(config.font.mono.face);
 
-	ImFont* fontProp = haveFontProp
+	fontProp = haveFontProp
 		? fonts->AddFontFromFileTTF(config.font.prop.face.c_str(), fontpx(config.font.prop.size), nullptr, uniPlane0)
 		: fontDef;
 
-	ImFont* fontMono = haveFontMono
+	fontMono = haveFontMono
 		? fonts->AddFontFromFileTTF(config.font.mono.face.c_str(), fontpx(config.font.mono.size), nullptr, uniPlane0)
 		: fontDef;
 
-	ImFont* fontView = haveFontMono && (config.view.font > 1.0f || config.view.font < 1.0f)
+	fontView = haveFontMono && (config.view.font > 1.0f || config.view.font < 1.0f)
 		? fonts->AddFontFromFileTTF(config.font.mono.face.c_str(), fontpx(config.font.mono.size * config.view.font), nullptr, uniPlane0)
 		: fontMono;
 
-	ImFont* fontSidebar = haveFontProp && (config.sidebar.font > 1.0f || config.sidebar.font < 1.0f)
+	fontSidebar = haveFontProp && (config.sidebar.font > 1.0f || config.sidebar.font < 1.0f)
 		? fonts->AddFontFromFileTTF(config.font.prop.face.c_str(), fontpx(config.font.prop.size * config.sidebar.font), nullptr, uniPlane0)
 		: fontProp;
 
-	ImFont* fontPopup = haveFontProp && (config.popup.font > 1.0f || config.popup.font < 1.0f)
+	fontPopup = haveFontProp && (config.popup.font > 1.0f || config.popup.font < 1.0f)
 		? fonts->AddFontFromFileTTF(config.font.prop.face.c_str(), fontpx(config.font.prop.size * config.popup.font), nullptr, uniPlane0)
 		: fontProp;
 

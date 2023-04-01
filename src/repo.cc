@@ -40,14 +40,14 @@ std::string Repo::branch() {
 Repo::Status Repo::status(const std::filesystem::path& fpath) {
 	auto stamp = std::chrono::system_clock::now();
 
-	if (cache.count(fpath)) {
-		auto& status = cache[fpath];
+	if (cacheStatus.count(fpath)) {
+		auto& status = cacheStatus[fpath];
 		auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(stamp-status.stamp);
 		if (ms < 100ms) return status;
 	}
 
 	auto status = Status(*this, fpath);
-	cache[status.path] = status;
+	cacheStatus[status.path] = status;
 
 	return status;
 }
@@ -75,6 +75,80 @@ bool Repo::Status::created() const {
 
 bool Repo::Status::modified() const {
 	return is(GIT_STATUS_WT_MODIFIED|GIT_STATUS_INDEX_MODIFIED);
+}
+
+namespace {
+	int line_cb(const git_diff_delta *delta, const git_diff_hunk *hunk, const git_diff_line *line, void *payload) {
+		std::stringstream& ss(*((std::stringstream*)payload));
+		char prefix = ' ';
+
+		if (line->origin == GIT_DIFF_LINE_ADDITION) {
+			prefix = '+';
+		}
+
+		if (line->origin == GIT_DIFF_LINE_DELETION) {
+			prefix = '-';
+		}
+
+		ss << prefix;
+
+		std::string_view view(line->content, line->content_len);
+
+		for (int i = 0, l = view.size(); i < l; i++) {
+			ss << view[i];
+			if (view[i] == '\n' && i+1 < l)
+				ss << prefix;
+		}
+
+		return 0;
+	}
+}
+
+Repo::Diff::Diff(Repo& repo, const std::filesystem::path& fpath) {
+	path = fpath;
+
+	if (repo.ok() && std::filesystem::exists(path) && starts_with(fpath, repo.path)) {
+		std::string rel = fpath.string().substr(repo.path.string().size()+1);
+		const char* rstr = rel.c_str();
+
+		git_diff_options opts = GIT_DIFF_OPTIONS_INIT;
+		git_diff* diff = nullptr;
+
+		opts.context_lines = 3;
+		opts.interhunk_lines = 2;
+		opts.flags |= GIT_DIFF_DISABLE_PATHSPEC_MATCH;
+		opts.pathspec.strings = (char**)&rstr;
+		opts.pathspec.count = 1;
+
+		err = git_diff_index_to_workdir(&diff, repo.repo, nullptr, &opts);
+
+		if (!err) {
+			std::stringstream ss;
+			git_diff_print(diff, GIT_DIFF_FORMAT_PATCH, line_cb, &ss);
+			patch = ss.str();
+		}
+
+		if (diff) git_diff_free(diff);
+	}
+}
+
+bool Repo::Diff::ok() const {
+	return err == 0;
+}
+
+Repo::Diff Repo::diff(const std::filesystem::path& fpath) {
+	auto stamp = std::chrono::system_clock::now();
+
+	if (cacheDiff.count(fpath)) {
+		auto& status = cacheDiff[fpath];
+		auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(stamp-status.stamp);
+		if (ms < 100ms) return status;
+	}
+
+	auto diff = Diff(*this, fpath);
+	cacheDiff[diff.path] = diff;
+
+	return diff;
 }
 
 Repo* Repo::open(const std::filesystem::path& opath) {
