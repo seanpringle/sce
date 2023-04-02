@@ -3,17 +3,17 @@
 
 using namespace std;
 
-#define UTF8_2 0b11000000
-#define UTF8_2_MASK 0b11100000
-#define UTF8_2_PAYLOAD 0b00011111
-#define UTF8_3 0b11100000
-#define UTF8_3_MASK 0b11110000
-#define UTF8_3_PAYLOAD 0b00001111
-#define UTF8_4 0b11110000
-#define UTF8_4_MASK 0b11111000
-#define UTF8_4_PAYLOAD 0b00000111
-#define UTF8_MARKER 0b10000000
-#define UTF8_PAYLOAD 0b00111111
+const uint8_t UTF8_2 = 0b11000000;
+const uint8_t UTF8_2_MASK = 0b11100000;
+const uint8_t UTF8_2_PAYLOAD = 0b00011111;
+const uint8_t UTF8_3 = 0b11100000;
+const uint8_t UTF8_3_MASK = 0b11110000;
+const uint8_t UTF8_3_PAYLOAD = 0b00001111;
+const uint8_t UTF8_4 = 0b11110000;
+const uint8_t UTF8_4_MASK = 0b11111000;
+const uint8_t UTF8_4_PAYLOAD = 0b00000111;
+const uint8_t UTF8_MARKER = 0b10000000;
+const uint8_t UTF8_PAYLOAD = 0b00111111;
 
 bool UTF8::ok() const {
 	return encodeErrors.size() == 0 && decodeErrors.size() == 0;
@@ -32,11 +32,11 @@ UTF8::UTF8(const string& in) {
 	};
 
 	auto next = [&]() {
-		return (uint32_t)in[cursor++];
+		return (uint8_t)in[cursor++];
 	};
 
 	auto peek = [&](size_t offset) {
-		return remaining() >= offset ? in[cursor+offset]: 0;
+		return (uint8_t)(remaining() >= offset ? in[cursor+offset]: 0);
 	};
 
 	auto continuations = [&](size_t n) {
