@@ -128,6 +128,25 @@ Repo::Diff::Diff(Repo& repo, const std::filesystem::path& fpath) {
 			patch = ss.str();
 		}
 
+		if (!patch.size()) {
+			git_object *head_obj;
+			git_revparse_single(&head_obj, repo.repo, "HEAD^{tree}");
+
+			git_tree *head_tree;
+			git_tree_lookup(&head_tree, repo.repo, git_object_id(head_obj));
+
+			err = git_diff_tree_to_index(&diff, repo.repo, head_tree, nullptr, &opts);
+
+			if (!err) {
+				std::stringstream ss;
+				git_diff_print(diff, GIT_DIFF_FORMAT_PATCH, line_cb, &ss);
+				patch = ss.str();
+			}
+
+			git_tree_free(head_tree);
+			git_object_free(head_obj);
+		}
+
 		if (diff) git_diff_free(diff);
 	}
 }

@@ -179,11 +179,10 @@ struct Doc {
 		uint ii;
 		const Doc* doc;
 
-		typedef uint32_t V;
 		typedef uint32_t value_type;
 		typedef uint difference_type;
-		typedef V* pointer;
-		typedef V& reference;
+		typedef value_type* pointer;
+		typedef value_type& reference;
 		typedef std::input_iterator_tag iterator_category;
 
 		explicit iterator(const Doc* ddoc, uint iii) {
@@ -200,12 +199,12 @@ struct Doc {
 			return doc->cursor(ii);
 		}
 
-		V& operator*() const {
+		value_type& operator*() const {
 			ensure(valid());
 			return *doc->cell(ii);
 		}
 
-		V* operator->() const {
+		value_type* operator->() const {
 			ensure(valid());
 			return doc->cell(ii);
 		}
