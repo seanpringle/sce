@@ -1,6 +1,8 @@
 #pragma once
 
-extern int KeyMap[100];
+#include "../imgui/imgui.h"
+
+extern ImGuiKey KeyMap[100];
 
 enum {
 	KEY_ESCAPE = 0,

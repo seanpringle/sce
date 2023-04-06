@@ -7,7 +7,7 @@
 #include "imgui_widgets.cpp"
 #include "imgui_tables.cpp"
 #include "imgui_freetype.cpp"
-#include "imgui_impl_sdl.cpp"
+#include "imgui_impl_sdl2.cpp"
 #include "imgui_impl_sdlrenderer.cpp"
 
 #include <string>
