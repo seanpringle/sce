@@ -135,7 +135,10 @@ void FilterPopup::render() {
 		| ImGuiInputTextFlags_CallbackHistory
 		| ImGuiInputTextFlags_CallbackCompletion;
 
-	if (InputTextWithHint(fmtc("##%s-input", name), hint().c_str(), input, sizeof(input), flags, callback, this)) {
+	InputTextWithHint(fmtc("##%s-input", name), hint().c_str(), input, sizeof(input), flags, callback, this);
+
+	// ImGuiInputTextFlags_EnterReturnsTrue triggers on press, sending release to the view
+	if (IsKeyReleased(ImGuiKey_Enter)) {
 		if (enterable() && std::string(input).size()) {
 			entered();
 		}
