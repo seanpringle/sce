@@ -831,6 +831,11 @@ bool View::interpret(const std::string& cmd) {
 		return true;
 	}
 
+	if (cmd == "all") {
+		selectAll();
+		return true;
+	}
+
 	if (prefix("syntax ")) {
 		auto name = cmd.substr(7);
 
@@ -971,10 +976,10 @@ void View::input() {
 	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_V])) { paste(); return; }
 	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_D])) { selectNext(); return; }
 	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_K])) { selectSkip(); return; }
-	if (Ctrl && ImGui::IsKeyPressed(KeyMap[KEY_A])) { selectAll(); return; }
 
+//	if (Ctrl && ImGui::IsKeyReleased(KeyMap[KEY_A])) { selectAll(); return; }
 	if (Ctrl && ImGui::IsKeyReleased(KeyMap[KEY_S])) { save(); return; }
-	if (Ctrl && ImGui::IsKeyReleased(KeyMap[KEY_L])) { reload(); return; }
+//	if (Ctrl && ImGui::IsKeyReleased(KeyMap[KEY_L])) { reload(); return; }
 
 	bool mods = io.KeyCtrl || io.KeyShift || io.KeyAlt || io.KeySuper;
 

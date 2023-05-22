@@ -213,7 +213,7 @@ int main(int argc, const char* argv[]) {
 	SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, flags);
 
 	ensuref(renderer, "%s", SDL_GetError());
-	
+
 	bool fullscreen = false;
 
 	IMGUI_CHECKVERSION();
@@ -388,26 +388,34 @@ int main(int argc, const char* argv[]) {
 
 				if (!suppressInputView) {
 
-					if (IsKeyPressed(KeyMap[KEY_F1])) {
+					if (IsKeyReleased(KeyMap[KEY_F1])) {
 						project.layout1();
 					}
 
-					if (IsKeyPressed(KeyMap[KEY_F2])) {
+					if (IsKeyReleased(KeyMap[KEY_F2])) {
 						project.layout2();
 					}
 
 					if (project.view()) {
-						if (io.KeyCtrl && IsKeyPressed(KeyMap[KEY_W])) {
+						if (io.KeyCtrl && IsKeyReleased(KeyMap[KEY_W])) {
 							if (!project.view()->modified) {
 								project.close();
 							}
 						}
 
-						if (IsKeyPressed(KeyMap[KEY_F3])) {
+						if (IsKeyReleased(KeyMap[KEY_F3])) {
 							project.relatedOpen();
 						}
 
-						if (io.KeyCtrl && IsKeyPressed(KeyMap[KEY_SPACE])) {
+						if (IsKeyReleased(KeyMap[KEY_F5])) {
+							project.view()->save();
+						}
+
+						if (IsKeyReleased(KeyMap[KEY_F8])) {
+							project.view()->reload();
+						}
+
+						if (io.KeyCtrl && IsKeyReleased(KeyMap[KEY_SPACE])) {
 							project.cycle();
 						}
 
@@ -419,7 +427,7 @@ int main(int argc, const char* argv[]) {
 							project.moveNextGroup();
 						}
 
-						if (io.KeyCtrl && IsKeyPressed(KeyMap[KEY_N])) {
+						if (io.KeyCtrl && IsKeyReleased(KeyMap[KEY_N])) {
 							project.fresh();
 						}
 					}
