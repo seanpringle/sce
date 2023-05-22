@@ -8,6 +8,7 @@
 #include "syntax/make.h"
 #include "syntax/cmake.h"
 #include "syntax/openscad.h"
+#include "syntax/javascript.h"
 #include "syntax/bash.h"
 #include "syntax/forth.h"
 #include "syntax/rela.h"
@@ -19,6 +20,7 @@
 #include <fstream>
 #include <filesystem>
 #include <chrono>
+#include <functional>
 #include "../imgui/imgui.h"
 #include "../imgui/imgui_impl_sdl2.h"
 #include "../imgui/imgui_impl_opengl3.h"
@@ -872,6 +874,12 @@ bool View::interpret(const std::string& cmd) {
 			return true;
 		}
 
+		if (name == "js") {
+			delete syntax;
+			syntax = new JavaScript();
+			return true;
+		}
+
 		if (name == "bash") {
 			delete syntax;
 			syntax = new Bash();
@@ -1022,6 +1030,10 @@ void View::autosyntax() {
 	else
 	if ((std::set<std::string>{".scad"}).count(ext)) {
 		syntax = new OpenSCAD();
+	}
+	else
+	if ((std::set<std::string>{".js"}).count(ext)) {
+		syntax = new JavaScript();
 	}
 	else
 	if ((std::set<std::string>{".sh"}).count(ext)) {

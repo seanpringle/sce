@@ -9,10 +9,17 @@
 #include "imgui_freetype.cpp"
 #include "imgui_impl_sdl2.cpp"
 #include "imgui_impl_sdlrenderer.cpp"
+#include "imgui_internal.h"
 
 #include <string>
 
 namespace ImGui {
+	void TweakDefaults() {
+		// Disable CTRL+Tab shortcuts (global): assign a "None" route to steal the route to our two shortcuts
+		ImGui::SetShortcutRouting(ImGuiMod_Ctrl | ImGuiKey_Tab, ImGuiKeyOwner_None);
+		ImGui::SetShortcutRouting(ImGuiMod_Ctrl | ImGuiMod_Shift | ImGuiKey_Tab, ImGuiKeyOwner_None);
+	}
+
 	ImU32 ImColorSRGB(unsigned int hexValue) {
 
 		unsigned char ru = ((unsigned int)hexValue >> 24) & 0xFF;

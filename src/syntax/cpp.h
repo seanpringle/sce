@@ -64,6 +64,7 @@ struct CPP : Syntax {
 		"continue",
 		"return",
 		"const",
+		"final",
 		"default",
 		"template",
 		"typename",
@@ -91,6 +92,7 @@ struct CPP : Syntax {
 		"mutable",
 		"noexcept",
 		"explicit",
+		"thread_local",
 	};
 
 	const std::set<std::string, std::less<>> blocktypes = {
@@ -114,6 +116,7 @@ struct CPP : Syntax {
 		"override",
 		"const",
 		"explicit",
+		"final",
 	};
 
 	bool isoperator(int c) override;

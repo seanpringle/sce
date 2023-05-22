@@ -1,12 +1,12 @@
 
 dev:
 	rm -rf build
-	cmake -DCMAKE_BUILD_TYPE=Debug S . -B build -G "Unix Makefiles"
+	cmake -DCMAKE_BUILD_TYPE=Debug -S . -B build -G "Unix Makefiles"
 	$(MAKE) -C build
 
 linux:
 	rm -rf build
-	cmake -DCMAKE_BUILD_TYPE=Release S . -B build -G "Unix Makefiles"
+	cmake -DCMAKE_BUILD_TYPE=Release -S . -B build -G "Unix Makefiles"
 	$(MAKE) -C build
 
 clean:

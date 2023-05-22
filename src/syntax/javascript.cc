@@ -1,6 +1,6 @@
-#include "cpp.h"
+#include "javascript.h"
 
-std::vector<ViewRegion> CPP::tags(const Doc& text) {
+std::vector<ViewRegion> JavaScript::tags(const Doc& text) {
 	std::vector<ViewRegion> hits;
 
 	int cursor = 0;
@@ -9,29 +9,20 @@ std::vector<ViewRegion> CPP::tags(const Doc& text) {
 		return get(text, cursor+offset);
 	};
 
-	// namespace::symbol or symbol
-	auto symbolStart = [&]() {
-		if (c(-2) == ':' && c(-1) == ':') {
-			cursor -= 2;
-			while (isname(c(-1))) cursor--;
-		}
-	};
-
 	auto extract = [&]() {
-		symbolStart();
 		int offset = cursor;
 		while (isname(c()) || c() == ':') cursor++;
 		hits.push_back({offset, cursor-offset});
 	};
 
 	while (cursor < (int)text.size()) {
-		if (matchFunction(text, cursor) || matchBlockType(text, cursor)) extract(); else cursor++;
+		if (matchFunction(text, cursor)) extract(); else cursor++;
 	}
 
 	return hits;
 }
 
-std::vector<std::string> CPP::matches(const Doc& text, int cursor) {
+std::vector<std::string> JavaScript::matches(const Doc& text, int cursor) {
 	std::set<std::string> hits;
 	std::vector<std::string> results;
 
@@ -83,11 +74,11 @@ std::vector<std::string> CPP::matches(const Doc& text, int cursor) {
 	return results;
 }
 
-bool CPP::isoperator(int c) {
+bool JavaScript::isoperator(int c) {
 	return strchr("+-*%/=<>&|^!?:", c);
 }
 
-bool CPP::word(const Doc& text, int cursor, const std::string& name) {
+bool JavaScript::word(const Doc& text, int cursor, const std::string& name) {
 	int l = name.size();
 	for (int i = 0; i < l; i++) {
 		if (get(text, cursor+i) != name[i]) return false;
@@ -95,16 +86,12 @@ bool CPP::word(const Doc& text, int cursor, const std::string& name) {
 	return !isname(get(text, cursor+l));
 }
 
-bool CPP::keyword(const Doc& text, int cursor) {
+bool JavaScript::keyword(const Doc& text, int cursor) {
 	return wordset(text, cursor, keywords);
 }
 
-bool CPP::specifier(const Doc& text, int cursor) {
-	return wordset(text, cursor, specifiers);
-}
-
 // is cursor inside a line // comment
-bool CPP::comment(const Doc& text, int cursor) {
+bool JavaScript::comment(const Doc& text, int cursor) {
 	auto c = [&](int offset = 0) {
 		return get(text, cursor+offset);
 	};
@@ -116,161 +103,24 @@ bool CPP::comment(const Doc& text, int cursor) {
 	return false;
 }
 
-// is cursor in a [namespace::]type[<namespace::type>[&*]]
-bool CPP::typelike(const Doc& text, int cursor) {
-	auto prev = [&]() {
-		return get(text, cursor-1);
-	};
-
-	auto white = [&]() {
-		return iswspace(prev());
-	};
-
-	auto name = [&]() {
-		return prev() == ':' || isname(prev());
-	};
-
-	auto refptr = [&]() {
-		return prev() == '&' || prev() == '*';
-	};
-
-	auto tpl = [&]() {
-		return prev() == '<' || prev() == '>';
-	};
-
-	auto skip = [&](auto fn) {
-		while (prev() && fn()) --cursor;
-	};
-
-	int start = cursor;
-
-	skip(white);
-
-	if (refptr()) --cursor;
-	skip(white);
-
-	if (prev() == '>') {
-		int depth = 0;
-		int length = 0;
-		while (length < 150 && (tpl() || name() || white() || refptr())) {
-			if (prev() == '>') depth++;
-			if (prev() == '<') depth--;
-			if (!depth) break;
-			cursor--;
-			length++;
-		}
-		if (prev() != '<') return false;
-		--cursor;
-	}
-
-	skip(white);
-	skip(name);
-
-	if (keyword(text, cursor)) return false;
-
-	int match = cursor;
-
-	auto gap = [&]() {
-		return prev() != '\n' && iswspace(prev());
-	};
-
-	skip(gap);
-
-	auto paren = [&]() {
-		return prev() == '(' || prev() == ')';
-	};
-
-	auto brace = [&]() {
-		return prev() == '{' || prev() == '}';
-	};
-
-	if (isoperator(prev()) || paren() || brace()) return false;
-
-	return match < start;
-}
-
-// is cursor on a struct or class definition name
-bool CPP::matchBlockType(const Doc& text, int cursor) {
-	auto c = [&](int offset = 0) {
-		return get(text, cursor+offset);
-	};
-
-	if (!isname(c())) return false;
-	int start = cursor;
-
-	// blocktype namespace::...::name {
-	if (c(-1) == ':') {
-		while (c(-1) && (isname(c(-1)) || c(-1) == ':')) --cursor;
-	}
-
-	// blocktype name {
-	while (c(-1) && iswspace(c(-1))) --cursor;
-	while (c(-1) && iswalnum(c(-1))) --cursor;
-
-	if (!iswalpha(c())) return false;
-	if (comment(text, cursor)) return false;
-	if (!wordset(text, cursor, blocktypes)) return false;
-
-	cursor = start;
-
-	while (c() && isname(c())) cursor++;
-	while (c() && iswspace(c())) cursor++;
-
-	if (wordset(text, cursor, specifiers)) {
-		while (c() && isname(c())) cursor++;
-		while (c() && iswspace(c())) cursor++;
-	}
-
-	if (!(c() == '{' || c() == ':' || c() == ';')) return false;
-
-	return !keyword(text, start);
-}
-
 // is cursor on a function or method name
-bool CPP::matchFunction(const Doc& text, int cursor) {
+bool JavaScript::matchFunction(const Doc& text, int cursor) {
 	auto c = [&](int offset = 0) {
 		return get(text, cursor+offset);
 	};
 
 	if (!isname(c())) return false;
-	int start = cursor;
 
+	int start = cursor;
 	while (isname(c())) cursor++;
 	int length = cursor-start;
 
-	bool constructor = false;
-	bool function = false;
+	if (keyword(text, start)) return false;
 
 	cursor = start;
-	// name::name constructor
-	if (c(-1) == ':' && c(-2) == ':') {
-		cursor = start-2;
-		while (c(-1) && isname(c(-1))) --cursor;
-		int cstart = cursor;
-		int clength = start-cursor-2;
-		constructor = clength == length;
-		for (int i = 0; constructor && i < clength; i++) {
-			constructor = get(text, cstart+i) == get(text, start+i);
-		}
-	}
-
-	cursor = start;
-	// type namespace::...::name
-	if (c(-1) == ':' && c(-2) == ':') {
-		while (c(-1) && (isname(c(-1)) || c(-1) == ':')) --cursor;
-		// type name {
-		while (c(-1) && iswspace(c(-1))) --cursor;
-		function = start != cursor && typelike(text, cursor);
-	}
-
-	cursor = start;
-	// type name
-	if (!function) {
-		while (c(-1) && iswspace(c(-1))) --cursor;
-		function = start != cursor && typelike(text, cursor) && !comment(text, cursor-1);
-	}
-
-	if (!constructor && !function) return false;
+	while (c(-1) && iswspace(c(-1))) --cursor;
+	while (c(-1) && isname(c(-1))) --cursor;
+	if (!wordset(text, cursor, {"function"})) return false;
 
 	cursor = start+length;
 	while (c() && iswspace(c())) cursor++;
@@ -287,21 +137,12 @@ bool CPP::matchFunction(const Doc& text, int cursor) {
 	}
 	if (c() != ')') return false;
 	cursor++;
+
 	while (c() && iswspace(c())) cursor++;
-
-	if (specifier(text, cursor)) {
-		while (c() && isname(c())) cursor++;
-		while (c() && iswspace(c())) cursor++;
-	}
-
-	bool isFunction = c() == '{';
-	bool isDeclaration = (c() == ';' || c() == '=');
-	bool isConstructor = c() == ':';
-
-	return (isFunction || isDeclaration || isConstructor) && !keyword(text, start);
+	return c() == '{';
 }
 
-Syntax::Token CPP::first(const Doc& text, int cursor) {
+Syntax::Token JavaScript::first(const Doc& text, int cursor) {
 
 	for (int i = cursor; i > 0 && i > cursor-1000; --i) {
 		auto a = get(text, i-1);
@@ -322,7 +163,7 @@ Syntax::Token CPP::first(const Doc& text, int cursor) {
 	return Token::None;
 }
 
-Syntax::Token CPP::next(const Doc& text, int cursor, Syntax::Token token) {
+Syntax::Token JavaScript::next(const Doc& text, int cursor, Syntax::Token token) {
 
 	auto rget = [&](int offset = 0) {
 		return get(text, cursor+offset);
@@ -352,35 +193,20 @@ Syntax::Token CPP::next(const Doc& text, int cursor, Syntax::Token token) {
 				return Token::CharStringStart;
 			}
 
-			if (matchFunction(text, cursor) || matchBlockType(text, cursor)) {
+			if (matchFunction(text, cursor)) {
 				return Token::Function;
 			}
 
 			if (isboundary(rget(-1))) {
-				for (auto& name: types) {
-					if (word(text, cursor, name)) return Token::Type;
-				}
-
 				if (keyword(text, cursor)) return Token::Keyword;
-
-				if (get(text, cursor) == '#') {
-					for (auto& name: directives) {
-						if (word(text, cursor, name)) return Token::Directive;
-					}
-				}
-
-				for (auto& name: constants) {
-					if (word(text, cursor, name)) return Token::Constant;
-				}
 			}
 
 			if (isname(rget())) {
 				int len = 0;
 				while (rget(len) && isname(rget(len))) len++;
-				if (rget(len) == '(') return Token::Call;
-				if (rget(len) == '<') return Token::Type;
-				if (rget(len) == ':' && rget(len+1) == ':') return Token::Namespace;
 				while (rget(len) && isspace(rget(len))) len++;
+				if (rget(len) == '(') return Token::Call;
+				if (rget(len) == ':') return Token::Variable;
 				if (rget(len) == '=' && rget(len+1) != '=') return Token::Variable;
 			}
 
@@ -476,7 +302,7 @@ Syntax::Token CPP::next(const Doc& text, int cursor, Syntax::Token token) {
 	return token;
 }
 
-bool CPP::hint(const Doc& text, int cursor, const std::vector<ViewRegion>& selections) {
+bool JavaScript::hint(const Doc& text, int cursor, const std::vector<ViewRegion>& selections) {
 	for (auto& selection: selections) {
 		if (hintMatchedPair(text, cursor, selection, '(', ')')) return true;
 		if (hintMatchedPair(text, cursor, selection, '{', '}')) return true;
@@ -484,4 +310,5 @@ bool CPP::hint(const Doc& text, int cursor, const std::vector<ViewRegion>& selec
 	}
 	return false;
 }
+
 

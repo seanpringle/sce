@@ -3,6 +3,13 @@
 #include "../imgui/imgui_impl_sdlrenderer.h"
 #include <SDL.h>
 
+#include <filesystem>
+#include <chrono>
+#include <algorithm>
+#include <functional>
+#include <regex>
+#include <thread>
+
 #include "theme.h"
 #include "config.h"
 #include "project.h"
@@ -13,11 +20,6 @@
 #include "workers.h"
 #include "repo.h"
 #include "filetree.h"
-#include <filesystem>
-#include <chrono>
-#include <algorithm>
-#include <regex>
-#include <thread>
 
 using namespace std::literals::chrono_literals;
 
@@ -204,10 +206,14 @@ int main(int argc, const char* argv[]) {
 		SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI
 	);
 
+	ensuref(window, "%s", SDL_GetError());
+
 	uint32_t flags = SDL_RENDERER_ACCELERATED;
 	if (config.window.vsync) flags |= SDL_RENDERER_PRESENTVSYNC;
 	SDL_Renderer* renderer = SDL_CreateRenderer(window, -1, flags);
 
+	ensuref(renderer, "%s", SDL_GetError());
+	
 	bool fullscreen = false;
 
 	IMGUI_CHECKVERSION();
@@ -228,6 +234,7 @@ int main(int argc, const char* argv[]) {
 	float hdpi = 0.0f;
 	float vdpi = 0.0f;
 	SDL_GetDisplayDPI(0, &ddpi, &hdpi, &vdpi);
+	if (ddpi < 0.01f) { ddpi = 96; hdpi = 96; vdpi = 96; }
 	notef("DPI: diagonal %0.2f horizontal %0.2f vertical %0.2f", ddpi, hdpi, vdpi);
 
 	auto fontpx = [&](float pt) {
@@ -339,6 +346,7 @@ int main(int argc, const char* argv[]) {
 		ImGui_ImplSDLRenderer_NewFrame();
 		ImGui_ImplSDL2_NewFrame(window);
 		ImGui::NewFrame();
+		ImGui::TweakDefaults();
 
 		bool suppressInput = gotFocus < lostFocus || gotFocus > now() - 300ms;
 

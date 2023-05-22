@@ -120,6 +120,7 @@
 typedef unsigned int ImU32;
 
 namespace ImGui {
+	void TweakDefaults();
 	ImU32 ImColorSRGB(unsigned int hexValue);
 	void TextColored(unsigned int hexValue, const char* text);
 	void Print(std::string s);
