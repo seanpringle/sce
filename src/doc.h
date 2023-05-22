@@ -174,6 +174,13 @@ struct Doc {
 		return extract((size_t)0, size());
 	}
 
+	Doc subdoc(size_t offset, size_t length) const {
+		Doc out;
+		for (size_t i = offset; i < offset+length && i < size(); i++)
+			out.push_back(*cell(i));
+		return out;
+	}
+
 	class iterator {
 	public:
 		uint ii;

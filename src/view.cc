@@ -610,8 +610,10 @@ bool View::selectNext() {
 		return false;
 	};
 
+	auto cmp = text.subdoc(pattern.offset, pattern.length);
+
 	auto check = [&](int i) {
-		auto a = text.begin()+pattern.offset;
+		auto a = cmp.begin();
 		auto b = text.begin()+i;
 		bool match = true;
 		for (int j = 0; j < pattern.length && match; j++) {
@@ -1378,7 +1380,7 @@ void View::draw() {
 				newState = Theme::State::Selected;
 			}
 			if (selection.offset + std::max(selection.length,1) == cursor) {
-				--selecting;
+				selecting = std::max(0,selecting-1);
 				if (!selecting) newState = Theme::State::Plain;
 			}
 		}
