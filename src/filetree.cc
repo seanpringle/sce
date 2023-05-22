@@ -82,7 +82,6 @@ void FileTree::render(const set<string>& paths, const set<string>& subset) {
 				}
 
 				if (isActive(entry.path())) {
-					if (!IsWindowHovered()) SetScrollHereY();
 					if (!IsItemHovered()) {
 						GetWindowDrawList()->ChannelsSetCurrent(0);
 						GetWindowDrawList()->AddRectFilled(GetItemRectMin(), GetItemRectMax(), GetColorU32(ImGuiCol_Header));
