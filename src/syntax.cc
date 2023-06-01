@@ -96,6 +96,7 @@ std::pair<bool,int> Syntax::tabs(const Doc& text) {
 #include "syntax/openscad.cc"
 #include "syntax/javascript.cc"
 #include "syntax/bash.cc"
+#include "syntax/docker.cc"
 #include "syntax/forth.cc"
 #include "syntax/rela.cc"
 #include "syntax/haxe.cc"

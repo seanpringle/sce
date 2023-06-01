@@ -10,6 +10,7 @@
 #include "syntax/openscad.h"
 #include "syntax/javascript.h"
 #include "syntax/bash.h"
+#include "syntax/docker.h"
 #include "syntax/forth.h"
 #include "syntax/rela.h"
 #include "syntax/haxe.h"
@@ -893,6 +894,12 @@ bool View::interpret(const std::string& cmd) {
 			return true;
 		}
 
+		if (name == "docker") {
+			delete syntax;
+			syntax = new Docker();
+			return true;
+		}
+
 		if (name == "forth") {
 			delete syntax;
 			syntax = new Forth();
@@ -1077,6 +1084,10 @@ void View::autosyntax() {
 	else
 	if (stem == "Makefile") {
 		syntax = new Make();
+	}
+	else
+	if (stem.find("Dockerfile") != std::string::npos) {
+		syntax = new Docker();
 	}
 	else {
 		syntax = new PlainText();
