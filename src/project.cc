@@ -6,6 +6,7 @@
 #include "workers.h"
 #include <fstream>
 #include <filesystem>
+#include <string_view>
 #include <regex>
 
 #include "json.hpp"
@@ -499,33 +500,25 @@ std::vector<Project::Match> Project::search(std::string needle) {
 
 	channel<Match,-1> matches;
 
-	std::vector<View*> state;
-
-	for (auto view: views) {
-		state.push_back(new View);
-		*state.back() = *view;
-	}
-
-	for (auto view: state) {
-		crew.job([&,view]() {
-			for (auto& region: view->search(needle)) {
-				int offset = region.offset - view->toSol(region.offset);
-				int length = view->toEol(offset);
+	auto all = files();
+	for (int i = 0, l = all.size(); i < l; i++) {
+		crew.job([&,v=i]() {
+			View view;
+			if (!view.open(all[v])) return;
+			for (auto& region: view.search(needle)) {
+				int offset = region.offset - view.toSol(region.offset);
+				int length = view.toEol(offset);
 				matches.send({
-					.path = view->path,
-					.line = view->extract({offset,length}),
+					.path = view.path,
+					.line = view.extract({offset,length}),
 					.region = region,
-					.lineno = view->text.cursor(offset).line,
+					.lineno = view.text.cursor(offset).line,
 				});
 			}
 		});
 	}
 
 	crew.wait();
-
-	for (auto view: state) {
-		delete view;
-	}
 
 	return matches.recv_all();
 }

@@ -836,6 +836,11 @@ bool View::interpret(const std::string& cmd) {
 		return true;
 	}
 
+	if (cmd == "reload") {
+		reload();
+		return true;
+	}
+
 	if (prefix("syntax ")) {
 		auto name = cmd.substr(7);
 
@@ -1109,7 +1114,7 @@ bool View::open(std::string path) {
 	undos.clear();
 	redos.clear();
 
-	std::string content((std::istreambuf_iterator<char>(in)), (std::istreambuf_iterator<char>()));
+	std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
 	text.push_back(content);
 	in.close();
 
@@ -1424,7 +1429,7 @@ void View::draw() {
 		if (col < w && c == '\t') {
 			format(theme.highlight[Syntax::Token::Indent][selecting ? Theme::State::Selected: Theme::State::Plain]);
 			int spaces = std::min(w-col, tabs.width);
-			for (int i = 0; i < spaces; i++) emit(i ? 0x20: 0xc2b7);
+			for (int i = 0; i < spaces; i++) emit(i ? 0x20: 0xb7);
 			format(theme.highlight[token][state]);
 			continue;
 		}
@@ -1465,7 +1470,6 @@ void View::draw() {
 			if (pos.x+cell.x > origin.x+region.x) break;
 			if (pos.y+cell.y > origin.y+region.y) break;
 			if (c < 32) c = 0xfffd;
-			if (c>>8 == 0xc2) c &= 0xff;
 			ImGui::GetFont()->RenderChar(ImGui::GetWindowDrawList(), -1.0f, pos, ImGui::ImColorSRGB(chunk.fg), c);
 		}
 	}

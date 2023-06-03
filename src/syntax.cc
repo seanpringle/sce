@@ -67,10 +67,6 @@ std::pair<bool,int> Syntax::tabs(const Doc& text) {
 		return cursor <= 0 || get(cursor-1) == '\n';
 	};
 
-	auto eol = [&](int cursor) {
-		return cursor >= text.size() || get(cursor) == '\n';
-	};
-
 	for (int i = 0, l = text.size(); i < l; i++) {
 		if (!sol(i)) continue;
 		if (get(i) == '\t') break;
