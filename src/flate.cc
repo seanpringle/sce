@@ -26,7 +26,7 @@ vector<char> inflate(const deflation& def) {
 
 	auto& cdata = def.cdata;
 
-	uLongf dlen = compressBound(cdata.size());
+	uLongf dlen = def.size;
 
 	vector<char> data(dlen,0);
 
