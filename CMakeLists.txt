@@ -14,6 +14,7 @@ set(CMAKE_CXX_COMPILE_OPTIONS_IPO -flto=16)
 #find_package(GLEW REQUIRED)
 find_package(Freetype REQUIRED)
 find_package(Threads REQUIRED)
+find_package(ZLIB REQUIRED)
 
 # gtest
 
@@ -44,4 +45,4 @@ set(CMAKE_CXX_STANDARD 20)
 
 add_executable(sce src/main.cc src/config.cc src/theme.cc src/syntax.cc src/project.cc src/view.cc src/filetree.cc)
 include_directories(sce /home/sean/src/SDL/include ${FREETYPE_INCLUDE_DIRS})
-target_link_libraries(sce imgui local-utf8 local-repo /home/sean/src/SDL/build/.libs/libSDL2.a ${FREETYPE_LIBRARIES} stdc++fs Threads::Threads git2 dl)
+target_link_libraries(sce imgui local-utf8 local-repo /home/sean/src/SDL/build/.libs/libSDL2.a ${FREETYPE_LIBRARIES} stdc++fs Threads::Threads git2 ZLIB::ZLIB dl)

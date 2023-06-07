@@ -407,16 +407,16 @@ int main(int argc, const char* argv[]) {
 							project.relatedOpen();
 						}
 
+						if (IsKeyReleased(KeyMap[KEY_F4])) {
+							project.cycle();
+						}
+
 						if (IsKeyReleased(KeyMap[KEY_F5])) {
 							project.view()->save();
 						}
 
 						if (IsKeyReleased(KeyMap[KEY_F8])) {
 							project.view()->reload();
-						}
-
-						if (io.KeyCtrl && IsKeyReleased(KeyMap[KEY_SPACE])) {
-							project.cycle();
 						}
 
 						if (io.KeyCtrl && io.KeyShift && IsKeyPressed(KeyMap[KEY_PAGEUP])) {

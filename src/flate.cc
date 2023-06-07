@@ -1,37 +1,39 @@
 #include "common.h"
 #include "flate.h"
+#include <vector>
+#include <zlib.h>
 
-#define SDEFL_IMPLEMENTATION
-#include "sdefl.h"
+using namespace std;
 
-#define SINFL_IMPLEMENTATION
-#include "sinfl.h"
-
-deflation deflate(const std::vector<char>& data, int quality) {
+deflation deflate(const vector<char>& data, int quality) {
 	if (!data.size()) return {};
 
-	quality = std::max(0, std::min(9, quality));
-	std::size_t bounds = sdefl_bound(data.size());
+	uLongf clen = compressBound(data.size());
 
-	std::vector<char> cdata;
-	cdata.insert(cdata.begin(), bounds, 0);
+	vector<char> cdata(clen,0);
 
-	struct sdefl sdefl;
-	std::memset(&sdefl, 0, sizeof(sdefl));
+	quality = max(-1,min(9,quality));
+	ensure(0 == compress2((Bytef*)cdata.data(), &clen, (Bytef*)data.data(), data.size(), quality));
 
-	std::size_t clen = sdeflate(&sdefl, (unsigned char*)cdata.data(), (unsigned char*)data.data(), data.size(), quality);
+	cdata.resize(clen);
+	cdata.shrink_to_fit();
 
-	return {data.size(), {cdata.begin(), cdata.begin() + clen}};
+	return {data.size(), move(cdata)};
 }
 
-std::vector<char> inflate(const deflation& def) {
+vector<char> inflate(const deflation& def) {
 	if (!def.size) return {};
 
-	std::vector<char> data;
-	data.insert(data.begin(), def.size, 0);
+	auto& cdata = def.cdata;
 
-	std::size_t dlen = sinflate((unsigned char*)data.data(), (unsigned char*)def.cdata.data(), def.cdata.size());
-	if (dlen != def.size) throw std::runtime_error("inflation incorrect size");
+	uLongf dlen = compressBound(cdata.size());
+
+	vector<char> data(dlen,0);
+
+	ensure(0 == uncompress((Bytef*)data.data(), &dlen, (Bytef*)cdata.data(), cdata.size()));
+
+	data.resize(dlen);
+	data.shrink_to_fit();
 
 	return data;
 }

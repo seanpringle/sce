@@ -13,5 +13,5 @@ struct deflation {
 	}
 };
 
-deflation deflate(const std::vector<char>& data, int quality = 3);
+deflation deflate(const std::vector<char>& data, int quality = -1);
 std::vector<char> inflate(const deflation& def);
