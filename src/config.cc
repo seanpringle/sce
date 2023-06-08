@@ -51,6 +51,11 @@ bool Config::interpret(const std::string& cmd) {
 		return cmd.find(s) == 0;
 	};
 
+	if (prefix("reconf")) {
+		defaults();
+		return true;
+	}
+
 	if (prefix("sidebar.width ") && cmd.size() > 14U) {
 		auto arg = cmd.substr(14); trim(arg);
 		sidebar.width = std::strtod(arg.c_str(), nullptr);
