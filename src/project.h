@@ -41,6 +41,8 @@ struct Project {
 	int group(View* view);
 	void bubble();
 
+	std::vector<View*> viewsTree();
+
 	void cycle();
 	void activeUpTree();
 	void activeDownTree();

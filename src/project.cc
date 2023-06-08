@@ -389,11 +389,19 @@ void Project::cycle() {
 	bubble();
 }
 
-void Project::activeUpTree() {
+vector<View*> Project::viewsTree() {
+	using namespace filesystem;
+
 	vector<View*> tree = views;
 	sort(tree.begin(), tree.end(), [&](auto a, auto b) {
-		return a->path < b->path;
+		return weakly_canonical(a->path) < weakly_canonical(b->path);
 	});
+
+	return tree;
+}
+
+void Project::activeUpTree() {
+	vector<View*> tree = viewsTree();
 
 	for (int i = 1, l = tree.size(); i < l; i++) {
 		if (tree[i] != views[active]) continue;
@@ -409,10 +417,7 @@ void Project::activeUpTree() {
 }
 
 void Project::activeDownTree() {
-	vector<View*> tree = views;
-	sort(tree.begin(), tree.end(), [&](auto a, auto b) {
-		return a->path < b->path;
-	});
+	vector<View*> tree = viewsTree();
 
 	for (int i = 0, l = tree.size(); i < l-1; i++) {
 		if (tree[i] != views[active]) continue;
