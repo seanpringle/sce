@@ -9,6 +9,8 @@
 #include <string_view>
 #include <regex>
 
+using namespace std;
+
 #include "json.hpp"
 using json = nlohmann::json;
 
@@ -24,9 +26,9 @@ Project::~Project() {
 }
 
 void Project::sanity() {
-	active = std::max(0, std::min((int)views.size()-1, active));
+	active = max(0, min((int)views.size()-1, active));
 
-	std::set<View*> viewset = {views.begin(), views.end()};
+	set<View*> viewset = {views.begin(), views.end()};
 
 	for (auto it = groups.begin(); it != groups.end(); ) {
 		auto &group = *it;
@@ -44,8 +46,8 @@ void Project::sanity() {
 	ensure(!viewset.size());
 }
 
-int Project::find(const std::string& vpath) {
-	auto it = std::find_if(views.begin(), views.end(), [&](auto view) { return view->path == vpath; });
+int Project::find(const string& vpath) {
+	auto it = find_if(views.begin(), views.end(), [&](auto view) { return view->path == vpath; });
 	return it == views.end() ? -1: it-views.begin();
 }
 
@@ -58,7 +60,7 @@ View* Project::view() {
 	return views.size() ? views[active]: nullptr;
 }
 
-View* Project::open(const std::string& path) {
+View* Project::open(const string& path) {
 	int gactive = group(view());
 	int factive = find(path);
 
@@ -73,7 +75,7 @@ View* Project::open(const std::string& path) {
 		groups[gactive].push_back(v);
 		views.push_back(v);
 
-		std::sort(views.begin(), views.end(), [](auto a, auto b) { return a->path < b->path; });
+		sort(views.begin(), views.end(), [](auto a, auto b) { return a->path < b->path; });
 
 		factive = find(path);
 		ensure(factive >= 0);
@@ -94,7 +96,7 @@ View* Project::fresh() {
 
 	v->path = "untitled";
 
-	std::sort(views.begin(), views.end(), [](auto a, auto b) { return a->path < b->path; });
+	sort(views.begin(), views.end(), [](auto a, auto b) { return a->path < b->path; });
 
 	active = find(v);
 	ensure(active >= 0);
@@ -113,40 +115,40 @@ void Project::close() {
 	}
 }
 
-void Project::searchPathAdd(const std::string& path) {
-	auto tpath = std::filesystem::path(path);
-	auto apath = std::filesystem::weakly_canonical(tpath);
+void Project::searchPathAdd(const string& path) {
+	auto tpath = filesystem::path(path);
+	auto apath = filesystem::weakly_canonical(tpath);
 	searchPaths.insert(apath.string());
 }
 
-void Project::searchPathDrop(const std::string& path) {
-	auto tpath = std::filesystem::path(path);
-	auto apath = std::filesystem::weakly_canonical(tpath);
+void Project::searchPathDrop(const string& path) {
+	auto tpath = filesystem::path(path);
+	auto apath = filesystem::weakly_canonical(tpath);
 	searchPaths.erase(apath.string());
 }
 
-void Project::ignorePathAdd(const std::string& path) {
-	auto tpath = std::filesystem::path(path);
-	auto apath = std::filesystem::weakly_canonical(tpath);
+void Project::ignorePathAdd(const string& path) {
+	auto tpath = filesystem::path(path);
+	auto apath = filesystem::weakly_canonical(tpath);
 	ignorePaths.insert(apath.string());
 }
 
-void Project::ignorePathDrop(const std::string& path) {
-	auto tpath = std::filesystem::path(path);
-	auto apath = std::filesystem::weakly_canonical(tpath);
+void Project::ignorePathDrop(const string& path) {
+	auto tpath = filesystem::path(path);
+	auto apath = filesystem::weakly_canonical(tpath);
 	ignorePaths.erase(apath.string());
 }
 
-void Project::ignorePatternAdd(const std::string& pattern) {
+void Project::ignorePatternAdd(const string& pattern) {
 	ignorePatterns.insert(pattern);
 }
 
-void Project::ignorePatternDrop(const std::string& pattern) {
+void Project::ignorePatternDrop(const string& pattern) {
 	ignorePatterns.erase(pattern);
 }
 
-bool Project::interpret(const std::string& cmd) {
-	auto prefix = [&](const std::string& s) {
+bool Project::interpret(const string& cmd) {
+	auto prefix = [&](const string& s) {
 		return cmd.find(s) == 0;
 	};
 
@@ -171,17 +173,17 @@ bool Project::interpret(const std::string& cmd) {
 	return false;
 }
 
-bool Project::load(const std::string path) {
+bool Project::load(const string path) {
 	config.defaults();
 
-	const std::string lpath = path.empty() ? ppath: path;
+	const string lpath = path.empty() ? ppath: path;
 	if (lpath.empty()) return false;
 
-	auto apath = std::filesystem::path(lpath);
-	auto rpath = std::filesystem::relative(apath);
+	auto apath = filesystem::path(lpath);
+	auto rpath = filesystem::relative(apath);
 	ppath = rpath.string();
 
-	auto in = std::ifstream(lpath);
+	auto in = ifstream(lpath);
 	if (!in) return false;
 	json pstate;
 	in >> pstate;
@@ -253,15 +255,15 @@ bool Project::load(const std::string path) {
 	return true;
 }
 
-bool Project::save(const std::string path) {
-	const std::string spath = path.empty() ? ppath: path;
+bool Project::save(const string path) {
+	const string spath = path.empty() ? ppath: path;
 	if (spath.empty()) return false;
 
-	auto tpath = std::filesystem::path(spath);
-	auto apath = std::filesystem::weakly_canonical(tpath);
+	auto tpath = filesystem::path(spath);
+	auto apath = filesystem::weakly_canonical(tpath);
 	ppath = apath.string();
 
-	auto out = std::ofstream(spath);
+	auto out = ofstream(spath);
 	if (!out) return false;
 
 	json pstate;
@@ -270,8 +272,8 @@ bool Project::save(const std::string path) {
 	int i = 0;
 	for (auto view: views) {
 		if (view->modified) view->save();
-		auto vpath = std::filesystem::path(view->path);
-		auto apath = std::filesystem::weakly_canonical(vpath);
+		auto vpath = filesystem::path(view->path);
+		auto apath = filesystem::weakly_canonical(vpath);
 		json vstate;
 		vstate["path"] = apath;
 		int j = 0;
@@ -291,8 +293,8 @@ bool Project::save(const std::string path) {
 		json gstate;
 		int j = 0;
 		for (auto view: group) {
-			auto vpath = std::filesystem::path(view->path);
-			auto apath = std::filesystem::weakly_canonical(vpath);
+			auto vpath = filesystem::path(view->path);
+			auto apath = filesystem::weakly_canonical(vpath);
 			gstate["views"][j++] = apath;
 		}
 		pstate["groups"][i++] = gstate;
@@ -300,15 +302,15 @@ bool Project::save(const std::string path) {
 
 	i = 0;
 	for (auto searchPath: searchPaths) {
-		auto spath = std::filesystem::path(searchPath);
-		auto apath = std::filesystem::weakly_canonical(spath);
+		auto spath = filesystem::path(searchPath);
+		auto apath = filesystem::weakly_canonical(spath);
 		pstate["searchPaths"][i++] = apath;
 	}
 
 	i = 0;
 	for (auto ignorePath: ignorePaths) {
-		auto spath = std::filesystem::path(ignorePath);
-		auto apath = std::filesystem::weakly_canonical(spath);
+		auto spath = filesystem::path(ignorePath);
+		auto apath = filesystem::weakly_canonical(spath);
 		pstate["ignorePaths"][i++] = apath;
 	}
 
@@ -328,7 +330,7 @@ bool Project::save(const std::string path) {
 
 void Project::forget(View* view) {
 	for (auto& src: groups) {
-		src.erase(std::remove(src.begin(), src.end(), view), src.end());
+		src.erase(remove(src.begin(), src.end(), view), src.end());
 	}
 }
 
@@ -388,8 +390,8 @@ void Project::cycle() {
 }
 
 void Project::activeUpTree() {
-	std::vector<View*> tree = views;
-	std::sort(tree.begin(), tree.end(), [&](auto a, auto b) {
+	vector<View*> tree = views;
+	sort(tree.begin(), tree.end(), [&](auto a, auto b) {
 		return a->path < b->path;
 	});
 
@@ -407,8 +409,8 @@ void Project::activeUpTree() {
 }
 
 void Project::activeDownTree() {
-	std::vector<View*> tree = views;
-	std::sort(tree.begin(), tree.end(), [&](auto a, auto b) {
+	vector<View*> tree = views;
+	sort(tree.begin(), tree.end(), [&](auto a, auto b) {
 		return a->path < b->path;
 	});
 
@@ -451,17 +453,18 @@ void Project::moveNextGroup() {
 	bubble();
 }
 
-std::vector<std::string> Project::files() {
-	using namespace std::filesystem;
-	std::vector<std::string> results;
+vector<string> Project::files() {
+	using namespace filesystem;
 
-	std::vector<std::regex> patterns;
+	set<path> seen;
+	vector<string> results;
+	vector<regex> patterns;
 
 	for (auto& pattern: ignorePatterns) {
 		try {
-			patterns.push_back(std::regex(pattern));
+			patterns.push_back(regex(pattern));
 		}
-		catch (const std::regex_error& e) {
+		catch (const regex_error& e) {
 			notef("%s", e.what());
 		}
 	}
@@ -475,6 +478,9 @@ std::vector<std::string> Project::files() {
 		);
 
 		for (const directory_entry& entry: it) {
+			if (seen.count(weakly_canonical(entry.path()))) continue;
+			seen.insert(weakly_canonical(entry.path()));
+
 			if (!is_regular_file(entry)) continue;
 			auto entryPath = entry.path();
 
@@ -483,7 +489,7 @@ std::vector<std::string> Project::files() {
 				ignore = ignore || starts_with(entryPath.string(), path);
 			}
 			for (auto re: patterns) {
-				ignore = ignore || std::regex_search(entryPath.string(), re);
+				ignore = ignore || regex_search(entryPath.string(), re);
 			}
 			if (!ignore) {
 				results.push_back(canonical(entryPath.string()));
@@ -494,7 +500,7 @@ std::vector<std::string> Project::files() {
 	return results;
 }
 
-std::vector<Project::Match> Project::search(std::string needle) {
+vector<Project::Match> Project::search(string needle) {
 	workers crew;
 	crew.start(8);
 
@@ -538,7 +544,7 @@ void Project::layout2() {
 	groups.resize(2);
 	layout = 2;
 	for (auto view: views) {
-		auto path = std::filesystem::path(view->path);
+		auto path = filesystem::path(view->path);
 		auto ext = path.extension().string();
 		if (ext.front() == '.') ext = ext.substr(1);
 		int g = config.layout2.left.count(ext) ? 0:1;
@@ -553,7 +559,7 @@ void Project::layout2() {
 }
 
 void Project::relatedRaise() {
-	auto path = std::filesystem::path(view()->path);
+	auto path = filesystem::path(view()->path);
 	auto ext = path.extension().string();
 
 	auto other = [&](auto rep) {
@@ -572,7 +578,7 @@ void Project::relatedRaise() {
 }
 
 void Project::relatedOpen() {
-	auto path = std::filesystem::path(view()->path);
+	auto path = filesystem::path(view()->path);
 	auto ext = path.extension().string();
 
 	auto other = [&](auto rep) {

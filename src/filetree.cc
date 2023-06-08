@@ -31,6 +31,8 @@ void FileTree::annotate(const string& fpath) {
 void FileTree::render(const set<string>& paths, const set<string>& subset) {
 	function<void(const path&, ImGuiTreeNodeFlags)> walk;
 
+	set<path> seen;
+
 	walk = [&](const path& walkPath, ImGuiTreeNodeFlags flags) {
 		if (!exists(walkPath)) return;
 
@@ -51,7 +53,10 @@ void FileTree::render(const set<string>& paths, const set<string>& subset) {
 		vector<directory_entry> entries;
 
 		for (const directory_entry& entry: it) {
-			if (is_regular_file(entry) && !subset.empty() && !subset.count(entry.path().string())) continue;
+			auto wpath = weakly_canonical(entry.path());
+			if (is_regular_file(entry) && !subset.empty() && !subset.count(wpath.string())) continue;
+			if (seen.count(wpath)) continue;
+			seen.insert(wpath);
 			entries.push_back(entry);
 		}
 
