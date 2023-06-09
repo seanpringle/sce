@@ -61,6 +61,7 @@ View* Project::view() {
 }
 
 View* Project::open(const string& path) {
+	using namespace filesystem;
 	int gactive = group(view());
 	int factive = find(path);
 
@@ -74,11 +75,7 @@ View* Project::open(const string& path) {
 
 		groups[gactive].push_back(v);
 		views.push_back(v);
-
-		sort(views.begin(), views.end(), [](auto a, auto b) { return a->path < b->path; });
-
-		factive = find(path);
-		ensure(factive >= 0);
+		factive = views.size()-1;
 	}
 
 	active = factive;
@@ -88,18 +85,14 @@ View* Project::open(const string& path) {
 }
 
 View* Project::fresh() {
+	using namespace filesystem;
 	int gactive = group(view());
 	auto v = new View();
 
 	groups[gactive].push_back(v);
 	views.push_back(v);
-
 	v->path = "untitled";
-
-	sort(views.begin(), views.end(), [](auto a, auto b) { return a->path < b->path; });
-
-	active = find(v);
-	ensure(active >= 0);
+	active = views.size()-1;
 
 	bubble();
 	return view();
