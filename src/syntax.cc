@@ -29,8 +29,21 @@ bool Syntax::wordset(const Doc& text, int cursor, const std::set<std::string,std
 bool Syntax::hintMatchedPair(const Doc& text, int cursor, const ViewRegion& selection, int open, int close) {
 	auto isBalancedPair = [&](int start, int finish) {
 		int count = 1;
+		bool dstring = false;
+		bool sstring = false;
+
 		for (int i = start+1; i <= finish; i++) {
 			int c = get(text, i);
+
+			if (sstring && c == '\'') { sstring = false; continue; }
+			if (dstring && c == '"') { dstring = false; continue; }
+			if (!dstring && c == '\'') sstring = true;
+			if (!sstring && c == '"') dstring = true;
+			if (sstring || dstring) {
+				if (c == '\\') i++;
+				continue;
+			}
+
 			if (c == open) count++;
 			if (c == close) count--;
 			if (!count && i < finish) return false;

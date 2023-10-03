@@ -1042,7 +1042,7 @@ void View::autosyntax() {
 		return line.find(sub) != std::string::npos;
 	};
 
-	if ((std::set<std::string>{".cc", ".cpp", ".cxx", ".c", ".h", ".hpp", ".fs", ".vs", ".ct", ".json"}).count(ext)) {
+	if ((std::set<std::string>{".cc", ".cpp", ".cxx", ".c", ".h", ".hpp", ".fs", ".vs", ".ct", ".json", ".php"}).count(ext)) {
 		syntax = new CPP();
 	}
 	else

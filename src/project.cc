@@ -163,6 +163,11 @@ bool Project::interpret(const string& cmd) {
 		return true;
 	}
 
+	if (cmd == "close all") {
+		while (views.size()) close();
+		return true;
+	}
+
 	return false;
 }
 
