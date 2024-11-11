@@ -289,7 +289,7 @@ bool CPP::matchFunction(const Doc& text, int cursor) {
 	cursor++;
 	while (c() && iswspace(c())) cursor++;
 
-	if (specifier(text, cursor)) {
+	while (specifier(text, cursor)) {
 		while (c() && isname(c())) cursor++;
 		while (c() && iswspace(c())) cursor++;
 	}

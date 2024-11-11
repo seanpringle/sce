@@ -2,6 +2,7 @@
 
 #include <string>
 #include <vector>
+#include <cstdint>
 
 struct UTF8 {
 	std::vector<size_t> decodeErrors;

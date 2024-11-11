@@ -102,7 +102,16 @@ namespace {
 		return ipath;
 	};
 
-	struct FileTreeBuffers : FileTree {
+	struct FileTreeAnnotated : FileTree {
+		struct Annotation {
+			std::chrono::time_point<std::chrono::system_clock> updated;
+			bool created = false;
+			bool modified = false;
+			Repo::Diff diff;
+		};
+
+		std::map<std::string,Annotation> annotations;
+
 		bool isOpen(const std::string& fpath) override {
 			int index = project.find(fpath);
 			return index >= 0;
@@ -124,21 +133,36 @@ namespace {
 
 		void annotate(const std::string& fpath) override {
 			using namespace ImGui;
-			auto repo = Repo::open(fpath);
 
-			if (repo && repo->ok()) {
-				auto status = repo->status(fpath);
-				if (status.created()) {
+			auto it = annotations.find(fpath);
+			if (it == annotations.end()) {
+				auto repo = Repo::open(fpath);
+				if (repo && repo->ok()) {
+					auto& anno = annotations[fpath];
+					auto status = repo->status(fpath);
+					anno.created = status.created();
+					anno.modified = status.modified();
+					anno.updated = std::chrono::system_clock::now();
+					if (anno.modified) {
+						anno.diff = repo->diff(fpath);
+					}
+					it = annotations.find(fpath);
+				}
+			}
+
+			if (it != annotations.end()) {
+				auto& anno = it->second;
+				if (anno.created) {
 					SameLine();
 					PrintRight("A");
 				}
-				if (status.modified()) {
+				if (anno.modified) {
 					SameLine();
 					PrintRight("M");
-					if (IsItemHovered()) {
+					if (IsItemHovered() && anno.diff.ok()) {
+						auto& diff = anno.diff;
 						BeginTooltip();
 							PushFont(fontView);
-							auto diff = repo->diff(fpath);
 							if (diff.ok()) {
 								for (auto line: discatenate(diff.patch, "\n")) {
 									int pushed = 0;
@@ -162,9 +186,38 @@ namespace {
 		}
 	};
 
+	FileTreeAnnotated ftree;
+
 	void fileTree(const std::set<std::string>& subset = {}) {
-		FileTreeBuffers tree;
-		tree.render(project.searchPaths, subset);
+		size_t tokens = std::max(size_t(10), ftree.annotations.size()/10);
+		for (auto it = ftree.annotations.begin(); it != ftree.annotations.end() && tokens > 0; ) {
+			if (it->second.updated < std::chrono::system_clock::now()-1s) {
+				it = ftree.annotations.erase(it);
+				--tokens;
+			}
+			else {
+				++it;
+			}
+		}
+		ftree.render(project.searchPaths, subset);
+	}
+
+	void fileTreeBuffers() {
+		std::set<std::string> viewPaths;
+		for (auto view: project.views)
+			viewPaths.insert(view->path);
+		fileTree(viewPaths);
+	}
+
+	void fileTreeBrowse() {
+		fileTree();
+	}
+
+	void fileTreeRefresh() {
+		std::set<std::string> viewPaths;
+		for (auto view: project.views)
+			viewPaths.insert(view->path);
+		ftree.cache(viewPaths);
 	}
 
 	#include "popup.cc"
@@ -415,6 +468,10 @@ int main(int argc, const char* argv[]) {
 							project.view()->save();
 						}
 
+						if (IsKeyReleased(KeyMap[KEY_F7])) {
+							fileTreeRefresh();
+						}
+
 						if (IsKeyReleased(KeyMap[KEY_F8])) {
 							project.view()->reload();
 						}
@@ -566,16 +623,13 @@ int main(int argc, const char* argv[]) {
 					if (BeginTabBar("#left-tabs")) {
 						if (BeginTabItem("buffers")) {
 							BeginChild("##open-pane");
-							std::set<std::string> viewPaths;
-							for (auto view: project.views)
-								viewPaths.insert(view->path);
-							fileTree(viewPaths);
+							fileTreeBuffers();
 							EndChild();
 							EndTabItem();
 						}
 						if (BeginTabItem("browse")) {
 							BeginChild("##browse-pane");
-							fileTree();
+							fileTreeBrowse();
 							EndChild();
 							EndTabItem();
 						}

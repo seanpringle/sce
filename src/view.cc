@@ -1042,7 +1042,7 @@ void View::autosyntax() {
 		return line.find(sub) != std::string::npos;
 	};
 
-	if ((std::set<std::string>{".cc", ".cpp", ".cxx", ".c", ".h", ".hpp", ".fs", ".vs", ".ct", ".json", ".php"}).count(ext)) {
+	if ((std::set<std::string>{".cc", ".cpp", ".cxx", ".c", ".h", ".hpp", ".fs", ".vs", ".ct", ".json", ".php", ".glsl"}).count(ext)) {
 		syntax = new CPP();
 	}
 	else
@@ -1115,8 +1115,10 @@ bool View::open(std::string path) {
 	redos.clear();
 
 	std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
-	text.push_back(content);
 	in.close();
+
+	for (auto& c: content) if (!c) return false;
+	text.push_back(content);
 
 	autosyntax();
 

@@ -37,4 +37,5 @@ void FilterPopupChange::init() {
 void FilterPopupChange::chosen(int option) {
 	project.save();
 	project.load(options[option]);
+	fileTreeRefresh();
 }
