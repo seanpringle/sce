@@ -6,7 +6,11 @@
 #include <filesystem>
 
 struct FileTree {
-	std::vector<std::filesystem::path> listing;
+	struct Entry {
+		std::filesystem::path epath;
+		std::filesystem::file_status estat;
+	};
+	std::vector<Entry> listing;
 	FileTree() = default;
 	void render(const std::set<std::string>& paths, const std::set<std::string>& subset = {});
 	virtual void onSelect(const std::string &spath);

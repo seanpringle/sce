@@ -37,23 +37,25 @@ namespace {
 void FileTree::cache(const set<string>& searchPaths) {
 	listing.clear();
 
-	auto known = [&](const path& path) {
-		auto it = std::lower_bound(listing.begin(), listing.end(), path);
-		return it != listing.end() && *it == path;
+	auto find = [&](const path& fpath) {
+		return std::lower_bound(listing.begin(), listing.end(), fpath, [](auto& a, auto& b) { return a.epath < b; });
 	};
 
-	auto record = [&](const path& path) {
-		auto it = std::lower_bound(listing.begin(), listing.end(), path);
-		if (it == listing.end() || *it != path) listing.insert(it, path);
+	auto known = [&](const path& kpath) {
+		auto it = find(kpath);
+		return it != listing.end() && it->epath == kpath;
+	};
+
+	auto record = [&](const path& rpath) {
+		auto it = find(rpath);
+		if (it == listing.end() || it->epath != rpath) listing.insert(it, {rpath,status(rpath)});
 	};
 
 	function<void(const path&)> walk;
 
 	walk = [&](const path& wpath) {
-		if (!exists(wpath)) return;
-		if (!is_directory(wpath)) return;
-
 		if (known(wpath)) return;
+
 		record(wpath);
 
 		auto it = directory_iterator(wpath,
@@ -61,11 +63,11 @@ void FileTree::cache(const set<string>& searchPaths) {
 		);
 
 		for (const directory_entry& entry: it) {
-			if (is_regular_file(entry)) {
+			if (entry.is_regular_file()) {
 				record(entry.path());
 				continue;
 			}
-			if (is_directory(entry)) {
+			if (entry.is_directory()) {
 				walk(entry.path());
 				continue;
 			}
@@ -73,10 +75,9 @@ void FileTree::cache(const set<string>& searchPaths) {
 	};
 
 	for (auto& dpath: searchPaths) {
-		walk(weakly_canonical(dpath));
+		auto spath = weakly_canonical(dpath);
+		if (is_directory(spath)) walk(spath);
 	}
-
-	sort(listing.begin(), listing.end());
 }
 
 void FileTree::render(const set<string>& searchPaths, const set<string>& openPaths) {
@@ -123,15 +124,13 @@ void FileTree::render(const set<string>& searchPaths, const set<string>& openPat
 		return istoplevel(epath);
 	};
 
-	for (auto& epath: listing) {
+	for (auto& [epath,estat]: listing) {
 		while (parent.size() && !is_subpath(epath, parent.back().ppath)) {
 			if (parent.back().open) TreePop();
 			parent.pop_back();
 		}
 
 		if (!display(epath)) continue;
-
-		auto estat = status(epath);
 
 		if (estat.type() == file_type::directory) {
 			string label = fmt("%s##%s", epath.filename().string(), epath.string());
