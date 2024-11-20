@@ -4,6 +4,7 @@
 #include <mutex>
 #include <condition_variable>
 #include <cassert>
+#include <span>
 
 /* Go-like channel
 
@@ -37,7 +38,7 @@ private:
 	std::condition_variable sendCond;
 	std::condition_variable recvCond;
 	std::deque<V> packets;
-	uint receivers = 0;
+	size_t receivers = 0;
 	bool accepting = true;
 
 public:
@@ -76,6 +77,7 @@ public:
 		}
 	}
 
+	// blocking
 	bool send(const V& v) {
 		std::unique_lock<std::mutex> m(mutex);
 
@@ -131,6 +133,7 @@ public:
 		return sent;
 	}
 
+	// blocking
 	V recv() {
 		std::unique_lock<std::mutex> m(mutex);
 
@@ -155,12 +158,32 @@ public:
 		return v;
 	}
 
+	// non-blocking
+	std::span<V> recv_any(std::span<V> to) {
+		std::unique_lock<std::mutex> m(mutex);
+		size_t n = std::min(to.size(), packets.size());
+		std::copy(packets.begin(), packets.begin()+n, to.begin());
+		packets.erase(packets.begin(), packets.begin()+n);
+		sendCond.notify_one();
+		if (packets.size()) recvCond.notify_one();
+		return std::span<V>(to.data(),n);
+	}
+
+	// non-blocking
+	std::vector<V> recv_all() {
+		std::unique_lock<std::mutex> m(mutex);
+		std::vector<V> batch(packets.begin(), packets.end());
+		packets.clear();
+		sendCond.notify_one();
+		return batch;
+	}
+
 	struct pair {
 		bool ok;
 		V v;
 	};
 
-	pair recv_pair() {
+	pair iter_recv() {
 		std::unique_lock<std::mutex> m(mutex);
 
 		// only block if channel is open and queue is empty
@@ -181,14 +204,6 @@ public:
 		sendCond.notify_one();
 		if (packets.size()) recvCond.notify_one();
 		return (pair){true,v};
-	}
-
-	std::vector<V> recv_all() {
-		std::unique_lock<std::mutex> m(mutex);
-		std::vector<V> batch = {packets.begin(), packets.end()};
-		packets.clear();
-		sendCond.notify_one();
-		return batch;
 	}
 
 	// Forward iteration until closed and drained
@@ -212,7 +227,7 @@ public:
 		}
 
 		void read() {
-			auto p = c->recv_pair();
+			auto p = c->iter_recv();
 			last = !p.ok;
 			v = p.v;
 		}

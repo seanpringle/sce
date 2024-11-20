@@ -82,6 +82,37 @@ ImGuiKey KeyMap[100] = {
 };
 
 namespace {
+	void fileTreeBuffers();
+	void fileTreeBrowse();
+	void fileTreeRefresh();
+
+	#include "popup.cc"
+	#include "popup/filter.cc"
+
+	#include "popup/setup.cc"
+	SetupPopup setupPopup;
+
+	#include "popup/diff.cc"
+	DiffPopup diffPopup;
+
+	#include "popup/filter/tags.cc"
+	FilterPopupTags tagsPopup;
+
+	#include "popup/filter/open.cc"
+	FilterPopupOpen openPopup;
+
+	#include "popup/filter/change.cc"
+	FilterPopupChange changePopup;
+
+	#include "popup/filter/complete.cc"
+	FilterPopupComplete completePopup;
+
+	#include "popup/filter/refs.cc"
+	FilterPopupRefs refsPopup;
+
+	#include "popup/filter/cmd.cc"
+	FilterPopupCmd cmdPopup;
+
 	struct ViewTitle {
 		char text[100] = {0};
 	};
@@ -159,6 +190,11 @@ namespace {
 				if (anno.modified) {
 					SameLine();
 					PrintRight("M");
+					if (IsItemClicked(ImGuiMouseButton_Right) && anno.diff.ok()) {
+						diffPopup.path = fpath;
+						diffPopup.activate = true;
+					}
+					else
 					if (IsItemHovered() && anno.diff.ok()) {
 						auto& diff = anno.diff;
 						BeginTooltip();
@@ -214,35 +250,8 @@ namespace {
 	}
 
 	void fileTreeRefresh() {
-		std::set<std::string> viewPaths;
-		for (auto view: project.views)
-			viewPaths.insert(view->path);
-		ftree.cache(viewPaths);
+		ftree.cache(project.searchPaths);
 	}
-
-	#include "popup.cc"
-	#include "popup/filter.cc"
-
-	#include "popup/setup.cc"
-	SetupPopup setupPopup;
-
-	#include "popup/filter/tags.cc"
-	FilterPopupTags tagsPopup;
-
-	#include "popup/filter/open.cc"
-	FilterPopupOpen openPopup;
-
-	#include "popup/filter/change.cc"
-	FilterPopupChange changePopup;
-
-	#include "popup/filter/complete.cc"
-	FilterPopupComplete completePopup;
-
-	#include "popup/filter/refs.cc"
-	FilterPopupRefs refsPopup;
-
-	#include "popup/filter/cmd.cc"
-	FilterPopupCmd cmdPopup;
 }
 
 int main(int argc, const char* argv[]) {
@@ -544,6 +553,10 @@ int main(int argc, const char* argv[]) {
 					OpenPopup("#setup");
 				}
 
+				if (diffPopup.activate) {
+					OpenPopup("#diff");
+				}
+
 				if (tagsPopup.activate) {
 					OpenPopup("#tags");
 				}
@@ -696,6 +709,10 @@ int main(int argc, const char* argv[]) {
 				nextPopup(config.window.height/3*2);
 
 				immediate = setupPopup.run() || immediate;
+
+				nextPopup(config.window.height/3*2);
+
+				immediate = diffPopup.run() || immediate;
 
 				PopFont();
 				PopFont();

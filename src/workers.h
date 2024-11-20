@@ -40,12 +40,12 @@ public:
 		stop();
 	}
 
-	uint size() {
+	size_t size() {
 		std::unique_lock<std::mutex> m(mutex);
 		return threads.size();
 	}
 
-	void start(uint p = 1) {
+	void start(size_t p = 1) {
 		std::unique_lock<std::mutex> m(mutex);
 		work.open();
 		while (threads.size() < p) {
@@ -77,5 +77,10 @@ public:
 		std::unique_lock<std::mutex> m(mutex);
 		uint64_t count = submitted;
 		while (count > completed) waiting.wait(m);
+	}
+
+	size_t pending() {
+		std::unique_lock<std::mutex> m(mutex);
+		return submitted - completed;
 	}
 };

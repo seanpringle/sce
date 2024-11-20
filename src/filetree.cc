@@ -10,6 +10,10 @@ using namespace std;
 using namespace ImGui;
 using namespace std::filesystem;
 
+FileTree::FileTree() {
+	worker.start(1);
+}
+
 void FileTree::onSelect(const string& spath) {
 }
 
@@ -35,53 +39,63 @@ namespace {
 }
 
 void FileTree::cache(const set<string>& searchPaths) {
-	listing.clear();
+	worker.job([&,paths=searchPaths]() {
+		vector<Entry> listing;
 
-	auto find = [&](const path& fpath) {
-		return std::lower_bound(listing.begin(), listing.end(), fpath, [](auto& a, auto& b) { return a.epath < b; });
-	};
+		auto find = [&](const path& fpath) {
+			return std::lower_bound(listing.begin(), listing.end(), fpath, [](auto& a, auto& b) { return a.epath < b; });
+		};
 
-	auto known = [&](const path& kpath) {
-		auto it = find(kpath);
-		return it != listing.end() && it->epath == kpath;
-	};
+		auto known = [&](const path& kpath) {
+			auto it = find(kpath);
+			return it != listing.end() && it->epath == kpath;
+		};
 
-	auto record = [&](const path& rpath) {
-		auto it = find(rpath);
-		if (it == listing.end() || it->epath != rpath) listing.insert(it, {rpath,status(rpath)});
-	};
+		auto record = [&](const path& rpath) {
+			auto it = find(rpath);
+			if (it == listing.end() || it->epath != rpath) listing.insert(it, {rpath,status(rpath)});
+		};
 
-	function<void(const path&)> walk;
+		function<void(const path&)> walk;
 
-	walk = [&](const path& wpath) {
-		if (known(wpath)) return;
+		walk = [&](const path& wpath) {
+			if (known(wpath)) return;
 
-		record(wpath);
+			record(wpath);
 
-		auto it = directory_iterator(wpath,
-			directory_options::skip_permission_denied
-		);
+			auto it = directory_iterator(wpath,
+				directory_options::skip_permission_denied
+			);
 
-		for (const directory_entry& entry: it) {
-			if (entry.is_regular_file()) {
-				record(entry.path());
-				continue;
+			for (const directory_entry& entry: it) {
+				if (entry.is_regular_file()) {
+					record(entry.path());
+					continue;
+				}
+				if (entry.is_directory()) {
+					walk(entry.path());
+					continue;
+				}
 			}
-			if (entry.is_directory()) {
-				walk(entry.path());
-				continue;
-			}
+		};
+
+		for (auto& dpath: paths) {
+			auto spath = weakly_canonical(dpath);
+			if (is_directory(spath)) walk(spath);
 		}
-	};
 
-	for (auto& dpath: searchPaths) {
-		auto spath = weakly_canonical(dpath);
-		if (is_directory(spath)) walk(spath);
-	}
+		listings.send(listing);
+	});
 }
 
 void FileTree::render(const set<string>& searchPaths, const set<string>& openPaths) {
-	if (!listing.size()) cache(searchPaths);
+	for (auto batch: listings.recv_all()) {
+		listing = batch;
+	}
+
+	if (!listing.size() && !worker.pending() && searchPaths.size()) {
+		cache(searchPaths);
+	}
 
 	vector<path> spaths, opaths;
 
