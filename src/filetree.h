@@ -9,8 +9,9 @@
 
 struct FileTree {
 	struct Entry {
-		std::filesystem::path epath;
+		std::string epath;
 		std::filesystem::file_status estat;
+		size_t ename = 0;
 	};
 	workers worker;
 	channel<std::vector<Entry>,1> listings;

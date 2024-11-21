@@ -18,7 +18,7 @@ Syntax::Token YAML::next(const Doc& text, int cursor, Syntax::Token token) {
 		return isname(c) || c == '-';
 	};
 
-	auto isField = [&](auto text, auto cursor) {
+	auto isField = [&](auto& text, auto cursor) {
 		if (!isfield(get(text, cursor))) return false;
 		while (isfield(get(text, cursor))) cursor++;
 		return get(text, cursor) == ':';

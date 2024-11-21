@@ -9,12 +9,14 @@ set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
 set(CMAKE_C_COMPILE_OPTIONS_IPO -flto=16)
 set(CMAKE_CXX_COMPILE_OPTIONS_IPO -flto=16)
 
-#find_package(SDL2 REQUIRED /home/sean/src/SDL/build)
+find_package(SDL2 REQUIRED)
 #find_package(OpenGL REQUIRED)
 #find_package(GLEW REQUIRED)
 find_package(Freetype REQUIRED)
 find_package(Threads REQUIRED)
 find_package(ZLIB REQUIRED)
+
+include_directories(${SDL2_INCLUDE_DIRS})
 
 # gtest
 
@@ -45,4 +47,4 @@ set(CMAKE_CXX_STANDARD 20)
 
 add_executable(sce src/main.cc src/config.cc src/theme.cc src/syntax.cc src/project.cc src/view.cc src/filetree.cc)
 include_directories(sce /home/sean/src/SDL/include ${FREETYPE_INCLUDE_DIRS})
-target_link_libraries(sce imgui local-utf8 local-repo /home/sean/src/SDL/build/.libs/libSDL2.a ${FREETYPE_LIBRARIES} stdc++fs Threads::Threads git2 ZLIB::ZLIB dl)
+target_link_libraries(sce imgui local-utf8 local-repo ${SDL2_LIBRARIES} ${FREETYPE_LIBRARIES} stdc++fs Threads::Threads git2 ZLIB::ZLIB dl)

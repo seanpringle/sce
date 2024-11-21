@@ -33,8 +33,8 @@ void FileTree::annotate(const string& fpath) {
 }
 
 namespace {
-	bool is_subpath(const std::filesystem::path& path, const std::filesystem::path& base) {
-		return path.string().size() > base.string().size() && starts_with(path.string(), base.string());
+	bool is_subpath(const string& path, const string& base) {
+		return path.size() > base.size() && starts_with(path, base);
 	}
 }
 
@@ -42,23 +42,26 @@ void FileTree::cache(const set<string>& searchPaths) {
 	worker.job([&,paths=searchPaths]() {
 		vector<Entry> listing;
 
-		auto find = [&](const path& fpath) {
+		auto lfind = [&](const string& fpath) {
 			return std::lower_bound(listing.begin(), listing.end(), fpath, [](auto& a, auto& b) { return a.epath < b; });
 		};
 
-		auto known = [&](const path& kpath) {
-			auto it = find(kpath);
+		auto known = [&](const string& kpath) {
+			auto it = lfind(kpath);
 			return it != listing.end() && it->epath == kpath;
 		};
 
-		auto record = [&](const path& rpath) {
-			auto it = find(rpath);
-			if (it == listing.end() || it->epath != rpath) listing.insert(it, {rpath,status(rpath)});
+		auto record = [&](const string& rpath) {
+			auto it = lfind(rpath);
+			if (it == listing.end() || it->epath != rpath) {
+				auto fp = weakly_canonical(rpath);
+				listing.insert(it, {rpath,status(fp),fp.filename().string().size()});
+			}
 		};
 
-		function<void(const path&)> walk;
+		function<void(const string&)> walk;
 
-		walk = [&](const path& wpath) {
+		walk = [&](const string& wpath) {
 			if (known(wpath)) return;
 
 			record(wpath);
@@ -69,11 +72,11 @@ void FileTree::cache(const set<string>& searchPaths) {
 
 			for (const directory_entry& entry: it) {
 				if (entry.is_regular_file()) {
-					record(entry.path());
+					record(entry.path().string());
 					continue;
 				}
 				if (entry.is_directory()) {
-					walk(entry.path());
+					walk(entry.path().string());
 					continue;
 				}
 			}
@@ -81,7 +84,7 @@ void FileTree::cache(const set<string>& searchPaths) {
 
 		for (auto& dpath: paths) {
 			auto spath = weakly_canonical(dpath);
-			if (is_directory(spath)) walk(spath);
+			if (is_directory(spath)) walk(spath.string());
 		}
 
 		listings.send(listing);
@@ -97,10 +100,10 @@ void FileTree::render(const set<string>& searchPaths, const set<string>& openPat
 		cache(searchPaths);
 	}
 
-	vector<path> spaths, opaths;
+	vector<string> spaths, opaths;
 
-	for (auto& spath: searchPaths) spaths.push_back(weakly_canonical(spath));
-	for (auto& opath: openPaths) opaths.push_back(weakly_canonical(opath));
+	for (auto& spath: searchPaths) spaths.push_back(weakly_canonical(spath).string());
+	for (auto& opath: openPaths) opaths.push_back(weakly_canonical(opath).string());
 
 	sort(spaths.begin(), spaths.end());
 	sort(opaths.begin(), opaths.end());
@@ -112,10 +115,11 @@ void FileTree::render(const set<string>& searchPaths, const set<string>& openPat
 
 	struct Parent {
 		bool open = false;
-		path ppath;
+		string ppath;
 	};
 
-	vector<Parent> parent;
+	static vector<Parent> parent;
+	parent.clear();
 
 	auto istoplevel = [&](auto& epath) {
 		return ingroup(epath, spaths);
@@ -138,7 +142,9 @@ void FileTree::render(const set<string>& searchPaths, const set<string>& openPat
 		return istoplevel(epath);
 	};
 
-	for (auto& [epath,estat]: listing) {
+	stringstream ss;
+
+	for (auto& [epath,estat,ename]: listing) {
 		while (parent.size() && !is_subpath(epath, parent.back().ppath)) {
 			if (parent.back().open) TreePop();
 			parent.pop_back();
@@ -146,11 +152,14 @@ void FileTree::render(const set<string>& searchPaths, const set<string>& openPat
 
 		if (!display(epath)) continue;
 
+		ss.str("");
+		ss << string_view(epath.begin() + epath.size()-ename, epath.end());
+		ss << "##" << epath;
+
 		if (estat.type() == file_type::directory) {
-			string label = fmt("%s##%s", epath.filename().string(), epath.string());
 			auto& nest = parent.emplace_back();
 			uint32_t flags = istoplevel(epath) || hasopenchild(epath) ? ImGuiTreeNodeFlags_DefaultOpen: 0u;
-			nest.open = TreeNodeEx(label.c_str(), flags | ImGuiTreeNodeFlags_SpanAvailWidth);
+			nest.open = TreeNodeEx(ss.str().c_str(), flags | ImGuiTreeNodeFlags_SpanAvailWidth);
 			nest.ppath = epath;
 			continue;
 		}
@@ -168,7 +177,7 @@ void FileTree::render(const set<string>& searchPaths, const set<string>& openPat
 				GetWindowDrawList()->ChannelsSetCurrent(1);
 			}
 
-			if (Selectable(fmtc("%s##%s", epath.filename().string(), epath.string()))) {
+			if (Selectable(ss.str().c_str())) {
 				onSelect(epath);
 			}
 
